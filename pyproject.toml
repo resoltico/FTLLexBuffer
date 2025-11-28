@@ -1,0 +1,356 @@
+[build-system]
+requires = ["hatchling>=1.27.0,<2.0.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ftllexbuffer"
+version = "0.1.0"
+description = "Python implementation of the FTL (Fluent Translation List) specification"
+readme = "README.md"
+requires-python = ">=3.13"
+license = {text = "MIT"}
+authors = [
+    {name = "Ervins Strauhmanis"},
+]
+keywords = [
+    "i18n",
+    "l10n",
+    "localization",
+    "ftl",
+    "fluent",
+    "translation",
+    "internationalization",
+    "cldr",
+    "plurals",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Software Development :: Internationalization",
+    "Topic :: Software Development :: Localization",
+    "Typing :: Typed",
+]
+dependencies = [
+    "Babel>=2.17.0,<3.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=9.0.1",
+    "pytest-cov>=7.0.0",
+    "hypothesis>=6.148.3",
+    "mypy>=1.18.2",
+    "pylint>=4.0.3",
+    "ruff>=0.14.6",
+    "pytest-benchmark>=5.2.3",
+]
+publish = [
+    "build>=1.3.0",
+    "twine>=6.2.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/resoltico/ftllexbuffer"
+Documentation = "https://github.com/resoltico/ftllexbuffer#readme"
+Repository = "https://github.com/resoltico/ftllexbuffer.git"
+Issues = "https://github.com/resoltico/ftllexbuffer/issues"
+Changelog = "https://github.com/resoltico/ftllexbuffer/blob/main/CHANGELOG.md"
+
+[tool.hatch.build.targets.sdist]
+# Source distribution includes:
+# - Full source code (/src) - runtime code
+# - Complete test suite (/tests) - for downstream packagers and verification
+# - Working examples (/examples) - educational value and learning resources
+# - User documentation (*.md) - offline reference and API docs
+# - CI workflows (/.github/workflows) - shows testing/release process for packagers
+# - License files (LICENSE, NOTICE, PATENTS.md) - legal compliance
+#
+# IMPORTANT: Hatch uses VCS (git) mode by default and respects git tracking
+# Files must be committed to git to be included in sdist
+# .gitignore is always included (cannot be excluded per Hatch behavior)
+only-include = [
+    "/src",
+    "/tests",
+    "/examples",
+    "/.github/workflows",
+    "LICENSE",
+    "NOTICE",
+    "PATENTS.md",
+    "README.md",
+    "CHANGELOG.md",
+    "API.md",
+    "MIGRATION.md",
+    "TERMINOLOGY.md",
+    "QUICK_REFERENCE.md",
+    "TYPE_HINTS.md",
+    "TESTING.md",
+    "CONTRIBUTING.md",
+]
+
+[tool.hatch.build.targets.wheel]
+# Wheel contains ONLY runtime code (src/ftllexbuffer/)
+# Automatically excludes: tests, examples, docs
+# Hatch auto-detects packages in src-layout (src/ftllexbuffer/)
+# No explicit configuration needed - hatch finds src/ftllexbuffer/ automatically
+
+# Pytest configuration
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",
+    "--strict-markers",
+    "--tb=short",
+]
+markers = [
+    "property: Property-based tests using Hypothesis",
+    "slow: Slow-running tests",
+]
+
+# Coverage configuration
+[tool.coverage.run]
+source = ["src/ftllexbuffer"]
+branch = true  # Track branch coverage, not just statement coverage
+omit = [
+    "*/tests/*",
+    "*/__pycache__/*",
+]
+
+[tool.coverage.report]
+precision = 2
+show_missing = true
+skip_covered = false
+fail_under = 95.0
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "@abstractmethod",
+    "if __name__ == .__main__.:",
+]
+
+# Mypy configuration
+[tool.mypy]
+python_version = "3.13"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_any_generics = true
+check_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+warn_return_any = false
+
+[[tool.mypy.overrides]]
+module = "babel.*"
+ignore_missing_imports = true
+
+# Ruff configuration
+[tool.ruff]
+line-length = 100
+target-version = "py313"  # Match minimum requires-python version
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "N",   # pep8-naming
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "DTZ", # flake8-datetimez
+    "T10", # flake8-debugger
+    "EM",  # flake8-errmsg
+    "ISC", # flake8-implicit-str-concat
+    "ICN", # flake8-import-conventions
+    "PIE", # flake8-pie
+    "PT",  # flake8-pytest-style
+    "Q",   # flake8-quotes
+    "RSE", # flake8-raise
+    "RET", # flake8-return
+    "SIM", # flake8-simplify
+    "TID", # flake8-tidy-imports
+    "ARG", # flake8-unused-arguments
+    "PTH", # flake8-use-pathlib
+    "ERA", # eradicate
+    "PL",  # pylint
+    "RUF", # Ruff-specific rules
+]
+ignore = [
+    "PLR0913",  # Too many arguments - acceptable for configuration objects
+    "PLR2004",  # Magic values - acceptable for protocol constants
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Architectural patterns - these are intentional design decisions, not suppressions
+
+# Parser expression dispatch - match statement over AST expression types
+# Refactoring would harm readability (strategy pattern adds indirection for no benefit)
+"src/ftllexbuffer/syntax/parser.py" = ["PLR0912"]
+
+# Visitor pattern (Python stdlib ast.NodeVisitor convention)
+# visit_NodeName is the standard pattern - snake_case would break it
+"src/ftllexbuffer/syntax/visitor.py" = ["N802", "PLR0911", "PLR0912"]
+"src/ftllexbuffer/syntax/serializer.py" = ["N802"]  # Extends visitor pattern
+"src/ftllexbuffer/introspection.py" = ["N802"]  # Introspection visitor (visit_Pattern method)
+
+# Plural rules - CLDR rules require many return statements per category
+# Each language group has distinct category logic, cannot be reduced
+"src/ftllexbuffer/runtime/plural_rules.py" = ["PLR0911"]
+
+# AST Transformer pattern matching - unavoidable complexity matching all AST node types
+# PLR0911: Too many return statements (15 cases for 15 AST node types)
+# PLR0912: Too many branches (pattern matching on all AST node variants)
+
+# Runtime imports to avoid circular dependencies
+# Guards must import at runtime since they're used by the modules they guard
+"src/ftllexbuffer/guards.py" = ["PLC0415"]
+"src/ftllexbuffer/diagnostics/errors.py" = ["PLC0415"]
+"src/ftllexbuffer/runtime/bundle.py" = ["PLC0415"]
+"src/ftllexbuffer/syntax/cursor.py" = ["PLC0415"]
+"src/ftllexbuffer/syntax/type_guards.py" = ["PLC0415"]
+
+# TEST CODE PATTERNS
+# Philosophy: Tests optimize for clarity and DSL fidelity over strict naming
+
+# test_visitor.py: N802 (visitor pattern visit_NodeName methods in tests)
+"tests/test_visitor.py" = ["N802"]
+
+# test_ast_tooling.py: N802 (visitor pattern), ARG002 (unused node in visit_Comment removal)
+"tests/test_ast_tooling.py" = ["N802", "ARG002"]
+
+# test_fluent_resolver.py: N802 (UPPERCASE FTL functions), EM101 (test exception messages)
+"tests/test_fluent_resolver.py" = ["N802", "EM101"]
+
+# test_fluent_bundle.py: N802 (UPPERCASE FTL functions), N806 (MockResolver naming)
+"tests/test_fluent_bundle.py" = ["N802", "N806"]
+
+# test_ast_validation_coverage.py: PLC0415 (import inside test to verify TypeIs guards)
+"tests/test_ast_validation_coverage.py" = ["PLC0415"]
+
+# test_resolver_coverage.py: N802 (UPPERCASE FTL function names mimicking spec)
+"tests/test_resolver_coverage.py" = ["N802"]
+
+# test_functions_coverage.py: SIM105 (explicit try-except for locale error handling)
+"tests/test_functions_coverage.py" = ["SIM105"]
+
+# test_properties.py: PLC0415 (runtime imports), SIM105 (explicit try-except)
+"tests/test_properties.py" = ["PLC0415", "SIM105"]
+
+# examples/: ERA001 (output comments), E402/I001 (demonstrative code, not production)
+"examples/**/*.py" = ["ERA001", "E402", "I001"]
+
+# helpers/type_assertions.py: PLC0415 (runtime imports to avoid circular dependencies)
+"tests/helpers/type_assertions.py" = ["PLC0415"]
+
+# Parser tests with type guards: PT018 (combined assertions for type narrowing)
+# Pattern: assert is_message(msg) and has_value(msg) is required for mypy type narrowing
+"tests/test_fluent_parser_*.py" = ["PT018"]
+
+# Metamorphic/property-based tests: PLC0415 (Hypothesis strategies with runtime imports)
+# Runtime imports inside test functions prevent eager strategy evaluation
+"tests/test_metamorphic_properties.py" = ["PLC0415"]
+
+# Parser coverage tests: PLC0415 (conditional imports), PT017 (assert-in-except pattern)
+# PT017: Tests deliberately trigger KeyError to verify logging behavior
+"tests/test_parser_coverage_gaps.py" = ["PLC0415", "PT017"]
+
+# __init__.py error path tests: Test module import failures
+# PLC0415: Runtime imports (needed to test import error paths)
+# EM101: String literal exceptions (test error messages)
+# PT017: Assert in except block (verifying RuntimeError messages)
+# F401: Unused imports (module cleanup imports for restoring test state)
+"tests/test_init_error_paths.py" = ["PLC0415", "EM101", "PT017", "F401"]
+
+# Final coverage tests: N801 (class names document parser line numbers), PLC0415 (runtime imports)
+# Pattern: TestLine283_EOFInContinuation documents specific parser line being tested
+# PLC0415: MessageReference import for conditional type checking
+"tests/test_parser_final_coverage.py" = ["N801", "PLC0415"]
+
+# Spec conformance tests: ARG002 (parametrize description), PLC0415 (runtime imports)
+# description parameter provides pytest output clarity but unused in test body
+"tests/test_spec_conformance.py" = ["ARG002", "PLC0415"]
+
+# Systematic error path tests: ARG002 (parametrize expected values)
+# expected parameter used for test naming/documentation
+"tests/test_systematic_error_paths.py" = ["ARG002"]
+
+# Hypothesis-based tests: E721 (type comparison), E501 (long line), B904 (exception chaining)
+# E721: Comparing types of unknown generated objects requires type() == type()
+# E501: Hypothesis alphabet strings can exceed line length
+"tests/test_multiline_hypothesis.py" = ["E721", "E501"]
+
+# Parser hypothesis error tests: E721 (type comparison), B904 (exception chaining)
+# E721: Generated data type comparison, B904: Test deliberately re-raises without chain
+"tests/test_parser_hypothesis_errors.py" = ["E721", "B904"]
+
+# Serializer tests: RUF002 (ambiguous unicode in docstring)
+# Mathematical notation using × (MULTIPLICATION SIGN) for clarity in test matrix
+"tests/test_serializer_completeness.py" = ["RUF002"]
+
+# Semantic validation tests: SIM102 (nested if), PLC0415 (runtime imports)
+# SIM102: Nested isinstance() checks enhance readability for union type narrowing
+"tests/test_semantic_validation.py" = ["SIM102", "PLC0415"]
+
+# Span attachment tests: PLC0415 (runtime imports for conditional type checking)
+"tests/test_span_attachment.py" = ["PLC0415"]
+
+# conftest.py: PLC0415 (runtime import of os for CI detection)
+# Must detect CI=true at runtime, not import time
+"tests/conftest.py" = ["PLC0415"]
+
+# test_result.py: Hypothesis property tests and internal result type testing
+# PT011: Broad ValueError/AttributeError exceptions are intentional for testing error paths
+# PLC0415: Import inside function tests __all__ exports
+# ARG001: Hypothesis @given parameter not always used in test body
+# SIM108: Explicit if/else for unreachable branch with type: ignore
+# E721: Testing type() equality for generic Result types
+"tests/test_result.py" = ["PT011", "PLC0415", "ARG001", "SIM108", "E721"]
+
+# Pylint configuration
+[tool.pylint.main]
+py-version = "3.13"
+ignore-paths = ["^tests/.*$"]
+extension-pkg-allow-list = ["babel"]
+
+[tool.pylint.messages_control]
+disable = [
+    "too-few-public-methods",     # Data classes are intentionally minimal
+    "too-many-arguments",         # Configuration objects need many parameters
+    "too-many-instance-attributes",  # AST nodes have many attributes
+    "fixme",                      # TODOs are tracked separately
+    "too-many-public-methods",    # Visitor pattern needs one method per node type
+    "duplicate-code",             # Similar __all__ lists across modules is intentional
+    "too-many-return-statements", # Parser/resolver patterns need multiple returns
+    "import-outside-toplevel",    # Runtime imports avoid circular dependencies
+    "unreachable",                # Pylint doesn't recognize Never return type from Result monad
+    "assignment-from-no-return",  # Pylint doesn't recognize Never return type from Result monad
+]
+
+[tool.pylint.format]
+max-line-length = 100
+
+[tool.pylint.design]
+max-args = 7
+max-attributes = 10
+max-locals = 20  # Parser methods need local variables for token tracking
+max-branches = 15  # Parser dispatch methods need multiple branches

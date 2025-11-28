@@ -1,0 +1,316 @@
+# ftllexbuffer Examples
+
+Comprehensive examples demonstrating all FTLLexBuffer features.
+
+**Requirements**: Python 3.13+
+
+## Note on Bidi Isolation Marks
+
+By default, FTLLexBuffer wraps interpolated variables in Unicode bidi isolation marks (FSI U+2068 and PDI U+2069). You may see `⁨` and `⁩` characters in terminal output like: `"Sveiki, ⁨Anna⁩!"` These marks are:
+- **Critical for RTL languages** (Arabic, Hebrew, Persian, Urdu) - prevents text corruption
+- **Invisible in proper Unicode rendering** (browsers, most GUI apps)
+- **May appear as symbols** in some terminals (this is a terminal limitation, not a bug)
+- **Recommended to keep enabled** (`use_isolating=True`, the default) unless your app will only ever support LTR languages
+
+**Important:** Examples in this directory use `use_isolating=False` for cleaner terminal demonstrations. **Never disable bidi isolation in production applications** that may support RTL languages.
+
+## Common Import Patterns
+
+All FTLLexBuffer APIs are available as top-level imports for maximum convenience:
+
+### Core Message Formatting
+
+```python
+from ftllexbuffer import FluentBundle, FluentLocalization
+
+# Single locale
+bundle = FluentBundle("en")
+
+# Multi-locale fallback
+l10n = FluentLocalization(['lv', 'en'])
+```
+
+### Resource Loading
+
+```python
+from ftllexbuffer import PathResourceLoader, ResourceLoader
+
+# File system loader
+loader = PathResourceLoader("locales/{locale}")
+ftl_source = loader.load("en", "main.ftl")
+
+# Custom loader (implement ResourceLoader protocol)
+class MyLoader:
+    def load(self, locale: str, resource_id: str) -> str:
+        # Your custom loading logic
+        ...
+```
+
+### AST Manipulation (Linters, Transformers)
+
+```python
+from ftllexbuffer import (
+    parse_ftl,
+    serialize_ftl,
+    ASTVisitor,
+    ASTTransformer,
+    Message,
+    Term,
+    VariableReference,
+)
+
+# Parse FTL to AST
+resource = parse_ftl(ftl_source)
+
+# Traverse AST
+class MyVisitor(ASTVisitor):
+    def visit_Message(self, node):
+        print(f"Found message: {node.id.name}")
+
+# Serialize back to FTL
+ftl_output = serialize_ftl(resource)
+```
+
+### Error Handling
+
+```python
+from ftllexbuffer import (
+    FluentError,
+    FluentSyntaxError,
+    FluentReferenceError,
+    FluentResolutionError,
+    FluentCyclicReferenceError,
+)
+
+# Robust error handling
+result, errors = bundle.format_pattern("msg", {"var": value})
+if errors:
+    for error in errors:
+        if isinstance(error, FluentReferenceError):
+            logger.warning(f"Missing translation: {error}")
+        elif isinstance(error, FluentResolutionError):
+            logger.error(f"Runtime error: {error}")
+```
+
+### Advanced - Function Registry
+
+```python
+from ftllexbuffer import FUNCTION_REGISTRY
+
+# Register global function
+def UPPER(text: str) -> str:
+    return text.upper()
+
+FUNCTION_REGISTRY.register(UPPER)
+
+# All bundles have access to UPPER()
+```
+
+**⚠️ WARNING**: `FUNCTION_REGISTRY` is a **global singleton**. Registering a function affects ALL bundles in your application. For bundle-specific functions, use `bundle.add_function()` instead.
+
+### Introspection
+
+```python
+from ftllexbuffer import introspect_message, extract_variables
+
+# Module-level introspection (works with AST nodes)
+resource = parse_ftl(ftl_source)
+msg = resource.entries[0]
+variables = extract_variables(msg)
+
+# Bundle method (works with message IDs)
+bundle = FluentBundle("en")
+bundle.add_resource(ftl_source)
+info = bundle.introspect_message("welcome")
+print(info.get_variable_names())
+```
+
+**Note**: All examples in this directory use these top-level imports. 
+
+## Available Examples
+
+### [quickstart.py](quickstart.py)
+
+**Basic usage of FluentBundle** - Start here for single-locale applications.
+
+Demonstrates:
+1. Simple messages
+2. Variable interpolation
+3. English plurals (one, other)
+4. Latvian plurals (zero, one, other)
+5. Select expressions
+6. Number formatting
+7. Loading from files
+8. **Proper error handling** (production pattern with error logging)
+
+**Run**: `python examples/quickstart.py`
+
+---
+
+### [locale_fallback.py](locale_fallback.py)
+
+**Multi-locale with fallback chains** - Use this for applications supporting multiple languages.
+
+Demonstrates:
+1. Basic two-locale fallback (Latvian → English)
+2. Three-locale fallback chains (Latvian → Lithuanian → English)
+3. Disk-based resource loading with PathResourceLoader
+4. Custom in-memory resource loaders
+5. Database/cache resource loaders (production pattern with Redis example)
+6. Realistic e-commerce application example
+7. Checking message availability
+8. Iterating through bundles for introspection
+
+**Run**: `python examples/locale_fallback.py`
+
+---
+
+### [ftl_transform.py](ftl_transform.py)
+
+**AST transformation and manipulation** - Build tools that modify FTL files programmatically.
+
+Demonstrates:
+1. Removing comments from FTL source
+2. Renaming variables (refactoring)
+3. Extracting hardcoded strings to variables
+4. Removing empty messages
+5. Chaining multiple transformations
+6. Real-world modernization workflow (camelCase → snake_case)
+
+**Run**: `python examples/ftl_transform.py`
+
+---
+
+### [ftl_linter.py](ftl_linter.py)
+
+**Static analysis and linting** - Build quality tools for FTL files.
+
+Demonstrates:
+1. Detecting duplicate message IDs
+2. Finding undefined variables
+3. Validating function calls
+4. Checking message/term references
+5. Identifying messages without values
+6. Building custom lint rules with ASTVisitor
+
+**Run**: `python examples/ftl_linter.py`
+
+---
+
+### [custom_functions.py](custom_functions.py)
+
+**Custom formatting functions** - Extend FTLLexBuffer with domain-specific formatters.
+
+Demonstrates:
+1. CURRENCY formatting with symbols
+2. PHONE number formatting
+3. MARKDOWN rendering (simplified)
+4. FILESIZE human-readable formatting
+5. DURATION time formatting
+6. Locale-aware custom functions using factory pattern
+
+**Run**: `python examples/custom_functions.py`
+
+---
+
+### [thread_safety.py](thread_safety.py)
+
+**Thread-safe FluentBundle usage** - Patterns for multi-threaded applications.
+
+Demonstrates:
+1. Single-threaded initialization (recommended pattern)
+2. Concurrent read operations with ThreadPoolExecutor
+3. Thread-local bundles (alternative for dynamic loading)
+4. Lock-based dynamic loading (if absolutely necessary)
+
+**Run**: `python examples/thread_safety.py`
+
+---
+
+### [benchmark_loaders.py](benchmark_loaders.py)
+
+**Performance benchmarks for resource loaders** - Compare different loader implementations.
+
+Demonstrates:
+1. In-memory loader benchmarks (baseline performance)
+2. Disk loader benchmarks (PathResourceLoader)
+3. Database loader benchmarks without cache (worst case)
+4. Database loader benchmarks with cache (production pattern)
+5. Cache hit rate analysis
+6. Throughput and latency measurements
+7. Production recommendations based on app size and requirements
+
+**Run**: `python examples/benchmark_loaders.py`
+
+**Output**: Comprehensive performance comparison with initialization times, throughput metrics, and best practice recommendations for choosing the optimal loader pattern.
+
+---
+
+## Running All Examples
+
+```bash
+# Run each example individually
+python examples/quickstart.py
+python examples/locale_fallback.py
+python examples/ftl_transform.py
+python examples/ftl_linter.py
+python examples/custom_functions.py
+python examples/thread_safety.py
+python examples/benchmark_loaders.py
+```
+
+## Basic Usage
+
+```python
+from ftllexbuffer import FluentBundle
+
+bundle = FluentBundle("en")
+bundle.add_resource("""
+my-message = Hello, { $name }!
+""")
+
+result, errors = bundle.format_pattern("my-message", {"name": "World"})
+print(result)  # Hello, World!
+```
+
+## Loading from Files
+
+```python
+from pathlib import Path
+from ftllexbuffer import FluentBundle
+
+ftl_source = Path("locales/en/messages.ftl").read_text(encoding="utf-8")
+bundle = FluentBundle("en")
+bundle.add_resource(ftl_source)
+result, errors = bundle.format_pattern("welcome")
+print(result)
+```
+
+## FTL File Example
+
+`locales/en/messages.ftl`:
+
+```ftl
+hello = Hello, World!
+greeting = Hello, { $name }!
+
+emails = You have { NUMBER($count) ->
+    [one] one email
+   *[other] { $count } emails
+}.
+
+greeting-formal = { $gender ->
+    [male] Mr. { $name }
+    [female] Ms. { $name }
+   *[other] { $name }
+}
+
+price = Price: { NUMBER($amount, minimumFractionDigits: 2) } EUR
+```
+
+## See Also
+
+- [API.md](../API.md) - Complete API reference with all public APIs documented
+- [README.md](../README.md) - Project overview and getting started guide
+- [TESTING.md](../TESTING.md) - Testing strategies and quality assurance practices
+- [CONTRIBUTING.md](../CONTRIBUTING.md) - Contribution guidelines for developers

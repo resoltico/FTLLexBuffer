@@ -1,0 +1,31 @@
+"""Diagnostic system for Fluent errors.
+
+Provides structured error diagnostics with codes, spans, hints, and help URLs.
+Inspired by Rust compiler diagnostics and Elm error messages.
+
+Python 3.13+. Zero external dependencies.
+"""
+
+from __future__ import annotations
+
+from .codes import Diagnostic, DiagnosticCode, SourceSpan
+from .errors import (
+    FluentCyclicReferenceError,
+    FluentError,
+    FluentReferenceError,
+    FluentResolutionError,
+    FluentSyntaxError,
+)
+from .templates import ErrorTemplate
+
+__all__ = [
+    "Diagnostic",
+    "DiagnosticCode",
+    "ErrorTemplate",
+    "FluentCyclicReferenceError",
+    "FluentError",
+    "FluentReferenceError",
+    "FluentResolutionError",
+    "FluentSyntaxError",
+    "SourceSpan",
+]

@@ -1,0 +1,434 @@
+name: Publish to PyPI
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:  # Allow manual triggers
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"  # Use 3.13 for build (produces py3-none-any wheel with requires-python>=3.13)
+          allow-prereleases: true  # Required for Python 3.14 in test matrix (3.13 is stable)
+
+      - name: Verify clean working tree
+        run: |
+          if ! git diff-index --quiet HEAD --; then
+            echo "[ERROR] Working directory is not clean"
+            git status
+            exit 1
+          fi
+
+      - name: Validate version tag
+        if: github.event_name == 'release'
+        run: |
+          # Extract tag name and remove 'v' prefix if present
+          TAG_VERSION="${GITHUB_REF#refs/tags/}"
+          TAG_VERSION="${TAG_VERSION#v}"
+          PACKAGE_VERSION=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
+          if [ "$TAG_VERSION" != "$PACKAGE_VERSION" ]; then
+            echo "[ERROR] Tag $TAG_VERSION doesn't match package version $PACKAGE_VERSION"
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # Pin build tool versions to prevent supply chain attacks
+          # and ensure reproducible builds
+          pip install "build>=1.3.0,<3.0.0" "twine>=6.2.0,<8.0.0"
+          pip install -e ".[dev]"
+
+      - name: Validate runtime version matches tag
+        if: github.event_name == 'release'
+        run: |
+          RUNTIME_VERSION=$(python -c "import ftllexbuffer; print(ftllexbuffer.__version__)")
+          # Extract tag name and remove 'v' prefix if present
+          TAG_VERSION="${GITHUB_REF#refs/tags/}"
+          TAG_VERSION="${TAG_VERSION#v}"
+          echo "Runtime __version__: $RUNTIME_VERSION"
+          echo "Release tag version: $TAG_VERSION"
+          if [ "$RUNTIME_VERSION" != "$TAG_VERSION" ]; then
+            echo "[ERROR] Runtime version $RUNTIME_VERSION doesn't match tag $TAG_VERSION"
+            echo "This indicates package metadata was not refreshed after version bump"
+            exit 1
+          fi
+          echo "[OK] Runtime version matches release tag: $RUNTIME_VERSION"
+
+      - name: Run quality checks
+        run: ./scripts/all.sh --ci
+
+      - name: Build package
+        run: python -m build
+
+      - name: Check package
+        run: twine check dist/*
+
+      - name: Verify package integrity
+        run: |
+          echo "Verifying package contents..."
+
+          # Check wheel contains required files
+          if ! unzip -l dist/*.whl | grep -q "ftllexbuffer/__init__.py"; then
+            echo "[ERROR] Wheel missing ftllexbuffer/__init__.py"
+            exit 1
+          fi
+          echo "[OK] Wheel contains __init__.py"
+
+          # Ensure no compiled Python files in wheel
+          if unzip -l dist/*.whl | grep -qE "\.pyc$|__pycache__"; then
+            echo "[ERROR] Wheel contains compiled Python files (.pyc or __pycache__)"
+            unzip -l dist/*.whl | grep -E "\.pyc$|__pycache__"
+            exit 1
+          fi
+          echo "[OK] No compiled Python files in wheel"
+
+          # Check source distribution contains source files
+          if ! tar -tzf dist/*.tar.gz | grep -q "src/ftllexbuffer/__init__.py"; then
+            echo "[ERROR] Source distribution missing src/ftllexbuffer/__init__.py"
+            exit 1
+          fi
+          echo "[OK] Source distribution contains source files"
+
+          # Ensure no backup files in distributions
+          # Matches all patterns from .gitignore: *.bak*, *.backup*, *.old, *.orig, *_backup, *_old, *.swp, *.swo
+          if tar -tzf dist/*.tar.gz | grep -qE "\.(bak|backup|old|orig|swp|swo)(\.|$)|_(backup|old)(\.|$)"; then
+            echo "[ERROR] Source distribution contains backup files"
+            tar -tzf dist/*.tar.gz | grep -E "\.(bak|backup|old|orig|swp|swo)(\.|$)|_(backup|old)(\.|$)"
+            exit 1
+          fi
+          echo "[OK] No backup files in distributions"
+
+          echo "[OK] Package integrity verification passed"
+
+      - name: Store build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          retention-days: 7
+
+  test-publish:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to TestPyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          # TestPyPI requires API token authentication (trusted publishing not available)
+          # Configure: GitHub Settings > Secrets > Actions > TEST_PYPI_API_TOKEN
+          # Generate token at: https://test.pypi.org/manage/account/token/
+          password: ${{ secrets.TEST_PYPI_API_TOKEN }}
+          skip-existing: true
+
+  verify-test-publish:
+    name: Verify TestPyPI Publication
+    needs: test-publish
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    strategy:
+      matrix:
+        python-version: ["3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          allow-prereleases: true  # Required for Python 3.14 until widely available
+
+      - name: Extract version from pyproject.toml
+        id: version
+        run: |
+          VERSION=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Package version: $VERSION"
+
+      - name: Wait for TestPyPI propagation with retry
+        run: |
+          echo "Waiting for TestPyPI propagation (max 2 minutes with 10s intervals)..."
+          VERSION="${{ steps.version.outputs.version }}"
+          WAIT_TIME=10
+          MAX_ATTEMPTS=12
+
+          for attempt in $(seq 1 $MAX_ATTEMPTS); do
+            echo "Attempt $attempt/$MAX_ATTEMPTS: Checking if ftllexbuffer $VERSION is available on TestPyPI..."
+            if pip index versions --index-url https://test.pypi.org/simple/ ftllexbuffer 2>/dev/null | grep -q "$VERSION"; then
+              echo "[OK] Package version $VERSION is now available on TestPyPI!"
+              exit 0
+            fi
+
+            if [ $attempt -lt $MAX_ATTEMPTS ]; then
+              echo "Not yet available, waiting ${WAIT_TIME}s before retry..."
+              sleep $WAIT_TIME
+              # Linear backoff: 10s per attempt, 12 attempts = 120s max
+              # TestPyPI typically propagates within 30-60 seconds
+            fi
+          done
+
+          echo "[WARN] Package may not be fully propagated, but proceeding with installation attempt..."
+
+      - name: Install from TestPyPI
+        run: |
+          echo "Installing ftllexbuffer from TestPyPI on Python ${{ matrix.python-version }}..."
+          pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ ftllexbuffer==${{ steps.version.outputs.version }}
+          echo "[OK] Installation successful"
+
+      - name: Verify installed version
+        run: |
+          INSTALLED_VERSION=$(python -c "import ftllexbuffer; print(ftllexbuffer.__version__)")
+          EXPECTED_VERSION="${{ steps.version.outputs.version }}"
+          echo "Installed version: $INSTALLED_VERSION"
+          echo "Expected version:  $EXPECTED_VERSION"
+
+          if [ "$INSTALLED_VERSION" != "$EXPECTED_VERSION" ]; then
+            echo "[ERROR] Version mismatch!"
+            echo "  Expected: $EXPECTED_VERSION"
+            echo "  Got:      $INSTALLED_VERSION"
+            exit 1
+          fi
+
+          echo "[OK] Version verification passed: $INSTALLED_VERSION"
+
+      - name: Smoke test - Basic import
+        run: |
+          python -c 'import ftllexbuffer; print(f"[OK] Successfully imported ftllexbuffer v{ftllexbuffer.__version__}")'
+
+      - name: Smoke test - FluentBundle
+        run: |
+          python <<'EOF'
+          from ftllexbuffer import FluentBundle
+          bundle = FluentBundle('en')
+          bundle.add_resource('hello = Hello, World!')
+          result = bundle.format_pattern('hello')
+          assert result == 'Hello, World!', f'Expected "Hello, World!", got "{result}"'
+          print('[OK] FluentBundle smoke test passed')
+          EOF
+
+      - name: Smoke test - FluentLocalization
+        run: |
+          python <<'EOF'
+          from ftllexbuffer import FluentLocalization
+          l10n = FluentLocalization(['en'])
+          l10n.add_resource('en', 'greeting = Welcome!')
+          value, errors = l10n.format_value('greeting')
+          assert value == 'Welcome!', f'Expected "Welcome!", got "{value}"'
+          assert errors == [], f'Expected no errors, got {errors}'
+          print('[OK] FluentLocalization smoke test passed')
+          EOF
+
+      - name: Smoke test - Parser
+        run: |
+          python <<'EOF'
+          from ftllexbuffer import parse_ftl, serialize_ftl
+          source = 'message = Hello\n'
+          resource = parse_ftl(source)
+          serialized = serialize_ftl(resource)
+          assert 'message' in serialized, f'Expected message in serialized output'
+          print('[OK] Parser smoke test passed')
+          EOF
+
+      - name: Verification summary
+        run: |
+          echo ""
+          echo "=========================================="
+          echo "TestPyPI Publication Verification Complete"
+          echo "=========================================="
+          echo ""
+          echo "[OK] Package installed successfully from TestPyPI"
+          echo "[OK] Python version: ${{ matrix.python-version }}"
+          echo "[OK] Version matches package: ${{ steps.version.outputs.version }}"
+          echo "[OK] All smoke tests passed"
+          echo ""
+          echo "Package is live at: https://test.pypi.org/project/ftllexbuffer/"
+          echo ""
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
+    permissions:
+      id-token: write  # Required for trusted publishing
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        # Uses trusted publishing (OIDC) - no password/token needed
+        # Configure at: https://pypi.org/manage/account/publishing/
+        # Requires: id-token: write permission (configured above)
+
+  verify-publish:
+    name: Verify PyPI Publication
+    needs: publish
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
+    strategy:
+      matrix:
+        python-version: ["3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          allow-prereleases: true  # Required for Python 3.14 until widely available
+
+      - name: Extract expected version from tag
+        id: tag_version
+        run: |
+          # Extract tag name and remove 'v' prefix if present
+          TAG_VERSION="${GITHUB_REF#refs/tags/}"
+          TAG_VERSION="${TAG_VERSION#v}"
+          echo "version=$TAG_VERSION" >> $GITHUB_OUTPUT
+          echo "Expected version: $TAG_VERSION"
+
+      - name: Wait for PyPI propagation with retry
+        run: |
+          echo "Waiting for PyPI CDN propagation (max 1 minute with 5s intervals)..."
+          VERSION="${{ steps.tag_version.outputs.version }}"
+          WAIT_TIME=5
+          MAX_ATTEMPTS=12
+
+          for attempt in $(seq 1 $MAX_ATTEMPTS); do
+            echo "Attempt $attempt/$MAX_ATTEMPTS: Checking if ftllexbuffer $VERSION is available on PyPI..."
+            if pip index versions ftllexbuffer 2>/dev/null | grep -q "$VERSION"; then
+              echo "[OK] Package version $VERSION is now available on PyPI!"
+              exit 0
+            fi
+
+            if [ $attempt -lt $MAX_ATTEMPTS ]; then
+              echo "Not yet available, waiting ${WAIT_TIME}s before retry..."
+              sleep $WAIT_TIME
+              # Linear backoff: 5s per attempt, 12 attempts = 60s max
+              # PyPI CDN typically propagates within 10-30 seconds
+            fi
+          done
+
+          echo "[WARN] Package may not be fully propagated, but proceeding with installation attempt..."
+
+      - name: Install from PyPI
+        run: |
+          echo "Installing ftllexbuffer from PyPI on Python ${{ matrix.python-version }}..."
+          pip install ftllexbuffer
+          echo "[OK] Installation successful"
+
+      - name: Verify installed version
+        run: |
+          INSTALLED_VERSION=$(python -c "import ftllexbuffer; print(ftllexbuffer.__version__)")
+          # Extract tag name and remove 'v' prefix if present
+          EXPECTED_VERSION="${GITHUB_REF#refs/tags/}"
+          EXPECTED_VERSION="${EXPECTED_VERSION#v}"
+          echo "Installed version: $INSTALLED_VERSION"
+          echo "Expected version:  $EXPECTED_VERSION"
+
+          if [ "$INSTALLED_VERSION" != "$EXPECTED_VERSION" ]; then
+            echo "[ERROR] Version mismatch!"
+            echo "  Expected: $EXPECTED_VERSION"
+            echo "  Got:      $INSTALLED_VERSION"
+            exit 1
+          fi
+
+          echo "[OK] Version verification passed: $INSTALLED_VERSION"
+
+      - name: Smoke test - Basic import
+        run: |
+          python -c 'import ftllexbuffer; print(f"[OK] Successfully imported ftllexbuffer v{ftllexbuffer.__version__}")'
+
+      - name: Smoke test - FluentBundle
+        run: |
+          python <<'EOF'
+          from ftllexbuffer import FluentBundle
+          bundle = FluentBundle('en')
+          bundle.add_resource('hello = Hello, World!')
+          result = bundle.format_pattern('hello')
+          assert result == 'Hello, World!', f'Expected "Hello, World!", got "{result}"'
+          print('[OK] FluentBundle smoke test passed')
+          EOF
+
+      - name: Smoke test - FluentLocalization
+        run: |
+          python <<'EOF'
+          from ftllexbuffer import FluentLocalization
+          l10n = FluentLocalization(['en'])
+          l10n.add_resource('en', 'greeting = Welcome!')
+          value, errors = l10n.format_value('greeting')
+          assert value == 'Welcome!', f'Expected "Welcome!", got "{value}"'
+          assert errors == [], f'Expected no errors, got {errors}'
+          print('[OK] FluentLocalization smoke test passed')
+          EOF
+
+      - name: Smoke test - Parser
+        run: |
+          python <<'EOF'
+          from ftllexbuffer import parse_ftl, serialize_ftl
+          source = 'message = Hello\n'
+          resource = parse_ftl(source)
+          serialized = serialize_ftl(resource)
+          assert 'message' in serialized, f'Expected message in serialized output'
+          print('[OK] Parser smoke test passed')
+          EOF
+
+      - name: Verification summary
+        run: |
+          echo ""
+          echo "=========================================="
+          echo "PyPI Publication Verification Complete"
+          echo "=========================================="
+          echo ""
+          echo "[OK] Package installed successfully from PyPI"
+          echo "[OK] Python version: ${{ matrix.python-version }}"
+          echo "[OK] Version matches release tag"
+          echo "[OK] All smoke tests passed"
+          echo ""
+          echo "Package is live at: https://pypi.org/project/ftllexbuffer/"
+          echo ""
+
+  verify-python-requirement:
+    name: Verify Python 3.13+ Requirement Blocks Older Versions
+    needs: publish
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
+    steps:
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          allow-prereleases: true  # For consistency across workflow
+
+      - name: Verify install is blocked on Python 3.12
+        run: |
+          echo "Attempting to install ftllexbuffer on Python 3.12 (should fail)..."
+          if pip install ftllexbuffer 2>&1 | tee /tmp/pip-output.txt; then
+            echo "[ERROR] Installation succeeded on Python 3.12 - requires-python constraint not working!"
+            exit 1
+          else
+            # Check that error message mentions Python version requirement
+            if grep -qi "requires python" /tmp/pip-output.txt || grep -qi "requires-python" /tmp/pip-output.txt; then
+              echo "[OK] Installation correctly blocked on Python 3.12"
+              echo "[OK] Error message mentions Python version requirement"
+              exit 0
+            else
+              echo "[WARN] Installation blocked but error message unclear"
+              cat /tmp/pip-output.txt
+              exit 0  # Still pass since install was blocked
+            fi
+          fi

@@ -1,0 +1,270 @@
+"""FTL Transformer Example - Demonstrating AST Modification API.
+
+This example shows how to use FTLLexBuffer's ASTTransformer to modify
+FTL files programmatically:
+
+- Remove all comments (documentation cleanup)
+- Rename variables (refactoring)
+- Extract hardcoded strings to variables
+- Remove unused attributes
+
+Leverages Python 3.13+ features:
+- Pattern matching in ASTTransformer
+- Type-safe AST node construction
+- Immutable transformations (original unchanged)
+
+Python 3.13+.
+"""
+
+from __future__ import annotations
+
+from dataclasses import replace
+
+from ftllexbuffer import (
+    ASTTransformer,
+    Comment,
+    Identifier,
+    Message,
+    Placeable,
+    TextElement,
+    VariableReference,
+    parse_ftl,
+    serialize_ftl,
+)
+
+
+class RemoveCommentsTransformer(ASTTransformer):
+    """Remove all comments from FTL source."""
+
+    def visit_Comment(self, _node: Comment) -> None:  # noqa: N802  # pylint: disable=invalid-name
+        """Remove comments by returning None.
+
+        Visitor pattern: visit_* methods follow stdlib ast.NodeVisitor convention.
+        """
+        return
+
+
+class RenameVariablesTransformer(ASTTransformer):
+    """Rename variables according to mapping."""
+
+    def __init__(self, mapping: dict[str, str]) -> None:
+        """Initialize with variable name mapping.
+
+        Args:
+            mapping: Dictionary of old_name -> new_name
+        """
+        super().__init__()
+        self.mapping = mapping
+
+    def visit_VariableReference(self, node: VariableReference) -> VariableReference:  # noqa: N802  # pylint: disable=invalid-name
+        """Rename variable if in mapping.
+
+        Visitor pattern: visit_* methods follow stdlib ast.NodeVisitor convention.
+        """
+        if node.id.name in self.mapping:
+            # Create new node with renamed variable (immutable transformation)
+            return replace(node, id=Identifier(name=self.mapping[node.id.name]))
+        return node
+
+
+class ExtractVariablesTransformer(ASTTransformer):
+    """Extract hardcoded text into variables.
+
+    This transformer detects TextElement nodes containing specific
+    patterns and converts them to VariableReferences.
+    """
+
+    def __init__(self, text_to_var: dict[str, str]) -> None:
+        """Initialize with text extraction rules.
+
+        Args:
+            text_to_var: Dictionary of text -> variable_name
+        """
+        super().__init__()
+        self.text_to_var = text_to_var
+
+    def visit_TextElement(self, node: TextElement) -> TextElement | Placeable:  # noqa: N802  # pylint: disable=invalid-name
+        """Convert matching text to variable reference.
+
+        Visitor pattern: visit_* methods follow stdlib ast.NodeVisitor convention.
+        """
+        for text, var_name in self.text_to_var.items():
+            if text in node.value:
+                # Replace text with variable
+                return Placeable(
+                    expression=VariableReference(id=Identifier(name=var_name))
+                )
+        return node
+
+
+class RemoveEmptyMessagesTransformer(ASTTransformer):
+    """Remove messages with no value and no attributes."""
+
+    def visit_Message(self, node: Message) -> Message | None:  # noqa: N802  # pylint: disable=invalid-name
+        """Remove message if it has no value and no attributes.
+
+        Visitor pattern: visit_* methods follow stdlib ast.NodeVisitor convention.
+        """
+        if not node.value and not node.attributes:
+            return None  # Remove this message
+        return node
+
+
+# Example usage
+if __name__ == "__main__":
+    # Example 1: Remove comments
+    print("=" * 60)
+    print("Example 1: Remove All Comments")
+    print("=" * 60)
+
+    # pylint: disable=invalid-name  # Example data strings - not module constants
+    ftl_with_comments = """
+# This is a resource comment
+## Group comment
+hello = Hello, World!
+    # This is a message comment
+goodbye = Goodbye!
+"""
+
+    print("BEFORE:")
+    print(ftl_with_comments)
+
+    resource = parse_ftl(ftl_with_comments)
+    transformer = RemoveCommentsTransformer()
+    cleaned_resource = transformer.transform(resource)
+
+    print("\nAFTER:")
+    print(serialize_ftl(cleaned_resource))
+
+    # Example 2: Rename variables
+    print("\n" + "=" * 60)
+    print("Example 2: Rename Variables")
+    print("=" * 60)
+
+    ftl_with_vars = """
+greeting = Hello, { $userName }!
+farewell = Goodbye, { $userName }!
+"""
+
+    print("BEFORE:")
+    print(ftl_with_vars)
+
+    resource = parse_ftl(ftl_with_vars)
+    rename_transformer = RenameVariablesTransformer({"userName": "user_name"})
+    renamed_resource = rename_transformer.transform(resource)
+
+    print("\nAFTER:")
+    print(serialize_ftl(renamed_resource))
+
+    # Example 3: Extract hardcoded strings
+    print("\n" + "=" * 60)
+    print("Example 3: Extract Hardcoded Strings to Variables")
+    print("=" * 60)
+
+    ftl_hardcoded = """
+welcome = Hello, World!
+about = This is World!
+"""
+
+    print("BEFORE:")
+    print(ftl_hardcoded)
+
+    resource = parse_ftl(ftl_hardcoded)
+    extract_transformer = ExtractVariablesTransformer({"World": "app_name"})
+    extracted_resource = extract_transformer.transform(resource)
+
+    print("\nAFTER (note: 'World' → { $app_name }):")
+    print(serialize_ftl(extracted_resource))
+
+    # Example 4: Remove empty messages
+    print("\n" + "=" * 60)
+    print("Example 4: Remove Empty Messages")
+    print("=" * 60)
+
+    ftl_with_empty = """
+hello = Hello!
+empty-message =
+another = Goodbye!
+"""
+
+    print("BEFORE:")
+    print(ftl_with_empty)
+
+    resource = parse_ftl(ftl_with_empty)
+    remove_empty_transformer = RemoveEmptyMessagesTransformer()
+    filtered_resource = remove_empty_transformer.transform(resource)
+
+    print("\nAFTER (empty-message removed):")
+    print(serialize_ftl(filtered_resource))
+
+    # Example 5: Chain multiple transformers
+    print("\n" + "=" * 60)
+    print("Example 5: Chain Multiple Transformations")
+    print("=" * 60)
+
+    complex_ftl = """
+# Old variable naming convention
+## Legacy code
+
+user-greeting = Hello, { $userName }!
+    # Needs refactoring
+
+admin-greeting = Hello, { $userName }!
+"""
+
+    print("BEFORE:")
+    print(complex_ftl)
+
+    # Apply transformations in sequence
+    resource = parse_ftl(complex_ftl)
+
+    # Step 1: Remove comments
+    resource = RemoveCommentsTransformer().transform(resource)
+
+    # Step 2: Rename variables
+    resource = RenameVariablesTransformer({"userName": "user_name"}).transform(resource)
+
+    print("\nAFTER (comments removed + variables renamed):")
+    print(serialize_ftl(resource))
+
+    # Example 6: Real-world use case - Modernize legacy FTL
+    print("\n" + "=" * 60)
+    print("Example 6: Modernize Legacy FTL (Real-World)")
+    print("=" * 60)
+
+    legacy_ftl = """
+# Legacy FTL file from 2019
+# Uses old variable naming (camelCase instead of snake_case)
+
+welcomeMessage = Welcome, { $firstName }!
+userProfile = { $firstName } { $lastName }
+accountBalance = Balance: { NUMBER($currentBalance) }
+
+# TODO: Refactor variable names
+# TODO: Remove obsolete messages
+"""
+
+    print("BEFORE:")
+    print(legacy_ftl)
+
+    resource = parse_ftl(legacy_ftl)
+
+    # Modern FTL: snake_case variables
+    modernizer = RenameVariablesTransformer({
+        "firstName": "first_name",
+        "lastName": "last_name",
+        "currentBalance": "current_balance",
+    })
+
+    modernized_resource = modernizer.transform(resource)
+
+    # Remove comments for production
+    comment_remover = RemoveCommentsTransformer()
+    production_resource = comment_remover.transform(modernized_resource)
+
+    print("\nAFTER (modernized + production-ready):")
+    print(serialize_ftl(production_resource))
+
+    print("\n" + "=" * 60)
+    print("[SUCCESS] Transformer examples complete!")
+    print("=" * 60)
