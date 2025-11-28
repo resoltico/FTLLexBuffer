@@ -421,7 +421,7 @@ jobs:
           echo "Attempting to install ftllexbuffer on Python 3.12 (should fail)..."
           set +e  # Disable errexit to capture pip exit code
           pip install ftllexbuffer 2>&1 | tee /tmp/pip-output.txt
-          INSTALL_RESULT=$?
+          INSTALL_RESULT=${PIPESTATUS[0]}
           set -e  # Re-enable errexit
 
           if [ $INSTALL_RESULT -eq 0 ]; then
