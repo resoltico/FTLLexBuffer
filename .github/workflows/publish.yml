@@ -214,8 +214,9 @@ jobs:
           from ftllexbuffer import FluentBundle
           bundle = FluentBundle('en')
           bundle.add_resource('hello = Hello, World!')
-          result = bundle.format_pattern('hello')
-          assert result == 'Hello, World!', f'Expected "Hello, World!", got "{result}"'
+          value, errors = bundle.format_pattern('hello')
+          assert value == 'Hello, World!', f'Expected "Hello, World!", got "{value}"'
+          assert errors == [], f'Expected no errors, got {errors}'
           print('[OK] FluentBundle smoke test passed')
           EOF
 
@@ -359,8 +360,9 @@ jobs:
           from ftllexbuffer import FluentBundle
           bundle = FluentBundle('en')
           bundle.add_resource('hello = Hello, World!')
-          result = bundle.format_pattern('hello')
-          assert result == 'Hello, World!', f'Expected "Hello, World!", got "{result}"'
+          value, errors = bundle.format_pattern('hello')
+          assert value == 'Hello, World!', f'Expected "Hello, World!", got "{value}"'
+          assert errors == [], f'Expected no errors, got {errors}'
           print('[OK] FluentBundle smoke test passed')
           EOF
 
@@ -417,7 +419,12 @@ jobs:
       - name: Verify install is blocked on Python 3.12
         run: |
           echo "Attempting to install ftllexbuffer on Python 3.12 (should fail)..."
-          if pip install ftllexbuffer 2>&1 | tee /tmp/pip-output.txt; then
+          set +e  # Disable errexit to capture pip exit code
+          pip install ftllexbuffer 2>&1 | tee /tmp/pip-output.txt
+          INSTALL_RESULT=$?
+          set -e  # Re-enable errexit
+
+          if [ $INSTALL_RESULT -eq 0 ]; then
             echo "[ERROR] Installation succeeded on Python 3.12 - requires-python constraint not working!"
             exit 1
           else
