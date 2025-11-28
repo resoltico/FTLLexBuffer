@@ -4,7 +4,7 @@
 [![Python 3.13+](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Python 3.13+ implementation of the Fluent Localization System v1.0 specification. **Tested on Python 3.13 and 3.14.**
+Python 3.13+ implementation of the Fluent Localization System v1.0 specification.
 
 > **Legal:** Licensed under MIT. Independent implementation of Apache 2.0-licensed FTL Specification. See [PATENTS.md](https://github.com/resoltico/ftllexbuffer/blob/main/PATENTS.md) for patent considerations and [NOTICE](https://github.com/resoltico/ftllexbuffer/blob/main/NOTICE) for attributions.
 
@@ -142,7 +142,11 @@ print(result)  # "5 faili"
 
 ## Terminology
 
-Understanding FTLLexBuffer's terminology ensures clear communication in code and documentation:
+Understanding FTLLexBuffer's terminology ensures clear communication in code and documentation.
+
+**See [TERMINOLOGY.md](https://github.com/resoltico/ftllexbuffer/blob/main/TERMINOLOGY.md) for complete reference.**
+
+Quick reference for common terms:
 
 | Term | Meaning | Usage |
 |------|---------|-------|
@@ -207,11 +211,9 @@ l10n = FluentLocalization(['lv', 'en'], ['main.ftl'], loader)
 
 ## Requirements
 
-- Python 3.13+ (tested on Python 3.13 and 3.14)
+- Python 3.13 and later. The codebase leverages Python 3.13+ features including `type` keyword type aliases (PEP 695) and `TypeIs` type guards (PEP 742).
 - Runtime dependencies:
   - `Babel>=2.17.0` (CLDR-compliant i18n formatting)
-
-**Note**: FTLLexBuffer requires Python 3.13 as the minimum version and is forward-compatible with Python 3.14. The codebase leverages Python 3.13+ features including `type` keyword type aliases (PEP 695) and `TypeIs` type guards (PEP 742).
 
 **Legal Note:** FTLLexBuffer is licensed under MIT. For patent considerations and licensing details, see [PATENTS.md](https://github.com/resoltico/ftllexbuffer/blob/main/PATENTS.md) and [NOTICE](https://github.com/resoltico/ftllexbuffer/blob/main/NOTICE).
 
@@ -955,7 +957,7 @@ Comprehensive comparison of localization libraries available in the Python ecosy
 | **Compilation Required** | No (runtime interpreter) | No (runtime interpreter) | **Yes** (FTL → Python bytecode) | **Yes** (msgfmt .po → .mo) | **Yes** (pybabel compile .po → .mo) | **Yes** (lrelease .ts → .qm) | No (YAML/JSON loaded at runtime) |
 | **Compilation Benefits** | N/A | N/A | Faster (PyPy optimized) | Faster lookups, validation, smaller size | Faster lookups, smaller size | Extremely fast lookups, binary format | N/A |
 | **Grammar Approach** | **Asymmetric** (each locale restructures freely) | **Asymmetric** (each locale restructures freely) | **Asymmetric** (each locale restructures freely) | **Symmetric** (all follow source structure) | **Symmetric** (all follow source structure) | **Symmetric** (all follow source structure) | **Symmetric** (all follow source structure) |
-| **Plural Forms** | CLDR (30 languages: ar:6, ru/pl:4, lv:3, etc.) | CLDR (all languages via babel) | CLDR (all languages via babel) | CLDR (via GNU ngettext) | **CLDR (600+ locales)** | **CLDR (all locales)** | Rails-style (one/many/zero/few) |
+| **Plural Forms** | CLDR (30 languages) | CLDR (all languages via babel) | CLDR (all languages via babel) | CLDR (via GNU ngettext) | **CLDR (600+ locales)** | **CLDR (all locales)** | Rails-style (one/many/zero/few) |
 | **Select Expressions** | Built-in (`{ $var -> ... }`) | Built-in | Built-in | Manual workarounds | Manual workarounds | Manual workarounds | Manual workarounds |
 | **Context Support** | Terms (`-brand`), Attributes | Terms, Attributes | Terms, Attributes | **pgettext()** (Python 3.8+) | **pgettext()** | **QCoreApplication.translate()** with disambiguation | Namespaces |
 | **Number Formatting** | Babel CLDR (NUMBER function) | Babel CLDR | Babel CLDR | Manual (use Babel separately) | **CLDR (format_number, format_currency)** | **Qt CLDR** | Manual |

@@ -613,6 +613,40 @@ class FluentBundle:
 
         return extract_variables(self._messages[message_id])
 
+    def get_all_message_variables(self) -> dict[str, frozenset[str]]:
+        """Get variables for all messages in bundle (batch introspection API).
+
+        Convenience method for extracting variables from all messages at once.
+        Useful for CI/CD validation pipelines that need to analyze entire
+        FTL resources in a single operation.
+
+        This is equivalent to calling get_message_variables() for each message
+        ID, but provides a cleaner API for batch operations.
+
+        Returns:
+            Dictionary mapping message IDs to their required variable sets.
+            Empty dict if bundle has no messages.
+
+        Example:
+            >>> bundle.add_resource('''
+            ... greeting = Hello, { $name }!
+            ... farewell = Goodbye, { $firstName } { $lastName }!
+            ... simple = No variables here
+            ... ''')
+            >>> all_vars = bundle.get_all_message_variables()
+            >>> assert all_vars["greeting"] == frozenset({"name"})
+            >>> assert all_vars["farewell"] == frozenset({"firstName", "lastName"})
+            >>> assert all_vars["simple"] == frozenset()
+
+        See Also:
+            - get_message_variables(): Get variables for single message
+            - introspect_message(): Get complete metadata (variables + functions + references)
+        """
+        return {
+            message_id: self.get_message_variables(message_id)
+            for message_id in self.get_message_ids()
+        }
+
     def introspect_message(self, message_id: str) -> MessageIntrospection:
         """Get complete introspection data for a message.
 
