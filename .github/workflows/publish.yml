@@ -144,9 +144,39 @@ jobs:
           VERSION=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Install from TestPyPI
+      - name: Wait for TestPyPI CDN propagation
         run: |
-          pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ ${{ env.PACKAGE_NAME }}==${{ steps.version.outputs.version }}
+          echo "Waiting 60 seconds for TestPyPI CDN to propagate..."
+          sleep 60
+
+      - name: Install from TestPyPI with retry
+        run: |
+          PACKAGE="${{ env.PACKAGE_NAME }}"
+          VERSION="${{ steps.version.outputs.version }}"
+
+          MAX_ATTEMPTS=5
+          ATTEMPT=1
+          DELAY=20
+
+          while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+            echo "Attempt $ATTEMPT of $MAX_ATTEMPTS: Installing ${PACKAGE}==${VERSION} from TestPyPI..."
+
+            pip cache purge || true
+            if pip install --no-cache-dir --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ "${PACKAGE}==${VERSION}"; then
+              echo "Successfully installed ${PACKAGE}==${VERSION}"
+              break
+            fi
+
+            if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
+              echo "::error::Failed to install ${PACKAGE}==${VERSION} from TestPyPI after $MAX_ATTEMPTS attempts"
+              exit 1
+            fi
+
+            echo "Installation failed, waiting ${DELAY}s before retry..."
+            sleep $DELAY
+            ATTEMPT=$((ATTEMPT + 1))
+            DELAY=$((DELAY * 2))
+          done
 
       - name: Verify installed version
         run: |
@@ -155,6 +185,7 @@ jobs:
             echo "::error::Version mismatch: $INSTALLED_VERSION != ${{ steps.version.outputs.version }}"
             exit 1
           fi
+          echo "✓ Verified: Installed version $INSTALLED_VERSION matches expected ${{ steps.version.outputs.version }}"
 
       - name: Smoke test - Basic import
         run: python -c "import ${{ env.PACKAGE_NAME }}; print(f'[OK] Imported ${{ env.PACKAGE_NAME }} v{{${{ env.PACKAGE_NAME }}.__version__}}')"
@@ -194,8 +225,41 @@ jobs:
       - name: Detect package name
         run: echo "PACKAGE_NAME=$(find src -mindepth 1 -maxdepth 1 -type d | head -n 1 | xargs basename)" >> $GITHUB_ENV
 
-      - name: Install from PyPI
-        run: pip install ${{ env.PACKAGE_NAME }}
+      - name: Wait for PyPI CDN propagation
+        run: |
+          echo "Waiting 90 seconds for PyPI CDN to propagate the new release..."
+          sleep 90
+
+      - name: Install from PyPI with retry
+        run: |
+          TAG_VERSION="${GITHUB_REF#refs/tags/}"
+          TAG_VERSION="${TAG_VERSION#v}"
+          PACKAGE="${{ env.PACKAGE_NAME }}"
+
+          MAX_ATTEMPTS=5
+          ATTEMPT=1
+          DELAY=30
+
+          while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+            echo "Attempt $ATTEMPT of $MAX_ATTEMPTS: Installing ${PACKAGE}==${TAG_VERSION} from PyPI..."
+
+            # Clear pip cache and try to install the specific version
+            pip cache purge || true
+            if pip install --no-cache-dir "${PACKAGE}==${TAG_VERSION}"; then
+              echo "Successfully installed ${PACKAGE}==${TAG_VERSION}"
+              break
+            fi
+
+            if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
+              echo "::error::Failed to install ${PACKAGE}==${TAG_VERSION} after $MAX_ATTEMPTS attempts"
+              exit 1
+            fi
+
+            echo "Installation failed, waiting ${DELAY}s before retry..."
+            sleep $DELAY
+            ATTEMPT=$((ATTEMPT + 1))
+            DELAY=$((DELAY * 2))  # Exponential backoff
+          done
 
       - name: Verify installed version
         run: |
@@ -206,6 +270,7 @@ jobs:
             echo "::error::Version mismatch: $INSTALLED_VERSION != $TAG_VERSION"
             exit 1
           fi
+          echo "✓ Verified: Installed version $INSTALLED_VERSION matches tag $TAG_VERSION"
 
       - name: Smoke test - Basic import
         run: python -c "import ${{ env.PACKAGE_NAME }}; print(f'[OK] Imported ${{ env.PACKAGE_NAME }} v{{${{ env.PACKAGE_NAME }}.__version__}}')"
