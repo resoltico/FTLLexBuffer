@@ -106,7 +106,7 @@ FUNCTION_REGISTRY.register(UPPER)
 # All bundles have access to UPPER()
 ```
 
-**⚠️ WARNING**: `FUNCTION_REGISTRY` is a **global singleton**. Registering a function affects ALL bundles in your application. For bundle-specific functions, use `bundle.add_function()` instead.
+**WARNING**: `FUNCTION_REGISTRY` is a **global singleton**. Registering a function affects ALL bundles in your application. For bundle-specific functions, use `bundle.add_function()` instead.
 
 ### Introspection
 
@@ -211,6 +211,8 @@ Demonstrates:
 
 **Run**: `python examples/custom_functions.py`
 
+**See also**: [ADVANCED_CUSTOM_FUNCTIONS.md](../ADVANCED_CUSTOM_FUNCTIONS.md) - Comprehensive guide to custom function development including error handling patterns, Babel integration, testing strategies, and best practices.
+
 ---
 
 ### [thread_safety.py](thread_safety.py)
@@ -246,6 +248,27 @@ Demonstrates:
 
 ---
 
+### [property_based_testing.py](property_based_testing.py)
+
+**Property-based testing with Hypothesis** - Advanced testing techniques for discovering edge cases.
+
+Demonstrates:
+1. Testing universal properties (format_pattern never raises exceptions)
+2. Testing idempotence (parse → serialize → parse roundtrip)
+3. Testing invariants (message count consistency)
+4. Testing symmetry (fallback chain locale precedence)
+5. Testing batch operations equivalence (batch vs individual introspection)
+6. Stateful property testing with RuleBasedStateMachine (advanced)
+7. Custom Hypothesis strategies for valid FTL generation
+
+**Prerequisites**: `pip install hypothesis`
+
+**Run**: `python examples/property_based_testing.py`
+
+**Note**: This example demonstrates advanced testing techniques using property-based testing, which generates hundreds of random test cases to verify universal properties of the library. Excellent for discovering edge cases and verifying API contracts.
+
+---
+
 ## Running All Examples
 
 ```bash
@@ -257,6 +280,7 @@ python examples/ftl_linter.py
 python examples/custom_functions.py
 python examples/thread_safety.py
 python examples/benchmark_loaders.py
+python examples/property_based_testing.py  # Requires: pip install hypothesis
 ```
 
 ## Basic Usage
@@ -312,5 +336,6 @@ price = Price: { NUMBER($amount, minimumFractionDigits: 2) } EUR
 
 - [API.md](../API.md) - Complete API reference with all public APIs documented
 - [README.md](../README.md) - Project overview and getting started guide
+- [ADVANCED_CUSTOM_FUNCTIONS.md](../ADVANCED_CUSTOM_FUNCTIONS.md) - Comprehensive guide to extending FTLLexBuffer with custom formatting functions
 - [TESTING.md](../TESTING.md) - Testing strategies and quality assurance practices
 - [CONTRIBUTING.md](../CONTRIBUTING.md) - Contribution guidelines for developers

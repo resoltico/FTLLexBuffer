@@ -81,24 +81,6 @@ FTLLexBuffer uses comprehensive testing with a focus on correctness and reliabil
 
 ---
 
-### [scripts/all.sh](scripts/all.sh) - Complete Pipeline
-
-**Purpose:** Run lint + test in correct order
-
-**Usage:**
-```bash
-./scripts/all.sh      # Run complete pipeline
-./scripts/all.sh --ci # CI mode
-```
-
-**Execution order:**
-1. lint.sh - Code quality
-2. test.sh - Full test suite
-
-**Duration:** ~1-2 minutes
-
----
-
 ## Daily Workflow
 
 ### Standard Development
@@ -115,15 +97,8 @@ vim src/ftllexbuffer/parser.py
 
 # 4. Commit if all pass
 git add . && git commit -m "Add feature"
-```
 
-### Full Validation Before Push
-
-```bash
-# Run complete pipeline
-./scripts/all.sh
-
-# If all pass, push
+# 5. Push
 git push
 ```
 

@@ -324,10 +324,11 @@ class FluentResolver:
         """Format value to string."""
         if isinstance(value, str):
             return value
-        if isinstance(value, (int, float)):
-            return str(value)
+        # Check bool BEFORE int/float (bool is subclass of int in Python)
         if isinstance(value, bool):
             return "true" if value else "false"
+        if isinstance(value, (int, float)):
+            return str(value)
         if value is None:
             return ""
         return str(value)

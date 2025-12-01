@@ -44,7 +44,7 @@ This document establishes the standard terminology used throughout FTLLexBuffer'
 
 ## CRITICAL: "Resource" Disambiguation
 
-**⚠️ WARNING**: The term "resource" has **three distinct meanings** in FTLLexBuffer. **ALWAYS specify which meaning** when using this term.
+**WARNING**: The term "resource" has **three distinct meanings** in FTLLexBuffer. **ALWAYS specify which meaning** when using this term.
 
 ### The Three Meanings of "Resource"
 

@@ -162,6 +162,11 @@ disable =
     # Reason: Ruff handles this
     ungrouped-imports,
 
+    # W0404: reimported
+    # Reason: Mid-function imports for test isolation (manual AST construction)
+    # Tests import modules mid-function to avoid circular dependencies and for test isolation
+    reimported,
+
     # ========================================================================
     # PROTECTED ACCESS (Integration Tests)
     # ========================================================================

@@ -203,7 +203,14 @@ class FluentLocalization:
                     try:
                         ftl_source = resource_loader.load(locale, resource_id)
                         bundle = self._bundles[locale]
-                        bundle.add_resource(ftl_source)
+                        # Construct source path for better error messages
+                        # If loader is PathResourceLoader, use its base_path
+                        if isinstance(resource_loader, PathResourceLoader):
+                            locale_path = resource_loader.base_path.format(locale=locale)
+                            source_path = f"{locale_path}/{resource_id}"
+                        else:
+                            source_path = f"{locale}/{resource_id}"
+                        bundle.add_resource(ftl_source, source_path=source_path)
                     except FileNotFoundError:
                         # Resource doesn't exist for this locale - skip it
                         # Fallback will try next locale in chain

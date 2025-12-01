@@ -188,7 +188,7 @@ def _punjabi_rule(n: int | float) -> str:
     return "one" if n in (0, 1) else "other"
 
 
-def _slavic_rule(n: int | float, lang: str) -> str:
+def _slavic_rule(n: int | float, _lang: str) -> str:
     """Slavic plural rules (Russian, Polish, Ukrainian).
 
     All use 4 categories: one, few, many, other
@@ -219,10 +219,7 @@ def _slavic_rule(n: int | float, lang: str) -> str:
     if i_mod_10 == 0 or 5 <= i_mod_10 <= 9 or 11 <= i_mod_100 <= 14:
         return "many"
 
-    # Polish has slightly different "one" rule for i=1 only
-    if lang == "pl" and i == 1:
-        return "one"
-
+    # All other cases (including Polish i=1, which is caught by line 211-212)
     return "other"
 
 

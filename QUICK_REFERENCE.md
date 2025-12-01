@@ -194,25 +194,32 @@ bundle.add_resource(ftl_source)
 ### Custom Functions
 
 ```python
-# Define custom function
-def CURRENCY(amount: float, *, currency_code: str = "USD") -> str:
-    """Format currency with symbol."""
-    symbols = {"USD": "$", "EUR": "€", "GBP": "£"}
-    symbol = symbols.get(currency_code, currency_code)
-    return f"{symbol}{amount:,.2f}"
+# Define custom function (FILESIZE example)
+def FILESIZE(bytes_count: int | float, *, precision: int = 2) -> str:
+    """Format file size in human-readable format."""
+    bytes_count = float(bytes_count)
+    units = ["B", "KB", "MB", "GB", "TB"]
+
+    for unit in units:
+        if bytes_count < 1024.0:
+            return f"{bytes_count:.{precision}f} {unit}"
+        bytes_count /= 1024.0
+    return f"{bytes_count:.{precision}f} PB"
 
 # Register function
 bundle = FluentBundle("en")
-bundle.add_function("CURRENCY", CURRENCY)
+bundle.add_function("FILESIZE", FILESIZE)
 
 # Use in FTL
 bundle.add_resource("""
-price = Total: { CURRENCY($amount, currency_code: "EUR") }
+file-info = { $filename } ({ FILESIZE($bytes) })
 """)
 
-result, errors = bundle.format_pattern("price", {"amount": 1234.56})
-# → "Total: €1,234.56"
+result, errors = bundle.format_pattern("file-info", {"filename": "video.mp4", "bytes": 157286400})
+# → "video.mp4 (150.00 MB)"
 ```
+
+**Note**: For currency formatting, use the built-in `CURRENCY()` function instead of custom implementations. See Built-in Functions section below.
 
 ---
 
@@ -353,13 +360,16 @@ about = About { -product-name }
 
 ```ftl
 # Built-in NUMBER function
-price = { NUMBER($amount, minimumFractionDigits: 2) } EUR
+quantity = { NUMBER($amount, minimumFractionDigits: 2) }
 
 # Built-in DATETIME function
 date = { DATETIME($timestamp, dateStyle: "short") }
 
+# Built-in CURRENCY function
+price = { CURRENCY($amount, currency: "EUR") }
+
 # Custom function
-formatted = { CURRENCY($amount, currency_code: "EUR") }
+file-size = { FILESIZE($bytes) }
 ```
 
 ---
@@ -390,6 +400,33 @@ percent = { NUMBER($value, maximumFractionDigits: 0) }%
 short-date = { DATETIME($timestamp, dateStyle: "short") }
 full-datetime = { DATETIME($timestamp, dateStyle: "long", timeStyle: "short") }
 ```
+
+### CURRENCY(value, options)
+
+**Options**:
+- `currency` (string, **required**): ISO 4217 currency code (e.g., "USD", "EUR", "JPY")
+- `currencyDisplay`: "symbol" | "code" | "name" (default: "symbol")
+
+**Examples**:
+```ftl
+# Symbol display (default)
+price = { CURRENCY($amount, currency: "USD") }
+# en_US → "$1,234.56"
+# lv_LV → "1 234,56 $"
+
+# Code display
+price-code = { CURRENCY($amount, currency: "EUR", currencyDisplay: "code") }
+# → "EUR 1,234.56"
+
+# Name display
+price-name = { CURRENCY($amount, currency: "EUR", currencyDisplay: "name") }
+# → "1,234.56 euros"
+```
+
+**CLDR Compliance**:
+- Currency-specific decimals: JPY (0), BHD/KWD/OMR (3), most others (2)
+- Locale-specific symbol placement: en_US (before), lv_LV/de_DE (after with space)
+- Uses Babel for CLDR-compliant formatting
 
 ---
 
@@ -512,7 +549,7 @@ if missing:
 
 ## Important Warnings
 
-### ⚠️ RTL Languages Require use_isolating=True
+### RTL Languages Require use_isolating=True
 
 ```python
 # WRONG - Breaks Arabic/Hebrew
@@ -527,7 +564,7 @@ bundle = FluentBundle("ar_EG")  # use_isolating=True by default
 - Unit tests (exact assertions)
 - LTR-only applications (verifiable constraint)
 
-### ⚠️ Errors Never Raise Exceptions
+### Errors Never Raise Exceptions
 
 ```python
 # format_pattern() NEVER raises - always returns (result, errors) tuple

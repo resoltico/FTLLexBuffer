@@ -148,7 +148,7 @@ class FluentBundle:
         self._messages: dict[str, Message] = {}
         self._terms: dict[str, Term] = {}
         self._parser = FluentParserV1()
-        self._function_registry = FUNCTION_REGISTRY
+        self._function_registry = FUNCTION_REGISTRY.copy()
 
         logger.info(
             "FluentBundle initialized for locale: %s (use_isolating=%s)",
@@ -183,6 +183,39 @@ class FluentBundle:
             True
         """
         return self._use_isolating
+
+    def get_babel_locale(self) -> str:
+        """Get the Babel locale identifier for this bundle (introspection API).
+
+        This is a debugging/introspection method that returns the actual Babel locale
+        identifier being used for NUMBER(), DATETIME(), and CURRENCY() formatting.
+
+        Useful for troubleshooting locale-related formatting issues, especially when
+        verifying which CLDR data is being applied.
+
+        Returns:
+            str: Babel locale identifier (e.g., "en_US", "lv_LV", "ar_EG")
+
+        Example:
+            >>> bundle = FluentBundle("lv")
+            >>> bundle.get_babel_locale()
+            'lv'
+            >>> bundle_us = FluentBundle("en-US")
+            >>> bundle_us.get_babel_locale()
+            'en_US'
+
+        Note:
+            This creates a LocaleContext temporarily to access Babel locale information.
+            The return value shows what locale Babel is using for CLDR-based formatting.
+
+        See Also:
+            - bundle.locale: The original locale code passed to FluentBundle
+            - LocaleContext.babel_locale: The underlying Babel Locale object
+        """
+        from .locale_context import LocaleContext
+
+        ctx = LocaleContext(self._locale)
+        return str(ctx.babel_locale)
 
     @staticmethod
     def _detect_circular_references(  # noqa: PLR0912
@@ -262,13 +295,15 @@ class FluentBundle:
                         cycle_str = " → ".join([f"-{t}" for t in cycle])
                         warnings.append(f"Circular term reference: {cycle_str}")
 
-    def add_resource(self, source: str) -> None:
+    def add_resource(self, source: str, *, source_path: str | None = None) -> None:
         """Add FTL resource to bundle.
 
         Parses FTL source and adds messages/terms to registry.
 
         Args:
             source: FTL file content
+            source_path: Optional path to source file for better error messages
+                        (e.g., "locales/lv/ui.ftl")
 
         Raises:
             FluentSyntaxError: On critical parse error
@@ -293,21 +328,41 @@ class FluentBundle:
                     case Junk():
                         # Count junk entries, log at debug level (non-critical parse artifacts)
                         junk_count += 1
-                        logger.debug("Junk entry (non-critical): %s", entry.content[:50])
+                        # Include source path in error message if available
+                        if source_path:
+                            logger.warning(
+                                "Syntax error in %s: %s",
+                                source_path,
+                                entry.content[:100]
+                            )
+                        else:
+                            logger.debug("Junk entry (non-critical): %s", entry.content[:50])
                     case _:
                         # Comments or other entry types don't need registration
                         pass
 
-            # Log summary
-            logger.info(
-                "Added resource: %d messages, %d terms, %d junk entries",
-                len(self._messages),
-                len(self._terms),
-                junk_count,
-            )
+            # Log summary with file context
+            if source_path:
+                logger.info(
+                    "Added resource %s: %d messages, %d terms, %d junk entries",
+                    source_path,
+                    len(self._messages),
+                    len(self._terms),
+                    junk_count,
+                )
+            else:
+                logger.info(
+                    "Added resource: %d messages, %d terms, %d junk entries",
+                    len(self._messages),
+                    len(self._terms),
+                    junk_count,
+                )
 
         except FluentSyntaxError as e:
-            logger.error("Failed to parse resource: %s", e)
+            if source_path:
+                logger.error("Failed to parse resource %s: %s", source_path, e)
+            else:
+                logger.error("Failed to parse resource: %s", e)
             raise
 
     # pylint: disable-next=too-many-locals,too-many-branches

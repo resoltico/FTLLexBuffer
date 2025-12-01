@@ -91,6 +91,7 @@ from .runtime.bundle import ValidationResult
 from .runtime.function_bridge import FunctionRegistry
 from .runtime.functions import (
     FUNCTION_REGISTRY,
+    currency_format,
     datetime_format,
     number_format,
 )
@@ -193,6 +194,7 @@ __all__ = [
     "FUNCTION_REGISTRY",
     "number_format",
     "datetime_format",
+    "currency_format",
     # AST - Core entry types
     "Resource",
     "Message",

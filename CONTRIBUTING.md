@@ -6,7 +6,6 @@
 git clone https://github.com/resoltico/ftllexbuffer.git
 cd ftllexbuffer
 pip install -e ".[dev]"
-./scripts/all.sh    # Run lint + test
 ```
 
 Dependencies: pytest, pytest-cov, hypothesis, mypy, ruff, pylint
@@ -15,7 +14,6 @@ Dependencies: pytest, pytest-cov, hypothesis, mypy, ruff, pylint
 
 | Script | Purpose | When to Use |
 |--------|---------|-------------|
-| `./scripts/all.sh` | Complete pipeline (lint + test) | Before every commit |
 | `./scripts/lint.sh` | Code quality checks | During development |
 | `./scripts/test.sh` | Run test suite | After code changes |
 
@@ -126,7 +124,8 @@ CI requirements:
 
 Before submitting:
 ```bash
-./scripts/all.sh --ci    # Ensure all checks pass
+./scripts/lint.sh
+./scripts/test.sh
 ```
 
 ## Version Management
@@ -158,7 +157,8 @@ The `__version__` attribute auto-populates from package metadata via `importlib.
 
 4. **Run tests to validate:**
    ```bash
-   ./scripts/all.sh
+   ./scripts/lint.sh
+   ./scripts/test.sh
    ```
 
 **NEVER** manually edit `__version__` in `src/ftllexbuffer/__init__.py` - it auto-updates from metadata.
@@ -174,7 +174,7 @@ Versioning (Semantic Versioning):
 
 ### Manual Release Process
 
-1. Run `./scripts/all.sh` (complete validation)
+1. Run `./scripts/lint.sh` and ./scripts/test.sh` (complete validation)
 2. Update version in `pyproject.toml` ONLY
 3. Run `pip install -e .` to refresh metadata
 4. Verify: `python -c "import ftllexbuffer; print(ftllexbuffer.__version__)"`

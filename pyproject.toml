@@ -1,10 +1,10 @@
 [build-system]
-requires = ["hatchling>=1.27.0,<2.0.0"]
+requires = ["hatchling>=1.28.0,<2.0.0"]
 build-backend = "hatchling.build"
 
 [project]
 name = "ftllexbuffer"
-version = "0.1.1"
+version = "0.2.0"
 description = "Python implementation of the FTL (Fluent Translation List) specification"
 readme = "README.md"
 requires-python = ">=3.13"
@@ -44,10 +44,10 @@ dependencies = [
 dev = [
     "pytest>=9.0.1",
     "pytest-cov>=7.0.0",
-    "hypothesis>=6.148.3",
-    "mypy>=1.18.2",
-    "pylint>=4.0.3",
-    "ruff>=0.14.6",
+    "hypothesis>=6.148.4",
+    "mypy>=1.19.0",
+    "pylint>=4.0.4",
+    "ruff>=0.14.7",
     "pytest-benchmark>=5.2.3",
 ]
 publish = [
@@ -91,6 +91,7 @@ only-include = [
     "TYPE_HINTS.md",
     "TESTING.md",
     "CONTRIBUTING.md",
+    "ADVANCED_CUSTOM_FUNCTIONS.md",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -256,8 +257,12 @@ ignore = [
 # test_properties.py: PLC0415 (runtime imports), SIM105 (explicit try-except)
 "tests/test_properties.py" = ["PLC0415", "SIM105"]
 
-# examples/: ERA001 (output comments), E402/I001 (demonstrative code, not production)
-"examples/**/*.py" = ["ERA001", "E402", "I001"]
+# examples/: Demonstrative code, not production - educational purpose
+# ERA001: Output comments are acceptable in examples
+# E402/I001: Import ordering not critical for examples
+# E501: Long lines acceptable for educational comments/docstrings
+# PLC0415: Mid-function imports acceptable for self-contained examples
+"examples/**/*.py" = ["ERA001", "E402", "I001", "E501", "PLC0415"]
 
 # helpers/type_assertions.py: PLC0415 (runtime imports to avoid circular dependencies)
 "tests/helpers/type_assertions.py" = ["PLC0415"]
@@ -325,6 +330,24 @@ ignore = [
 # SIM108: Explicit if/else for unreachable branch with type: ignore
 # E721: Testing type() equality for generic Result types
 "tests/test_result.py" = ["PT011", "PLC0415", "ARG001", "SIM108", "E721"]
+
+# test_ast_edge_cases.py: Manual AST construction and visitor pattern testing
+# N801: Class names like TestValidatorLines364_365 document specific line numbers being tested
+# N802: Visitor pattern methods (visit_TextElement) follow stdlib ast.NodeVisitor convention
+# PLC0415: Mid-function imports for manual AST construction (test isolation)
+"tests/test_ast_edge_cases.py" = ["N801", "N802", "PLC0415"]
+
+# test_introspection_coverage.py: Manual AST construction for introspection API testing
+# PLC0415: Mid-function imports for manual AST construction (test isolation)
+"tests/test_introspection_coverage.py" = ["PLC0415"]
+
+# test_locale_context_coverage.py: Error path testing with monkeypatching
+# PLC0415: Mid-function imports of babel modules for monkeypatching (test isolation)
+"tests/test_locale_context_coverage.py" = ["PLC0415"]
+
+# test_visitor_coverage.py: Visitor pattern transformation tests
+# N802: Visitor pattern methods (visit_Identifier) follow stdlib ast.NodeVisitor convention
+"tests/test_visitor_coverage.py" = ["N802"]
 
 # Pylint configuration
 [tool.pylint.main]

@@ -1,6 +1,6 @@
 """Fluent built-in functions with Python-native APIs.
 
-Implements NUMBER and DATETIME functions with locale-aware formatting.
+Implements NUMBER, DATETIME, and CURRENCY functions with locale-aware formatting.
 Uses snake_case parameters (PEP 8) with FTL camelCase bridge.
 
 Architecture:
@@ -139,6 +139,65 @@ def datetime_format(
     )
 
 
+def currency_format(
+    value: int | float,
+    locale_code: str = "en-US",
+    *,
+    currency: str,
+    currency_display: Literal["symbol", "code", "name"] = "symbol",
+) -> str:
+    """Format currency with locale-specific formatting.
+
+    Python-native API with snake_case parameters. FunctionRegistry bridges
+    to FTL camelCase (currencyDisplay → currency_display).
+
+    Args:
+        value: Monetary amount
+        locale_code: BCP 47 locale identifier (e.g., 'en-US', 'de-DE')
+        currency: ISO 4217 currency code (EUR, USD, JPY, BHD, etc.)
+        currency_display: Display style (default: "symbol")
+            - "symbol": Use currency symbol (€, $, ¥)
+            - "code": Use currency code (EUR, USD, JPY)
+            - "name": Use currency name (euros, dollars, yen)
+
+    Returns:
+        Formatted currency string
+
+    Examples:
+        >>> currency_format(123.45, "en-US", currency="EUR")
+        '€123.45'
+        >>> currency_format(123.45, "lv-LV", currency="EUR")
+        '123,45 €'
+        >>> currency_format(12345, "ja-JP", currency="JPY")
+        '¥12,345'
+        >>> currency_format(123.456, "ar-BH", currency="BHD")
+        '123.456 د.ب.'
+
+    FTL Usage:
+        price = { CURRENCY($amount, currency: "EUR") }
+        price-code = { CURRENCY($amount, currency: $code, currencyDisplay: "code") }
+        price-name = { CURRENCY($amount, currency: "EUR", currencyDisplay: "name") }
+
+    Thread Safety:
+        Thread-safe. Uses Babel (no global locale state mutation).
+
+    CLDR Compliance:
+        Implements CLDR formatting rules via Babel.
+        Matches Intl.NumberFormat with style: 'currency'.
+        Automatically applies currency-specific decimal places:
+        - JPY, KRW: 0 decimals
+        - BHD, KWD, OMR: 3 decimals
+        - Most others: 2 decimals
+    """
+    # Delegate to LocaleContext (immutable, thread-safe)
+    ctx = LocaleContext(locale_code)
+    return ctx.format_currency(
+        value,
+        currency=currency,
+        currency_display=currency_display,
+    )
+
+
 # Create function registry and register built-in functions
 FUNCTION_REGISTRY = FunctionRegistry()
 
@@ -147,3 +206,6 @@ FUNCTION_REGISTRY.register(number_format, ftl_name="NUMBER")
 
 # Register DATETIME function with camelCase parameter mapping
 FUNCTION_REGISTRY.register(datetime_format, ftl_name="DATETIME")
+
+# Register CURRENCY function with camelCase parameter mapping
+FUNCTION_REGISTRY.register(currency_format, ftl_name="CURRENCY")

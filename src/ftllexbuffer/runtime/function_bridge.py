@@ -187,6 +187,21 @@ class FunctionRegistry:
         sig = self._functions.get(ftl_name)
         return sig.python_name if sig else None
 
+    def copy(self) -> FunctionRegistry:
+        """Create a shallow copy of this registry.
+
+        Returns:
+            New FunctionRegistry instance with the same functions.
+
+        Note:
+            This creates a shallow copy - the FunctionSignature objects
+            are shared, but modifications to the registry (adding/removing
+            functions) won't affect the original.
+        """
+        new_registry = FunctionRegistry()
+        new_registry._functions = self._functions.copy()  # pylint: disable=protected-access
+        return new_registry
+
     @staticmethod
     def _to_camel_case(snake_case: str) -> str:
         """Convert Python snake_case to FTL camelCase.

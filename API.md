@@ -2,6 +2,8 @@
 
 Complete reference documentation for FTLLexBuffer's public API.
 
+**Latest Version**: 0.2.0 | [Changelog](CHANGELOG.md)
+
 **Package**: `ftllexbuffer`
 **Python Version**: 3.13+
 **Dependencies**: `Babel>=2.17.0`
@@ -331,7 +333,7 @@ bundle_fast = FluentBundle("en", use_isolating=False)
 #### add_resource
 
 ```python
-add_resource(source: FTLSource) -> None
+add_resource(source: FTLSource, *, source_path: str | None = None) -> None
 ```
 
 Parse and load FTL source into bundle.
@@ -339,6 +341,7 @@ Parse and load FTL source into bundle.
 **Parameters**:
 
 - **`source`** (FTLSource): FTL source (UTF-8 encoded string)
+- **`source_path`** (str | None, optional): File path for error messages (Added in 0.2.0)
 
 **Returns**:
 
@@ -354,6 +357,7 @@ Parse and load FTL source into bundle.
 - Non-critical syntax errors become `Junk` entries (logged at DEBUG level)
 - Messages/Terms with duplicate IDs: **last-write-wins** (later definition replaces earlier)
 - Comments are parsed but not stored (not needed for runtime)
+- **source_path** (v0.2.0+): When provided, includes file context in error/warning logs for easier debugging
 
 **Example**:
 
@@ -368,9 +372,10 @@ hello = Sveiki!
 goodbye = Uz redzēšanos!
 """)
 
-# From file
+# From file (with source_path for better error messages - v0.2.0+)
 ftl_path = Path("locale/lv/main.ftl")
-bundle.add_resource(ftl_path.read_text(encoding="utf-8"))
+bundle.add_resource(ftl_path.read_text(encoding="utf-8"), source_path=str(ftl_path))
+# Junk errors now logged as: "Junk entry in locale/lv/main.ftl:42: invalid syntax"
 
 # Overwrite previous definition
 bundle.add_resource("hello = Čau!")  # Replaces "Sveiki!"
@@ -782,6 +787,57 @@ if missing:
 
 ---
 
+#### get_all_message_variables
+
+> **Added in**: 0.1.1
+
+```python
+get_all_message_variables() -> dict[str, frozenset[str]]
+```
+
+Get variables for all messages in bundle (batch introspection API).
+
+**Returns**:
+
+- (dict[str, frozenset[str]]): Mapping of message IDs to their required variables
+
+**Use Cases**:
+
+- CI/CD validation pipelines analyzing entire FTL resources
+- Batch variable extraction for documentation generation
+- Translation completeness checking
+
+**Example**:
+
+```python
+bundle = FluentBundle("en", use_isolating=False)
+bundle.add_resource("""
+welcome = Hello, { $firstName } { $lastName }!
+emails = You have { $count } { $count ->
+    [one] email
+   *[other] emails
+}
+greeting = Hi!
+""")
+
+all_vars = bundle.get_all_message_variables()
+print(all_vars)
+# {
+#     'welcome': frozenset({'firstName', 'lastName'}),
+#     'emails': frozenset({'count'}),
+#     'greeting': frozenset()
+# }
+
+# Validate all messages have required variables
+for msg_id, required_vars in all_vars.items():
+    if required_vars:
+        print(f"{msg_id} requires: {', '.join(sorted(required_vars))}")
+```
+
+**Note**: This is equivalent to calling `get_message_variables()` for each message ID, but provides a cleaner API for batch operations.
+
+---
+
 #### introspect_message
 
 ```python
@@ -790,7 +846,7 @@ introspect_message(message_id: MessageId) -> MessageIntrospection
 
 Get comprehensive metadata about a message (bundle convenience method).
 
-**⚠️ IMPORTANT**: `introspect_message()` has two forms:
+**IMPORTANT**: `introspect_message()` has two forms:
 - **This bundle method**: `bundle.introspect_message(message_id: str)` - takes message ID
 - **Module-level function**: `introspect_message(message: Message)` - takes AST node (see [Introspection API](#introspect_message))
 
@@ -821,6 +877,48 @@ print(f"Variables: {info.get_variable_names()}")
 print(f"Functions: {info.get_function_names()}")
 # Output: Functions: frozenset({'NUMBER'})
 ```
+
+---
+
+#### get_babel_locale
+
+> **Added in**: 0.2.0
+
+```python
+get_babel_locale() -> str
+```
+
+Get the Babel locale identifier for this bundle (introspection/debugging API).
+
+**Returns**:
+
+- (str): Babel locale identifier (e.g., "en_US", "lv_LV", "ar_EG")
+
+**Use Cases**:
+
+- Debugging locale-related formatting issues
+- Verifying which CLDR data is being applied
+- Integration with custom functions that use Babel directly
+
+**Example**:
+
+```python
+bundle = FluentBundle("en-US")
+print(bundle.get_babel_locale())
+# Output: "en_US"
+
+bundle_lv = FluentBundle("lv-LV")
+print(bundle_lv.get_babel_locale())
+# Output: "lv_LV"
+
+# Use in custom functions
+def CUSTOM_FORMAT(value: float) -> str:
+    from babel import numbers
+    locale = bundle.get_babel_locale()
+    return numbers.format_decimal(value, locale=locale)
+```
+
+**Note**: This returns the actual Babel locale identifier being used internally for NUMBER(), DATETIME(), and CURRENCY() formatting. BCP-47 locale codes (with hyphens) are automatically converted to Babel's POSIX format (with underscores).
 
 ---
 
@@ -1875,9 +1973,11 @@ print(errors)
 
 ## Built-in Functions
 
-FTLLexBuffer provides two built-in Fluent functions following ECMA-402 Internationalization API conventions.
+FTLLexBuffer provides built-in Fluent functions following ECMA-402 Internationalization API conventions.
 
 ### NUMBER
+
+> **Added in**: 0.1.0
 
 ```python
 NUMBER(value, options)
@@ -1937,6 +2037,8 @@ bundle_de.format_pattern("price", {"amount": 1234.5})
 
 ### DATETIME
 
+> **Added in**: 0.1.0
+
 ```python
 DATETIME(value, options)
 ```
@@ -1990,11 +2092,145 @@ bundle.format_pattern("timestamp", {"time": dt})
 # → "Oct 27, 2025 2:30 PM"
 ```
 
+### CURRENCY
+
+> **Added in**: 0.2.0
+
+```python
+CURRENCY(value, options)
+```
+
+Format currency amounts with locale-specific symbols, placement, and precision.
+
+**Parameters**:
+
+- **`value`** (int | float): Monetary amount
+- **`currency`** (str, required): ISO 4217 currency code (EUR, USD, JPY, BHD, etc.)
+- **`currencyDisplay`** ("symbol" | "code" | "name", default="symbol"): Display mode
+  - `"symbol"`: Use currency symbol (€, $, ¥)
+  - `"code"`: Use currency code (EUR, USD, JPY)
+  - `"name"`: Use full currency name (euros, dollars, yen)
+
+**Returns**: Formatted currency string
+
+**Locale Behavior**:
+
+- Uses Babel's `format_currency()` (CLDR-compliant)
+- Thread-safe (no global locale state mutation)
+- Automatically positions currency symbol based on locale
+  - en_US: `$123.45` (symbol before, no space)
+  - lv_LV: `123,45 €` (symbol after, with space)
+  - de_DE: `123,45 €` (symbol after, with space)
+- Uses currency-specific decimal places from CLDR:
+  - JPY, KRW: 0 decimals (¥12,345)
+  - BHD, KWD, OMR: 3 decimals (123.456 د.ب.)
+  - Most others: 2 decimals (€123.45)
+- Handles locale-specific grouping separators automatically
+
+**Implementation Details**:
+
+- Locale is injected by `FluentBundle` (bundle-scoped, not process-global)
+- Uses Unicode CLDR currency data via Babel
+- Matches `Intl.NumberFormat` with `style: 'currency'` from JavaScript
+- Symbol placement and spacing per CLDR locale conventions
+
+**Examples**:
+
+```ftl
+# Basic usage
+price = { CURRENCY($amount, currency: "EUR") }
+
+# Variable currency code
+price = { CURRENCY($amount, currency: $code) }
+
+# Display as code
+price-code = { CURRENCY($amount, currency: "USD", currencyDisplay: "code") }
+
+# Multi-currency select
+price = { $currency ->
+    [EUR] { CURRENCY($amount, currency: "EUR") }
+    [USD] { CURRENCY($amount, currency: "USD") }
+   *[other] { CURRENCY($amount, currency: $currency) }
+}
+```
+
+```python
+# US locale: symbol before, period decimal
+bundle_us = FluentBundle("en_US")
+bundle_us.add_resource('price = { CURRENCY($amount, currency: "EUR") }')
+bundle_us.format_pattern("price", {"amount": 123.45})
+# → "€123.45"
+
+# Latvian locale: symbol after with space, comma decimal
+bundle_lv = FluentBundle("lv_LV")
+bundle_lv.add_resource('price = { CURRENCY($amount, currency: "EUR") }')
+bundle_lv.format_pattern("price", {"amount": 123.45})
+# → "123,45 €"
+
+# Japanese locale: JPY has 0 decimals
+bundle_jp = FluentBundle("ja_JP")
+bundle_jp.add_resource('price = { CURRENCY($amount, currency: "JPY") }')
+bundle_jp.format_pattern("price", {"amount": 12345})
+# → "¥12,345"
+
+# Bahrain: BHD has 3 decimals
+bundle_bh = FluentBundle("ar_BH")
+bundle_bh.add_resource('price = { CURRENCY($amount, currency: "BHD") }')
+bundle_bh.format_pattern("price", {"amount": 123.456})
+# → "123.456 د.ب."
+
+# Currency code display
+bundle = FluentBundle("en_US")
+bundle.add_resource('price = { CURRENCY($amount, currency: "EUR", currencyDisplay: "code") }')
+bundle.format_pattern("price", {"amount": 99.99})
+# → "EUR 99.99"
+```
+
+#### BIDI Isolation Characters
+
+For RTL language support (Arabic, Hebrew, Urdu), NUMBER(), DATETIME(), and CURRENCY() add Unicode BIDI isolation marks (U+2068 FSI, U+2069 PDI) around formatted output when `use_isolating=True` (default).
+
+**Why BIDI marks are needed**:
+- Prevents RTL/LTR text mixing issues in bidirectional text
+- Essential for proper display of numbers and currency in RTL languages
+- Follows Unicode TR9 bidirectional text algorithm
+
+**Example**:
+```python
+bundle = FluentBundle("ar")  # use_isolating=True by default
+bundle.add_resource("price = { NUMBER($amount) }")
+result, _ = bundle.format_pattern("price", {"amount": 123.45})
+# result → "\u2068123.45\u2069" (invisible FSI/PDI marks)
+```
+
+**Parsing Formatted Output**:
+
+If you need to parse NUMBER() or CURRENCY() output back to numeric values (e.g., user copy/paste into input fields):
+
+```python
+# Strip BIDI marks before parsing
+formatted = bundle.format_pattern("price", {"amount": 123.45})[0]
+clean = formatted.replace("\u2068", "").replace("\u2069", "")
+# Now parse clean string
+
+# Alternative: Remove all Unicode format characters
+import unicodedata
+clean = "".join(c for c in formatted if unicodedata.category(c) != "Cf")
+```
+
+**Disabling BIDI isolation** (not recommended):
+
+```python
+bundle = FluentBundle("ar", use_isolating=False)
+# WARNING: Only disable for non-production use (testing, examples)
+# RTL languages require BIDI marks for correct display
+```
+
 ---
 
 ## Advanced APIs - Low-Level Functions
 
-For advanced use cases requiring direct access to formatting functions without the FTL syntax layer, FTLLexBuffer exports the underlying Python implementations of NUMBER and DATETIME.
+For advanced use cases requiring direct access to formatting functions without the FTL syntax layer, FTLLexBuffer exports the underlying Python implementations of NUMBER, DATETIME, and CURRENCY.
 
 **When to use these**:
 - Building custom functions that need number/datetime formatting
@@ -2008,12 +2244,14 @@ For advanced use cases requiring direct access to formatting functions without t
 
 **Import**:
 ```python
-from ftllexbuffer import number_format, datetime_format
+from ftllexbuffer import number_format, datetime_format, currency_format
 ```
 
 ---
 
 ### number_format()
+
+> **Added in**: 0.1.0
 
 ```python
 def number_format(
@@ -2075,6 +2313,8 @@ number_format(1234567, "en-US", use_grouping=False)
 
 ### datetime_format()
 
+> **Added in**: 0.1.0
+
 ```python
 def datetime_format(
     value: datetime | str,
@@ -2126,6 +2366,94 @@ datetime_format("2025-10-27T14:30:00Z", "en-US", date_style="long")
 - `DATETIME()` in FTL uses camelCase parameters (dateStyle, timeStyle)
 - `datetime_format()` uses Python snake_case parameters (date_style, time_style)
 - FunctionRegistry bridges the two conventions automatically
+
+---
+
+### currency_format()
+
+> **Added in**: 0.2.0
+
+```python
+def currency_format(
+    value: int | float,
+    locale_code: str = "en-US",
+    *,
+    currency: str,
+    currency_display: Literal["symbol", "code", "name"] = "symbol",
+) -> str
+```
+
+Format currency with locale-specific formatting using Python API (snake_case parameters).
+
+**Parameters**:
+- **`value`** (int | float): Monetary amount to format
+- **`locale_code`** (str, default="en-US"): BCP 47 locale identifier (e.g., "en-US", "de-DE", "lv-LV")
+- **`currency`** (str, **required**): ISO 4217 currency code (e.g., "USD", "EUR", "JPY", "BHD")
+- **`currency_display`** ("symbol" | "code" | "name", default="symbol"): Display format
+  - `"symbol"`: Currency symbol (€, $, ¥)
+  - `"code"`: ISO code (EUR, USD, JPY)
+  - `"name"`: Full currency name (euros, US dollars)
+
+**Returns**: str - Formatted currency string
+
+**Thread Safety**: Thread-safe. Uses Babel (no global locale state mutation).
+
+**CLDR Compliance**: Implements CLDR currency formatting rules via Babel. Respects:
+- **Currency-specific decimal places**: JPY (0), BHD/KWD/OMR (3), most others (2)
+- **Locale-specific symbol placement**: en_US (before), lv_LV/de_DE (after with space)
+- **Locale-specific grouping**: en_US (comma), de_DE (period), lv_LV (space)
+
+**Examples**:
+```python
+from ftllexbuffer import currency_format
+
+# Symbol display (default) - locale determines placement
+currency_format(1234.56, "en-US", currency="USD")
+# → "$1,234.56"  (symbol before, no space)
+
+currency_format(1234.56, "de-DE", currency="EUR")
+# → "1.234,56 €"  (symbol after, with space)
+
+currency_format(1234.56, "lv-LV", currency="EUR")
+# → "1 234,56 €"  (space grouping, symbol after)
+
+# Code display
+currency_format(1234.56, "en-US", currency="EUR", currency_display="code")
+# → "EUR 1,234.56"
+
+# Name display
+currency_format(1234.56, "en-US", currency="EUR", currency_display="name")
+# → "1,234.56 euros"
+
+# Currency-specific decimal places (CLDR rules)
+currency_format(1234, "en-US", currency="JPY")
+# → "¥1,234"  (0 decimals for JPY)
+
+currency_format(1234.567, "en-US", currency="BHD")
+# → "BHD 1,234.567"  (3 decimals for BHD)
+
+# All major currencies
+currency_format(99.99, "en-US", currency="GBP")  # → "£99.99"
+currency_format(99.99, "en-US", currency="CAD")  # → "CA$99.99"
+currency_format(99.99, "en-US", currency="AUD")  # → "A$99.99"
+currency_format(99.99, "en-US", currency="CHF")  # → "CHF 99.99"
+```
+
+**Relationship to CURRENCY() function**:
+- `CURRENCY()` in FTL uses camelCase parameters (currencyDisplay)
+- `currency_format()` uses Python snake_case parameters (currency_display)
+- FunctionRegistry bridges the two conventions automatically
+
+**Error Handling**:
+- Invalid currency codes: Falls back to `"{currency} {value}"` format
+- Invalid values: Falls back to `"{currency} {value}"` format
+- Never raises exceptions (graceful degradation)
+
+**BIDI Isolation**:
+- By default, formatted output includes Unicode FSI/PDI marks (U+2068, U+2069)
+- Required for RTL language support (Arabic, Hebrew)
+- Can be disabled with `FluentBundle(use_isolating=False)` (NOT recommended for production)
+- See BIDI Isolation section for details on parsing formatted output
 
 ---
 
@@ -4368,7 +4696,7 @@ class NamedArgument:
 
 **Type Aliases**
 
-⚠️ **IMPORTANT**: Type aliases defined with Python 3.13's `type` keyword are for type annotations ONLY. They CANNOT be used with `isinstance()` at runtime.
+**IMPORTANT**: Type aliases defined with Python 3.13's `type` keyword are for type annotations ONLY. They CANNOT be used with `isinstance()` at runtime.
 
 These type aliases are defined in `ftllexbuffer.syntax.ast` and are primarily intended for type annotations rather than runtime isinstance checks.
 

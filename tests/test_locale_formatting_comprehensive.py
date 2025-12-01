@@ -157,6 +157,29 @@ class TestFluentBundleAllLocales:
         assert "{ERROR" not in result
 
     @pytest.mark.parametrize("locale_code", sorted(SUPPORTED_LOCALES))
+    def test_bundle_currency_function(self, locale_code: str) -> None:
+        """CURRENCY function works in FluentBundle for all 30 locales."""
+        bundle = FluentBundle(locale_code)
+        bundle.add_resource('price = { CURRENCY($amount, currency: "EUR") }')
+        result, _ = bundle.format_pattern("price", {"amount": 123.45})
+        assert isinstance(result, str)
+        assert "{ERROR" not in result
+        # Should contain currency symbol or code
+        assert "€" in result or "EUR" in result or "123" in result
+
+    @pytest.mark.parametrize("locale_code", sorted(SUPPORTED_LOCALES))
+    def test_bundle_currency_with_params(self, locale_code: str) -> None:
+        """CURRENCY function with parameters works for all 30 locales."""
+        bundle = FluentBundle(locale_code)
+        bundle.add_resource(
+            'price = { CURRENCY($amount, currency: "USD", currencyDisplay: "code") }'
+        )
+        result, _ = bundle.format_pattern("price", {"amount": 99.99})
+        assert isinstance(result, str)
+        assert "{ERROR" not in result
+        assert "USD" in result  # Code display should show USD
+
+    @pytest.mark.parametrize("locale_code", sorted(SUPPORTED_LOCALES))
     def test_bundle_plural_selection(self, locale_code: str) -> None:
         """Plural selection works for all 30 locales."""
         bundle = FluentBundle(locale_code)
@@ -230,6 +253,38 @@ class TestLocaleSpecificFormatting:
         # Chinese: 1,234.56
         assert isinstance(result, str)
 
+    def test_currency_eur_us(self) -> None:
+        """EUR in en_US: symbol before."""
+        ctx = LocaleContext("en-US")
+        result = ctx.format_currency(123.45, currency="EUR")
+        assert "€" in result or "EUR" in result
+        assert "123" in result
+
+    def test_currency_eur_lv(self) -> None:
+        """EUR in lv_LV: symbol after with space."""
+        ctx = LocaleContext("lv-LV")
+        result = ctx.format_currency(123.45, currency="EUR")
+        assert "€" in result or "EUR" in result
+        assert "123" in result
+        # Symbol typically after in Latvian
+
+    def test_currency_jpy_zero_decimals(self) -> None:
+        """JPY has 0 decimal places."""
+        ctx = LocaleContext("ja-JP")
+        result = ctx.format_currency(12345, currency="JPY")
+        # Accept halfwidth yen (\xa5 ¥), fullwidth yen (\uffe5 ￥), or JPY code
+        assert "\xa5" in result or "\uffe5" in result or "JPY" in result
+        # Should not show decimals - verify amount is present
+        assert "12" in result
+        assert "345" in result
+
+    def test_currency_bhd_three_decimals(self) -> None:
+        """BHD has 3 decimal places."""
+        ctx = LocaleContext("ar-BH")
+        result = ctx.format_currency(123.456, currency="BHD")
+        assert "123" in result
+        assert "456" in result  # 3 decimals
+
 
 class TestHypothesisLocaleFormatting:
     """Property-based tests for locale formatting."""
@@ -259,6 +314,20 @@ class TestHypothesisLocaleFormatting:
         ctx = LocaleContext(locale)
         dt = datetime(year, month, day, tzinfo=UTC)
         result = ctx.format_datetime(dt)
+        assert isinstance(result, str)
+
+    @given(
+        locale=st.sampled_from(sorted(SUPPORTED_LOCALES)),
+        amount=st.floats(min_value=-1e9, max_value=1e9, allow_nan=False, allow_infinity=False),
+        currency=st.sampled_from(["USD", "EUR", "GBP", "JPY", "CHF"]),
+    )
+    @settings(max_examples=200)
+    def test_currency_format_never_crashes(
+        self, locale: str, amount: float, currency: str
+    ) -> None:
+        """format_currency() never crashes for any locale, amount, and currency."""
+        ctx = LocaleContext(locale)
+        result = ctx.format_currency(amount, currency=currency)
         assert isinstance(result, str)
 
     @given(

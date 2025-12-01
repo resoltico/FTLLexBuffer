@@ -62,7 +62,7 @@ class TestResolverExpressionEdgeCases:
             resolver._resolve_expression(unknown, {})
 
     def test_resolve_bool_true_as_string(self) -> None:
-        """Boolean True converts to 'True' string."""
+        """Boolean True converts to lowercase 'true' string."""
         resolver = FluentResolver(
             locale="en",
             messages={},
@@ -73,10 +73,10 @@ class TestResolverExpressionEdgeCases:
 
         result = resolver._format_value(True)
 
-        assert result == "True"
+        assert result == "true"
 
     def test_resolve_bool_false_as_string(self) -> None:
-        """Boolean False converts to 'False' string."""
+        """Boolean False converts to lowercase 'false' string."""
         resolver = FluentResolver(
             locale="en",
             messages={},
@@ -87,7 +87,7 @@ class TestResolverExpressionEdgeCases:
 
         result = resolver._format_value(False)
 
-        assert result == "False"
+        assert result == "false"
 
     def test_resolve_none_as_empty_string(self) -> None:
         """None value converts to empty string."""

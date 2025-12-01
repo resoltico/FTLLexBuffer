@@ -352,15 +352,15 @@ test-none = { $value }
         """Resolver formats boolean True."""
         result, _errors = bundle.format_pattern("test-bool", {"value": True})
 
-        # Python str(True) = "True"
-        assert "True" in result
+        # Fluent formats booleans as lowercase "true"/"false"
+        assert "true" in result
 
     def test_format_boolean_false(self, bundle: Any) -> None:
         """Resolver formats boolean False."""
         result, _errors = bundle.format_pattern("test-bool", {"value": False})
 
-        # Python str(False) = "False"
-        assert "False" in result
+        # Fluent formats booleans as lowercase "true"/"false"
+        assert "false" in result
 
     def test_format_none_value(self, bundle: Any) -> None:
         """Resolver formats None as empty string."""

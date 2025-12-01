@@ -469,7 +469,8 @@ class TestResolverValueFormatting:
 
         result, _errors = bundle.format_pattern("msg", {var_name: bool_value})
 
-        expected = str(bool_value)
+        # Fluent formats booleans as lowercase "true"/"false"
+        expected = "true" if bool_value else "false"
         assert expected in result, f"Boolean {bool_value} not formatted correctly"
 
 

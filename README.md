@@ -38,7 +38,11 @@ Python 3.13+ implementation of the Fluent Localization System v1.0 specification
 
 ### The Problem with Traditional i18n
 
-**gettext/PO files** require all translations to follow the source message structure:
+Traditional localization often hands translators a single, opaque string with numbered placeholders. That works for trivial phrases, but quickly breaks when languages require different word order, grammatical inflection (case, gender), or multiple plural categories. The usual workarounds — forcing translators to guess placeholder positions, adding many near-duplicate strings, or entangling business logic with formatting — create brittle, hard-to-maintain code and unnatural translations.
+
+FTLLexBuffer solves this by exposing the lexical building blocks of a message: named tokens (not anonymous %s slots), conditional/variant sections (plural/gender branches), and the ability to reorder tokens in the translation. Translators keep full control of how words and tokens combine in their language, and developers keep application logic simple and correct.
+
+**gettext/PO files**, for example, require all translations to follow the source message structure, and translators can only fill in blanks, not restructure messages for natural phrasing:
 
 ```po
 # English source defines the structure
@@ -51,8 +55,6 @@ msgstr[1] "Masz %d pliki"
 msgstr[2] "Masz %d plików"
 msgstr[3] "Masz %d pliku"
 ```
-
-**Limitation**: Translators can only fill in blanks, not restructure messages for natural phrasing.
 
 ### The Fluent Solution: Asymmetric Localization
 
@@ -136,7 +138,7 @@ print(result)  # "5 faili"
 - Machine translation
 - Translation memory
 
-**Think of it as**: Jinja2 is to HTML templates what FTLLexBuffer is to localization.
+**Think of it as**: It’s the translator who doesn’t just change words — it rearranges them so the sentence actually fits your language’s grammar.
 
 ---
 
@@ -769,6 +771,53 @@ Formats datetime values with locale-specific patterns.
 date = { DATETIME($timestamp, dateStyle: "short") }
 ```
 
+**CURRENCY(value, options)**
+
+Formats monetary amounts with locale-specific currency symbols, placement, and precision.
+
+**Locale Behavior:**
+- Uses Babel (CLDR-compliant) for formatting
+- Automatically positions currency symbol (before/after) based on locale
+- Uses currency-specific decimal places (JPY: 0, BHD: 3, EUR/USD: 2)
+- Handles spacing and grouping per locale conventions
+
+**Options:**
+- `currency` (required): ISO 4217 currency code (EUR, USD, JPY, BHD, etc.)
+- `currencyDisplay`: "symbol" | "code" | "name" (default: "symbol")
+  - `"symbol"`: Use currency symbol (€, $, ¥)
+  - `"code"`: Use currency code (EUR, USD, JPY)
+  - `"name"`: Use full currency name (euros, dollars, yen)
+
+**Examples:**
+```ftl
+# Basic usage
+price = { CURRENCY($amount, currency: "EUR") }
+
+# Variable currency code
+price = { CURRENCY($amount, currency: $code) }
+
+# Display as code instead of symbol
+price-code = { CURRENCY($amount, currency: "USD", currencyDisplay: "code") }
+```
+
+**Locale-Specific Formatting:**
+```python
+bundle_us = FluentBundle("en_US")
+bundle_us.add_resource('price = { CURRENCY($amount, currency: "EUR") }')
+result, _ = bundle_us.format_pattern("price", {"amount": 123.45})
+# Result: "€123.45" (symbol before, period decimal)
+
+bundle_lv = FluentBundle("lv_LV")
+bundle_lv.add_resource('price = { CURRENCY($amount, currency: "EUR") }')
+result, _ = bundle_lv.format_pattern("price", {"amount": 123.45})
+# Result: "123,45 €" (symbol after with space, comma decimal)
+
+bundle_jp = FluentBundle("ja_JP")
+bundle_jp.add_resource('price = { CURRENCY($amount, currency: "JPY") }')
+result, _ = bundle_jp.format_pattern("price", {"amount": 12345})
+# Result: "¥12,345" (no decimals - JPY uses 0 decimal places)
+```
+
 ### Exception Classes
 
 All exceptions inherit from `FluentError`.
@@ -960,7 +1009,7 @@ Comprehensive comparison of localization libraries available in the Python ecosy
 | **Plural Forms** | CLDR (30 languages) | CLDR (all languages via babel) | CLDR (all languages via babel) | CLDR (via GNU ngettext) | **CLDR (600+ locales)** | **CLDR (all locales)** | Rails-style (one/many/zero/few) |
 | **Select Expressions** | Built-in (`{ $var -> ... }`) | Built-in | Built-in | Manual workarounds | Manual workarounds | Manual workarounds | Manual workarounds |
 | **Context Support** | Terms (`-brand`), Attributes | Terms, Attributes | Terms, Attributes | **pgettext()** (Python 3.8+) | **pgettext()** | **QCoreApplication.translate()** with disambiguation | Namespaces |
-| **Number Formatting** | Babel CLDR (NUMBER function) | Babel CLDR | Babel CLDR | Manual (use Babel separately) | **CLDR (format_number, format_currency)** | **Qt CLDR** | Manual |
+| **Number Formatting** | Babel CLDR (NUMBER, CURRENCY functions) | Babel CLDR | Babel CLDR | Manual (use Babel separately) | **CLDR (format_number, format_currency)** | **Qt CLDR** | Manual |
 | **Date Formatting** | Babel CLDR (DATETIME function) | Babel CLDR | Babel CLDR | Manual (use Babel separately) | **CLDR (format_datetime, format_date, format_time)** | **Qt CLDR** | Manual |
 | **Bidi Isolation** | **Yes** (Unicode FSI/PDI marks) | **Yes** | **Yes** | No (manual \u2068/\u2069) | No (manual) | **Yes** (Qt handles RTL) | No |
 | **Error Handling** | (value, errors) tuples | (value, errors) tuples | (value, errors) tuples | Fallback to msgid | Fallback to msgid | Fallback to source text | Fallback to key |

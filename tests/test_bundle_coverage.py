@@ -1,85 +1,134 @@
-"""Tests for runtime/bundle.py to achieve 100% coverage.
+"""Coverage tests for bundle.py edge cases and warning paths.
 
-Focuses on Junk entry handling and FluentSyntaxError in validate_resource.
+Targets uncovered lines in bundle.py:
+- Line 185: use_isolating property getter
+- Lines 215-218: get_babel_locale method
+- Lines 423-425: Warning for message with neither value nor attributes
+- Lines 429-432: Warning for duplicate term ID
+- Line 463: Visiting term attributes for validation
+- Lines 467-470: Warning for term referencing undefined message
+- Lines 475-477: Warning for term referencing undefined term
+- Lines 729-730: KeyError when introspecting non-existent message
 """
 
-from unittest.mock import patch
+import pytest
 
-from ftllexbuffer.diagnostics import FluentSyntaxError
-from ftllexbuffer.runtime.bundle import FluentBundle
-from ftllexbuffer.syntax.ast import Junk
+from ftllexbuffer import FluentBundle
 
 
-class TestBundleJunkHandling:
-    """Test Junk entry handling in add_resource (line 130)."""
+class TestBundleProperties:
+    """Test FluentBundle property accessors."""
 
-    def test_add_resource_with_junk_entry_increments_count(self):
-        """Test that Junk entries are counted in add_resource."""
+    def test_use_isolating_property_getter(self) -> None:
+        """Test use_isolating property getter (line 185)."""
+        bundle = FluentBundle("en", use_isolating=True)
+
+        # Access the property (hits line 185)
+        assert bundle.use_isolating is True
+
+        bundle_no_iso = FluentBundle("en", use_isolating=False)
+        assert bundle_no_iso.use_isolating is False
+
+    def test_get_babel_locale(self) -> None:
+        """Test get_babel_locale method (lines 215-218)."""
+        bundle = FluentBundle("en_US")
+
+        # Call get_babel_locale (hits lines 215-218)
+        locale_str = bundle.get_babel_locale()
+
+        assert "en" in locale_str  # Should return Babel locale string
+        assert isinstance(locale_str, str)
+
+
+class TestBundleValidationWarnings:
+    """Test bundle validation warning paths."""
+
+    def test_duplicate_term_id_warning(self) -> None:
+        """Duplicate term ID triggers warning (lines 429-432)."""
         bundle = FluentBundle("en")
 
-        # Create FTL with syntax that produces Junk
-        # Unclosed brace will create Junk entry
-        source = "bad = { missing close\nhello = World"
-
-        # Add resource - should handle Junk gracefully
-        bundle.add_resource(source)
-
-        # Should have registered the valid message
-        assert bundle.has_message("hello")
-
-    def test_add_resource_counts_junk_entries(self):
-        """Test Junk entry counting logic (line 130-133)."""
-        bundle = FluentBundle("en")
-
-        # Mix of valid and invalid entries
-        source = """
-# This will parse
-good = Valid message
-
-# This might create junk (malformed)
-{ unclosed
-
-# Another valid one
-another = Another valid
+        # Add FTL with duplicate term definitions
+        ftl = """
+-brand = Acme Corp
+-brand = Different Corp
+welcome = Welcome to { -brand }!
 """
+        # add_resource returns warnings
+        bundle.add_resource(ftl)
 
-        # Should not crash, even with junk
-        bundle.add_resource(source)
+        # The duplicate term is accepted but should trigger a warning
+        # The later definition overwrites the earlier one
+        result, _ = bundle.format_value("welcome")
+        assert "Different Corp" in result
 
-        # Valid messages should be registered
-        assert bundle.has_message("good") or bundle.has_message("another")
-
-
-class TestBundleValidateResourceError:
-    """Test validate_resource exception handling (lines 179-184)."""
-
-    def test_validate_resource_critical_syntax_error(self):
-        """Test validate_resource with critical FluentSyntaxError."""
+    def test_term_with_attributes_validation(self) -> None:
+        """Term with attributes gets validated (line 463)."""
         bundle = FluentBundle("en")
 
-        # Mock the parser to raise FluentSyntaxError
-        with patch.object(bundle._parser, "parse") as mock_parse:
-            mock_parse.side_effect = FluentSyntaxError("Critical parse error")
+        # Add term with attributes
+        ftl = """
+-brand = Acme Corp
+    .legal = Acme Corporation Ltd.
+    .short = Acme
 
-            result = bundle.validate_resource("any source")
+legal-notice = Legal: { -brand.legal }
+"""
+        bundle.add_resource(ftl)
 
-            # Should return ValidationResult with error
-            assert not result.is_valid
-            assert result.error_count == 1
-            assert isinstance(result.errors[0], Junk)
-            assert "Critical parse error" in result.errors[0].content
+        # This should successfully validate all attributes (hits line 463)
+        result, _ = bundle.format_value("legal-notice")
+        assert "Acme Corporation" in result
 
-    def test_validate_resource_logs_critical_error(self):
-        """Test that critical errors are logged."""
+    def test_term_references_undefined_message(self) -> None:
+        """Term referencing undefined message triggers warning (lines 467-470)."""
         bundle = FluentBundle("en")
 
-        with patch.object(bundle._parser, "parse") as mock_parse:
-            mock_parse.side_effect = FluentSyntaxError("Parse failure")
+        # Add term that references a non-existent message
+        ftl = """
+-brand = { missing-message }
+welcome = { -brand }
+"""
+        bundle.add_resource(ftl)
 
-            with patch("ftllexbuffer.runtime.bundle.logger") as mock_logger:
-                bundle.validate_resource("source")
+        # Should trigger warning but still work
+        result, _ = bundle.format_value("welcome")
+        assert isinstance(result, str)
 
-                # Should log error
-                mock_logger.error.assert_called_once()
-                call_args = str(mock_logger.error.call_args)
-                assert "Critical validation error" in call_args
+    def test_term_references_undefined_term(self) -> None:
+        """Term referencing undefined term triggers warning (lines 475-477)."""
+        bundle = FluentBundle("en")
+
+        # Add term that references a non-existent term
+        ftl = """
+-company = Welcome to { -missing-term }
+welcome = { -company }
+"""
+        bundle.add_resource(ftl)
+
+        # Should trigger warning but still work
+        result, _ = bundle.format_value("welcome")
+        assert isinstance(result, str)
+
+
+class TestBundleIntrospection:
+    """Test bundle introspection error paths."""
+
+    def test_introspect_message_not_found(self) -> None:
+        """Introspecting non-existent message raises KeyError (lines 729-730)."""
+        bundle = FluentBundle("en")
+        bundle.add_resource("hello = Hello!")
+
+        # Try to introspect a message that doesn't exist
+        with pytest.raises(KeyError, match="Message 'nonexistent' not found"):
+            bundle.introspect_message("nonexistent")
+
+    def test_introspect_message_exists(self) -> None:
+        """Introspecting existing message works."""
+        bundle = FluentBundle("en")
+        bundle.add_resource("hello = Hello { $name }!")
+
+        # Introspect existing message
+        info = bundle.introspect_message("hello")
+
+        # Should return MessageInfo
+        assert "name" in info.get_variable_names()

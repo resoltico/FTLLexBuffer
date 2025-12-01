@@ -1,9 +1,16 @@
 """Custom Functions Example - Demonstrating FluentBundle.add_function() API.
 
+    FTLLexBuffer includes built-in CURRENCY() function.
+    The CURRENCY example below is for EDUCATIONAL PURPOSES ONLY to demonstrate
+    how custom functions can properly integrate with Babel for i18n.
+
+    In production, use the built-in CURRENCY() function instead:
+        price = { CURRENCY($amount, currency: "EUR") }
+
 This example shows how to extend FTLLexBuffer with custom formatting functions
 for domain-specific needs:
 
-1. CURRENCY formatting with symbols
+1. CURRENCY formatting (EDUCATIONAL - shows proper Babel integration, use built-in instead!)
 2. PHONE number formatting
 3. MARKDOWN rendering
 4. FILESIZE human-readable formatting
@@ -24,31 +31,51 @@ from typing import Any
 from ftllexbuffer import FluentBundle
 
 
-# Example 1: CURRENCY Formatting
-def CURRENCY(amount: float, *, currency_code: str = "USD") -> str:  # noqa: N802  # pylint: disable=invalid-name
-    """Format currency with symbol.
+# Example 1: CURRENCY Formatting (EDUCATIONAL - Use Built-in CURRENCY() Instead!)
+def CURRENCY_CUSTOM_EXAMPLE(amount: float, *, currency_code: str = "USD", locale: str = "en_US") -> str:  # noqa: N802  # pylint: disable=invalid-name
+    """Format currency with CLDR-compliant locale-aware formatting.
 
-    FTL function naming convention: UPPERCASE names match FTL spec (DATETIME, NUMBER, etc.)
-    This follows the same pattern as built-in FTL functions.
+    EDUCATIONAL EXAMPLE ONLY - FTLLexBuffer has built-in CURRENCY() function!
+
+    This example demonstrates how to properly implement currency formatting
+    using Babel for i18n, handling locale-specific symbol placement, decimal
+    precision, and spacing.
+
+    DO NOT USE THIS IN PRODUCTION - use the built-in CURRENCY() function instead:
+        bundle.add_resource('price = { CURRENCY($amount, currency: "EUR") }')
+
+    FTL function naming convention: UPPERCASE names match FTL spec.
 
     Args:
         amount: Monetary amount
-        currency_code: ISO 4217 currency code (USD, EUR, GBP, etc.)
+        currency_code: ISO 4217 currency code (USD, EUR, GBP, JPY, BHD, etc.)
+        locale: Babel locale identifier for formatting
 
     Returns:
-        Formatted currency string with symbol
+        Formatted currency string using CLDR rules
+
+    Note:
+        The built-in CURRENCY() function uses the bundle's locale automatically.
+        This example shows how custom functions can leverage Babel for i18n.
+
+    Why the old example was broken:
+        - Hardcoded symbol placement (always before amount) - wrong for many locales
+        - Hardcoded 2 decimals - wrong for JPY (0 decimals), BHD (3 decimals)
+        - Ignored locale-specific spacing and formatting rules
+        - Did not use CLDR data
     """
-    symbols = {
-        "USD": "$",
-        "EUR": "€",
-        "GBP": "£",
-        "PLN": "zł",
-        "JPY": "¥",
-        "CAD": "CA$",
-        "AUD": "A$",
-    }
-    symbol = symbols.get(currency_code, currency_code)
-    return f"{symbol}{amount:,.2f}"
+    try:
+        # Import Babel inside function to keep example self-contained
+        from babel import numbers  # pylint: disable=import-outside-toplevel
+
+        # Use Babel's format_currency for proper CLDR compliance
+        return numbers.format_currency(amount, currency_code, locale=locale)
+    except ImportError:
+        # Fallback if Babel not installed (should never happen in FTLLexBuffer env)
+        return f"{currency_code} {amount:.2f}"
+    except Exception:  # pylint: disable=broad-exception-caught
+        # Fluent functions must never crash
+        return f"{currency_code} {amount}"
 
 
 # Example 2: PHONE Formatting
@@ -227,8 +254,11 @@ if __name__ == "__main__":
 
     bundle = FluentBundle("en_US", use_isolating=False)
 
-    # Register all custom functions
-    bundle.add_function("CURRENCY", CURRENCY)
+    # Register custom functions
+    # NOTE: CURRENCY is NOW BUILT-IN! Use the built-in CURRENCY() function instead
+    # The CURRENCY_CUSTOM_EXAMPLE is shown for educational purposes only
+    # bundle.add_function("CURRENCY_CUSTOM_EXAMPLE", CURRENCY_CUSTOM_EXAMPLE)  # Don't use!
+
     bundle.add_function("PHONE", PHONE)
     bundle.add_function("MARKDOWN", MARKDOWN)
     bundle.add_function("FILESIZE", FILESIZE)
@@ -236,10 +266,10 @@ if __name__ == "__main__":
     # Create locale-aware function for English
     bundle.add_function("GREETING", make_greeting_function(bundle.locale))
 
-    # Add FTL resource using custom functions
+    # Add FTL resource using built-in and custom functions
     bundle.add_resource("""
-# E-commerce examples
-product-price = { CURRENCY($amount, currency_code: "EUR") }
+# E-commerce examples (using BUILT-IN CURRENCY function)
+product-price = { CURRENCY($amount, currency: "EUR") }
 support-phone = Call us at { PHONE($number, format_style: "international") }
 
 # File management
@@ -257,12 +287,13 @@ greet = { GREETING($name, formal: "false") }
 greet-formal = { GREETING($name, formal: "true") }
 """)
 
-    # Example 1: Currency
+    # Example 1: Currency (using BUILT-IN CURRENCY function)
     print("\n" + "-" * 60)
-    print("Example 1: CURRENCY Formatting")
+    print("Example 1: CURRENCY Formatting (BUILT-IN)")
     print("-" * 60)
     result, _ = bundle.format_pattern("product-price", {"amount": 1234.56})
     print(f"Product price: {result}")
+    print("Note: Using built-in CURRENCY() function with CLDR-compliant formatting")
     # Output: Product price: €1,234.56
 
     # Example 2: Phone

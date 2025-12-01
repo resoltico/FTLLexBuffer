@@ -51,7 +51,8 @@ __version__ = version("ftllexbuffer")  # ← Auto-populated from package metadat
 
 4. **Run validation:**
    ```bash
-   ./scripts/all.sh  # Lint + test
+   ./scripts/lint.sh
+   ./scripts/test.sh
    ```
 
 5. **Commit and tag:**
@@ -471,7 +472,7 @@ Next Steps
 ❌ **Don't skip `pip install -e .`** - Metadata won't update
 ❌ **Don't use non-semver formats** - Breaks tooling
 ❌ **Don't duplicate version in multiple files** - Causes drift
-❌ **Don't commit without testing** - Run `./scripts/all.sh` first
+❌ **Don't commit without testing** - Run `./scripts/lint.sh` and `./scripts/test.sh` first
 
 ---
 

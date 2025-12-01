@@ -216,6 +216,7 @@ class SemanticValidator:
                 span=term.span,
                 term_id=term.id.name,
             )
+            return  # Cannot validate further without a value
 
         # Validate value pattern
         self._validate_pattern(term.value, context="term")

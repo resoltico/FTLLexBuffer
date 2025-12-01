@@ -1,7 +1,7 @@
 """Locale context for thread-safe, bundle-scoped formatting.
 
 This module provides locale-aware formatting without global state mutation.
-Uses Babel for CLDR-compliant number and date formatting.
+Uses Babel for CLDR-compliant number, date, and currency formatting.
 
 Architecture:
     - LocaleContext: Immutable locale configuration container
@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 class LocaleContext:
     """Immutable locale configuration for formatting operations.
 
-    Provides thread-safe, locale-specific formatting for numbers and dates
+    Provides thread-safe, locale-specific formatting for numbers, dates, and currency
     without mutating global state. Each FluentBundle owns its LocaleContext.
 
     Args:
@@ -266,3 +266,95 @@ class LocaleContext:
                 exc_info=True,
             )
             return dt_value.isoformat()
+
+    def format_currency(
+        self,
+        value: int | float,
+        *,
+        currency: str,
+        currency_display: Literal["symbol", "code", "name"] = "symbol",
+    ) -> str:
+        """Format currency with locale-specific rules.
+
+        Implements Fluent CURRENCY function semantics using Babel.
+
+        Args:
+            value: Monetary amount
+            currency: ISO 4217 currency code (EUR, USD, JPY, BHD, etc.)
+            currency_display: Display style for currency
+                - "symbol": Use currency symbol (€, $, ¥)
+                - "code": Use currency code (EUR, USD, JPY)
+                - "name": Use currency name (euros, dollars, yen)
+
+        Returns:
+            Formatted currency string according to locale rules
+
+        Examples:
+            >>> ctx = LocaleContext('en-US')
+            >>> ctx.format_currency(123.45, currency='EUR')
+            '€123.45'
+
+            >>> ctx = LocaleContext('lv-LV')
+            >>> ctx.format_currency(123.45, currency='EUR')
+            '123,45 €'
+
+            >>> ctx = LocaleContext('ja-JP')
+            >>> ctx.format_currency(12345, currency='JPY')
+            '¥12,345'
+
+            >>> ctx = LocaleContext('ar-BH')
+            >>> ctx.format_currency(123.456, currency='BHD')
+            '123.456 د.ب.'
+
+        CLDR Compliance:
+            Uses Babel's format_currency() which implements CLDR rules.
+            Matches Intl.NumberFormat with style: 'currency'.
+            Automatically applies currency-specific decimal places:
+            - JPY: 0 decimals
+            - BHD, KWD, OMR: 3 decimals
+            - Most others: 2 decimals
+        """
+        try:
+            # Map currency_display to Babel's format_type parameter
+            # Babel format_type must be Literal["name", "standard", "accounting"]
+            if currency_display == "name":
+                format_type: Literal["name", "standard", "accounting"] = "name"
+            else:
+                # Both "symbol" and "code" use "standard" format_type
+                format_type = "standard"
+
+            # For "code" display, we need custom format pattern
+            # Babel uses ¤ for symbol, ¤¤ for code, ¤¤¤ for name
+            format_pattern: str | None = None
+            if currency_display == "code":
+                # Force code display with ¤¤ pattern
+                format_pattern = "¤¤ #,##0.00"
+
+            # Babel's format_currency() automatically uses currency-specific
+            # decimal places from CLDR (0 for JPY, 3 for BHD, 2 for most)
+            return str(
+                babel_numbers.format_currency(
+                    value,
+                    currency,
+                    locale=self.babel_locale,
+                    currency_digits=True,  # Use CLDR currency-specific decimals
+                    format_type=format_type,
+                    format=format_pattern,  # Custom pattern for code display
+                )
+            )
+
+        except (ValueError, TypeError) as e:
+            # Expected: invalid currency code or non-numeric value
+            logger.debug("Currency formatting failed (expected error): %s", e)
+            return f"{currency} {value}"
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            # Unexpected: platform-specific errors
+            logger.warning(
+                "Unexpected error in format_currency(%s, %s, locale=%s): %s",
+                value,
+                currency,
+                self.locale_code,
+                e,
+                exc_info=True,
+            )
+            return f"{currency} {value}"
