@@ -5,6 +5,95 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2025-12-02
+
+### Fixed
+
+- **[CRITICAL] CURRENCY() locale bug**: CURRENCY() function now correctly respects FluentBundle locale instead of always formatting in en_US
+  - **Root cause**: CURRENCY was missing from locale injection check in resolver.py:307
+  - **Impact**: All non-US locales now format currency correctly
+    - Before: `FluentBundle("lv-LV")` with EUR → "€123.45" (incorrect US format)
+    - After: `FluentBundle("lv-LV")` with EUR → "123,45 €" (correct Latvian format)
+  - **Fix**: Added "CURRENCY" to locale injection check + replaced magic tuple with metadata system
+
+### Added
+
+- **Function metadata system** (`src/ftllexbuffer/runtime/function_metadata.py`)
+  - Replaces fragile magic tuple `("NUMBER", "DATETIME")` with explicit metadata declarations
+  - Type-safe helpers: `requires_locale_injection()`, `should_inject_locale()`
+  - Prevents future locale injection bugs through self-validation
+  - Correctly handles custom functions that override built-in names
+
+- **Contract testing framework** (358 new tests in `tests/test_function_locale_contracts.py`)
+  - Verifies FluentBundle output matches direct function calls for all locale-dependent functions
+  - Tests NUMBER(), DATETIME(), CURRENCY() across 30 locales with various parameters
+  - **Would have caught CURRENCY locale bug immediately**
+  - Prevents future locale injection regressions
+
+- **Documentation validation CI** (`scripts/validate_docs.py`)
+  - Parses all FTL code blocks in markdown files to ensure validity
+  - Prevents shipping invalid FTL examples that mislead users
+  - Auto-skips intentionally invalid examples (marked with comments)
+  - Validates 37 FTL examples across 6 documentation files
+
+- **Enhanced parser error messages** for variable named arguments
+  - Explains WHY variables aren't allowed in named arguments (FTL spec restriction for static analysis)
+  - Shows spec-compliant workaround using select expressions
+  - Links to official Fluent documentation
+
+### Changed
+
+- **Resolver architecture**: Now uses metadata system instead of hardcoded function list
+  - Old (fragile): `if func_name in ("NUMBER", "DATETIME"):`  # Easy to forget new functions
+  - New (robust): `if should_inject_locale(func_name, registry):`  # Self-documenting, type-safe
+
+- **Documentation**: Fixed all invalid FTL examples that violated spec
+  - README.md: Replaced `currency: $code` with spec-compliant select expression workaround
+  - API.md: Removed all variable named argument examples, added correct alternatives
+  - All documentation examples now parse successfully with FluentParserV1
+
+### Removed
+
+- Removed invalid FTL examples showing `useGrouping: false` (boolean literals not supported in FTL spec)
+
+### Internal
+
+- Resolver now queries metadata system for locale injection decisions
+- All built-in functions have explicit metadata entries with `requires_locale` flag
+- Import-time validation ensures metadata completeness
+
+### Migration Notes
+
+#### For Users
+
+**CURRENCY() output changes for non-US locales** (Bug fix, not breaking change):
+- If you used CURRENCY() in v0.2.0 with non-US locales, output will now be correctly locale-formatted
+- Example: `FluentBundle("de-DE")` with EUR now returns "123,45 €" instead of "€123.45"
+- **Action required**: None - this is correct behavior. If you worked around the bug, remove your workaround.
+
+**Variable named arguments now show helpful error**:
+- If you tried `currency: $code`, you'll get a clear error explaining the FTL spec limitation
+- Error message includes spec-compliant workaround using select expressions
+- **Action required**: Update FTL to use select expressions (see error message for example)
+
+#### For Contributors
+
+**Adding new built-in functions**:
+1. Add function implementation to `src/ftllexbuffer/runtime/functions.py`
+2. **NEW**: Add metadata entry to `BUILTIN_FUNCTIONS` in `function_metadata.py`:
+   ```python
+   "MYFUNCTION": FunctionMetadata(
+       python_name="my_function",
+       ftl_name="MYFUNCTION",
+       requires_locale=True,  # Set based on function needs
+       category="formatting",
+   )
+   ```
+3. Add contract tests to `tests/test_function_locale_contracts.py` if locale-dependent
+4. Register in `FUNCTION_REGISTRY` (validation will fail if metadata missing)
+
+---
+
 ## [0.2.0] - 2025-12-01
 
 ### Added
@@ -116,5 +205,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release.
 
+[0.3.0]: https://github.com/resoltico/ftllexbuffer/releases/tag/v0.3.0
+[0.2.0]: https://github.com/resoltico/ftllexbuffer/releases/tag/v0.2.0
 [0.1.1]: https://github.com/resoltico/ftllexbuffer/releases/tag/v0.1.1
 [0.1.0]: https://github.com/resoltico/ftllexbuffer/releases/tag/v0.1.0

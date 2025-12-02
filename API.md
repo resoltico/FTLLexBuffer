@@ -2013,7 +2013,6 @@ Format numeric values with locale-specific separators.
 ```ftl
 price = { NUMBER($amount, minimumFractionDigits: 2) }
 percent = { NUMBER($ratio, maximumFractionDigits: 0) }%
-exact = { NUMBER($value, useGrouping: false) }
 ```
 
 ```python
@@ -2140,17 +2139,15 @@ Format currency amounts with locale-specific symbols, placement, and precision.
 # Basic usage
 price = { CURRENCY($amount, currency: "EUR") }
 
-# Variable currency code
-price = { CURRENCY($amount, currency: $code) }
-
 # Display as code
 price-code = { CURRENCY($amount, currency: "USD", currencyDisplay: "code") }
 
-# Multi-currency select
+# Variable currency code - use select expression (FTL spec requires literal named args)
 price = { $currency ->
     [EUR] { CURRENCY($amount, currency: "EUR") }
     [USD] { CURRENCY($amount, currency: "USD") }
-   *[other] { CURRENCY($amount, currency: $currency) }
+    [GBP] { CURRENCY($amount, currency: "GBP") }
+   *[other] { $amount } { $currency }
 }
 ```
 

@@ -969,13 +969,23 @@ class FluentParserV1:
                 # Per FTL spec: NamedArgument ::= Identifier ":" (StringLiteral | NumberLiteral)
                 # Named argument values MUST be literals, NOT references or variables
                 if not isinstance(value_expr, (StringLiteral, NumberLiteral)):
-                    return Failure(
-                        ParseError(
-                            "Named argument value must be literal (string or number), "
-                            "not variable or reference",
-                            cursor,
-                        )
+                    # Enhanced error message with explanation and workaround
+                    error_msg = (
+                        f"Named argument '{arg_name}' requires a literal value "
+                        f"(string or number), not a variable or reference.\n\n"
+                        f"FTL Specification Restriction:\n"
+                        f"  The Fluent spec restricts named arguments to literals\n"
+                        f"  for static analysis by translation tools.\n\n"
+                        f"Workaround - Use Select Expression:\n"
+                        f"  Instead of: {{ FUNCTION($val, {arg_name}: $variable) }}\n"
+                        f"  Use this:   {{ $variable ->\n"
+                        f'                 [opt1] {{ FUNCTION($val, {arg_name}: "opt1") }}\n'
+                        f'                 [opt2] {{ FUNCTION($val, {arg_name}: "opt2") }}\n'
+                        f"                *[other] {{ $val }}\n"
+                        f"              }}\n\n"
+                        f"See: https://projectfluent.org/fluent/guide/selectors.html"
                     )
+                    return Failure(ParseError(error_msg, cursor))
 
                 named.append(NamedArgument(name=Identifier(arg_name), value=value_expr))
                 seen_named = True

@@ -793,8 +793,13 @@ Formats monetary amounts with locale-specific currency symbols, placement, and p
 # Basic usage
 price = { CURRENCY($amount, currency: "EUR") }
 
-# Variable currency code
-price = { CURRENCY($amount, currency: $code) }
+# Variable currency code - use select expression (FTL spec requires literal named args)
+price = { $code ->
+    [EUR] { CURRENCY($amount, currency: "EUR") }
+    [USD] { CURRENCY($amount, currency: "USD") }
+    [GBP] { CURRENCY($amount, currency: "GBP") }
+   *[other] { $amount } { $code }
+}
 
 # Display as code instead of symbol
 price-code = { CURRENCY($amount, currency: "USD", currencyDisplay: "code") }

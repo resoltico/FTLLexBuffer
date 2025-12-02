@@ -289,7 +289,10 @@ class FluentResolver:
         """Resolve function call.
 
         Uses FunctionRegistry to handle camelCase → snake_case parameter conversion.
+        Uses metadata system to determine if locale injection is needed.
         """
+        from ftllexbuffer.runtime.function_metadata import should_inject_locale
+
         func_name = func_ref.id.name
 
         # Evaluate positional arguments
@@ -303,17 +306,18 @@ class FluentResolver:
             for arg in func_ref.arguments.named
         }
 
-        # Built-in functions: Use registry with locale injection
-        if func_name in ("NUMBER", "DATETIME"):
+        # Check if locale injection is needed (metadata-driven, not magic tuple)
+        # This correctly handles custom functions with same name as built-ins
+        if should_inject_locale(func_name, self.function_registry):
+            # Built-in formatting function: inject locale as second positional argument
             # FunctionRegistry.call() handles camelCase → snake_case conversion
-            # Insert locale as second positional argument (after value)
             return self.function_registry.call(
                 func_name,
                 [*positional_values, self.locale],
                 named_values,
             )
 
-        # Custom functions: Use registry without locale injection
+        # Custom function or built-in that doesn't need locale: pass args as-is
         return self.function_registry.call(
             func_name,
             positional_values,

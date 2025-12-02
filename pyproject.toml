@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "ftllexbuffer"
-version = "0.2.0"
+version = "0.3.0"
 description = "Python implementation of the FTL (Fluent Translation List) specification"
 readme = "README.md"
 requires-python = ">=3.13"
@@ -44,7 +44,7 @@ dependencies = [
 dev = [
     "pytest>=9.0.1",
     "pytest-cov>=7.0.0",
-    "hypothesis>=6.148.4",
+    "hypothesis>=6.148.5",
     "mypy>=1.19.0",
     "pylint>=4.0.4",
     "ruff>=0.14.7",
@@ -75,23 +75,23 @@ Changelog = "https://github.com/resoltico/ftllexbuffer/blob/main/CHANGELOG.md"
 # Files must be committed to git to be included in sdist
 # .gitignore is always included (cannot be excluded per Hatch behavior)
 only-include = [
+    "/.github/workflows",
+    "/examples",
     "/src",
     "/tests",
-    "/examples",
-    "/.github/workflows",
+    "ADVANCED_CUSTOM_FUNCTIONS.md",
+    "API.md",
+    "CHANGELOG.md",
+    "CONTRIBUTING.md",
     "LICENSE",
+    "MIGRATION.md",
     "NOTICE",
     "PATENTS.md",
-    "README.md",
-    "CHANGELOG.md",
-    "API.md",
-    "MIGRATION.md",
-    "TERMINOLOGY.md",
     "QUICK_REFERENCE.md",
-    "TYPE_HINTS.md",
+    "README.md",
     "TESTING.md",
-    "CONTRIBUTING.md",
-    "ADVANCED_CUSTOM_FUNCTIONS.md",
+    "TERMINOLOGY.md",
+    "TYPE_HINTS.md",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -229,6 +229,12 @@ ignore = [
 "src/ftllexbuffer/runtime/bundle.py" = ["PLC0415"]
 "src/ftllexbuffer/syntax/cursor.py" = ["PLC0415"]
 "src/ftllexbuffer/syntax/type_guards.py" = ["PLC0415"]
+
+# Metadata system: Runtime import to avoid circular dependency with FUNCTION_REGISTRY
+"src/ftllexbuffer/runtime/function_metadata.py" = ["PLC0415"]
+
+# Resolver: Runtime import of metadata system to avoid circular dependency
+"src/ftllexbuffer/runtime/resolver.py" = ["PLC0415"]
 
 # TEST CODE PATTERNS
 # Philosophy: Tests optimize for clarity and DSL fidelity over strict naming
