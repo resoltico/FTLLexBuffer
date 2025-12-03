@@ -133,22 +133,31 @@ jobs:
           echo "Verifying package: $PACKAGE"
 
           # Check wheel contains required files
+          set +o pipefail  # grep -q can cause SIGPIPE
           if ! unzip -l dist/*.whl | grep -q "${PACKAGE}/__init__.py"; then
+            set -o pipefail
             echo "::error::Wheel missing ${PACKAGE}/__init__.py"
             exit 1
           fi
+          set -o pipefail
 
           # Ensure no compiled Python files in wheel
+          set +o pipefail
           if unzip -l dist/*.whl | grep -qE "\.pyc$|__pycache__"; then
+            set -o pipefail
             echo "::error::Wheel contains compiled Python files"
             exit 1
           fi
+          set -o pipefail
 
           # Check source distribution contains source files
+          set +o pipefail  # grep -q closes pipe early, causing tar SIGPIPE with pipefail
           if ! tar -tzf dist/*.tar.gz | grep -q "src/${PACKAGE}/__init__.py"; then
+            set -o pipefail
             echo "::error::Source distribution missing src/${PACKAGE}/__init__.py"
             exit 1
           fi
+          set -o pipefail
 
           echo "✓ Package integrity verified"
 
