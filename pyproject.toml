@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "ftllexbuffer"
-version = "0.3.0"
+version = "0.4.0"
 description = "Python implementation of the FTL (Fluent Translation List) specification"
 readme = "README.md"
 requires-python = ">=3.13"
@@ -257,6 +257,9 @@ ignore = [
 # test_resolver_coverage.py: N802 (UPPERCASE FTL function names mimicking spec)
 "tests/test_resolver_coverage.py" = ["N802"]
 
+# test_function_registry_integration.py: N802 (UPPERCASE FTL function names for testing)
+"tests/test_function_registry_integration.py" = ["N802"]
+
 # test_functions_coverage.py: SIM105 (explicit try-except for locale error handling)
 "tests/test_functions_coverage.py" = ["SIM105"]
 
@@ -268,7 +271,8 @@ ignore = [
 # E402/I001: Import ordering not critical for examples
 # E501: Long lines acceptable for educational comments/docstrings
 # PLC0415: Mid-function imports acceptable for self-contained examples
-"examples/**/*.py" = ["ERA001", "E402", "I001", "E501", "PLC0415"]
+# N802: UPPERCASE FTL function names matching spec conventions
+"examples/**/*.py" = ["ERA001", "E402", "I001", "E501", "PLC0415", "N802"]
 
 # helpers/type_assertions.py: PLC0415 (runtime imports to avoid circular dependencies)
 "tests/helpers/type_assertions.py" = ["PLC0415"]

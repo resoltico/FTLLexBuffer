@@ -36,7 +36,7 @@ from ftllexbuffer import (
 class RemoveCommentsTransformer(ASTTransformer):
     """Remove all comments from FTL source."""
 
-    def visit_Comment(self, _node: Comment) -> None:  # noqa: N802  # pylint: disable=invalid-name
+    def visit_Comment(self, _node: Comment) -> None:  # pylint: disable=invalid-name
         """Remove comments by returning None.
 
         Visitor pattern: visit_* methods follow stdlib ast.NodeVisitor convention.
@@ -56,7 +56,7 @@ class RenameVariablesTransformer(ASTTransformer):
         super().__init__()
         self.mapping = mapping
 
-    def visit_VariableReference(self, node: VariableReference) -> VariableReference:  # noqa: N802  # pylint: disable=invalid-name
+    def visit_VariableReference(self, node: VariableReference) -> VariableReference:  # pylint: disable=invalid-name
         """Rename variable if in mapping.
 
         Visitor pattern: visit_* methods follow stdlib ast.NodeVisitor convention.
@@ -83,7 +83,7 @@ class ExtractVariablesTransformer(ASTTransformer):
         super().__init__()
         self.text_to_var = text_to_var
 
-    def visit_TextElement(self, node: TextElement) -> TextElement | Placeable:  # noqa: N802  # pylint: disable=invalid-name
+    def visit_TextElement(self, node: TextElement) -> TextElement | Placeable:  # pylint: disable=invalid-name
         """Convert matching text to variable reference.
 
         Visitor pattern: visit_* methods follow stdlib ast.NodeVisitor convention.
@@ -100,7 +100,7 @@ class ExtractVariablesTransformer(ASTTransformer):
 class RemoveEmptyMessagesTransformer(ASTTransformer):
     """Remove messages with no value and no attributes."""
 
-    def visit_Message(self, node: Message) -> Message | None:  # noqa: N802  # pylint: disable=invalid-name
+    def visit_Message(self, node: Message) -> Message | None:  # pylint: disable=invalid-name
         """Remove message if it has no value and no attributes.
 
         Visitor pattern: visit_* methods follow stdlib ast.NodeVisitor convention.

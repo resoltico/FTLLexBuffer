@@ -32,7 +32,9 @@ from ftllexbuffer import FluentBundle
 
 
 # Example 1: CURRENCY Formatting (EDUCATIONAL - Use Built-in CURRENCY() Instead!)
-def CURRENCY_CUSTOM_EXAMPLE(amount: float, *, currency_code: str = "USD", locale: str = "en_US") -> str:  # noqa: N802  # pylint: disable=invalid-name
+def CURRENCY_CUSTOM_EXAMPLE(  # pylint: disable=invalid-name
+    amount: float, *, currency_code: str = "USD", locale: str = "en_US"
+) -> str:
     """Format currency with CLDR-compliant locale-aware formatting.
 
     EDUCATIONAL EXAMPLE ONLY - FTLLexBuffer has built-in CURRENCY() function!
@@ -79,7 +81,7 @@ def CURRENCY_CUSTOM_EXAMPLE(amount: float, *, currency_code: str = "USD", locale
 
 
 # Example 2: PHONE Formatting
-def PHONE(number: str, *, format_style: str = "international") -> str:  # noqa: N802  # pylint: disable=invalid-name
+def PHONE(number: str, *, format_style: str = "international") -> str:  # pylint: disable=invalid-name
     """Format phone number.
 
     FTL function naming convention: UPPERCASE name.
@@ -107,7 +109,7 @@ def PHONE(number: str, *, format_style: str = "international") -> str:  # noqa: 
 
 
 # Example 3: MARKDOWN Rendering (Simple)
-def MARKDOWN(text: str, *, render: str = "html") -> str:  # noqa: N802  # pylint: disable=invalid-name
+def MARKDOWN(text: str, *, render: str = "html") -> str:  # pylint: disable=invalid-name
     """Render markdown to HTML (simplified).
 
     FTL function naming convention: UPPERCASE name.
@@ -137,7 +139,7 @@ def MARKDOWN(text: str, *, render: str = "html") -> str:  # noqa: N802  # pylint
 
 
 # Example 4: FILESIZE Formatting
-def FILESIZE(bytes_count: int | float, *, precision: int = 2) -> str:  # noqa: N802  # pylint: disable=invalid-name
+def FILESIZE(bytes_count: int | float, *, precision: int = 2) -> str:  # pylint: disable=invalid-name
     """Format file size in human-readable format.
 
     FTL function naming convention: UPPERCASE name.
@@ -161,7 +163,7 @@ def FILESIZE(bytes_count: int | float, *, precision: int = 2) -> str:  # noqa: N
 
 
 # Example 5: DURATION Formatting
-def DURATION(seconds: int | float, *, format_style: str = "long") -> str:  # noqa: N802, PLR0912  # pylint: disable=invalid-name,too-many-branches
+def DURATION(seconds: int | float, *, format_style: str = "long") -> str:  # noqa: PLR0912  # pylint: disable=invalid-name,too-many-branches
     """Format duration in human-readable format.
 
     FTL function naming convention: UPPERCASE name.
@@ -220,7 +222,7 @@ def make_greeting_function(bundle_locale: str) -> Any:
     Returns:
         Greeting function customized for the locale
     """
-    def GREETING(name: str, *, formal: str = "false") -> str:  # noqa: N802  # pylint: disable=invalid-name
+    def GREETING(name: str, *, formal: str = "false") -> str:  # pylint: disable=invalid-name
         """Locale-aware greeting.
 
         FTL function naming convention: UPPERCASE name.

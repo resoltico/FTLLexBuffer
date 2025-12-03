@@ -173,7 +173,7 @@ def main() -> int:
 
     # Report results
     if all_errors:
-        print(f"[FAIL] Invalid FTL examples in documentation:\n")
+        print("[FAIL] Invalid FTL examples in documentation:\n")
         for error in all_errors:
             print(f"  {error}\n")
         print(

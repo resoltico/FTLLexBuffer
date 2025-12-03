@@ -88,7 +88,7 @@ from .localization import (
 )
 from .runtime import FluentBundle
 from .runtime.bundle import ValidationResult
-from .runtime.function_bridge import FunctionRegistry
+from .runtime.function_bridge import FunctionRegistry, FunctionSignature
 from .runtime.functions import (
     FUNCTION_REGISTRY,
     currency_format,
@@ -191,6 +191,7 @@ __all__ = [
     "introspect_message",
     # Advanced - Function registry and formatting
     "FunctionRegistry",
+    "FunctionSignature",
     "FUNCTION_REGISTRY",
     "number_format",
     "datetime_format",

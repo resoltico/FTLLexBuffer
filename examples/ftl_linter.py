@@ -55,7 +55,7 @@ class FTLLinterVisitor(ASTVisitor):
         self.message_ids: set[str] = set()
         self.current_message_id: str | None = None
 
-    def visit_Resource(self, node: Resource) -> None:  # noqa: N802  # pylint: disable=invalid-name
+    def visit_Resource(self, node: Resource) -> None:  # pylint: disable=invalid-name
         """Visit resource and check for duplicate message IDs.
 
         Visitor pattern: visit_* methods follow stdlib ast.NodeVisitor convention.
@@ -79,7 +79,7 @@ class FTLLinterVisitor(ASTVisitor):
         for entry in node.entries:
             self.visit(entry)
 
-    def visit_Message(self, node: Message) -> None:  # noqa: N802  # pylint: disable=invalid-name
+    def visit_Message(self, node: Message) -> None:  # pylint: disable=invalid-name
         """Visit message and check for issues.
 
         Visitor pattern: visit_* methods follow stdlib ast.NodeVisitor convention.
@@ -107,7 +107,7 @@ class FTLLinterVisitor(ASTVisitor):
 
         self.current_message_id = None
 
-    def visit_VariableReference(self, node: VariableReference) -> None:  # noqa: N802  # pylint: disable=invalid-name
+    def visit_VariableReference(self, node: VariableReference) -> None:  # pylint: disable=invalid-name
         """Visit variable reference (no validation needed - runtime provided).
 
         Visitor pattern: visit_* methods follow stdlib ast.NodeVisitor convention.
@@ -115,7 +115,7 @@ class FTLLinterVisitor(ASTVisitor):
         # Variables are provided at runtime, not declared in FTL
         super().visit_VariableReference(node)
 
-    def visit_FunctionReference(self, node: FunctionReference) -> None:  # noqa: N802  # pylint: disable=invalid-name
+    def visit_FunctionReference(self, node: FunctionReference) -> None:  # pylint: disable=invalid-name
         """Check function calls.
 
         Visitor pattern: visit_* methods follow stdlib ast.NodeVisitor convention.
@@ -139,7 +139,7 @@ class FTLLinterVisitor(ASTVisitor):
 
         super().visit_FunctionReference(node)
 
-    def visit_MessageReference(self, node: MessageReference) -> None:  # noqa: N802  # pylint: disable=invalid-name
+    def visit_MessageReference(self, node: MessageReference) -> None:  # pylint: disable=invalid-name
         """Check message references.
 
         Visitor pattern: visit_* methods follow stdlib ast.NodeVisitor convention.
@@ -156,7 +156,7 @@ class FTLLinterVisitor(ASTVisitor):
 
         super().visit_MessageReference(node)
 
-    def visit_TermReference(self, node: TermReference) -> None:  # noqa: N802  # pylint: disable=invalid-name
+    def visit_TermReference(self, node: TermReference) -> None:  # pylint: disable=invalid-name
         """Check term references (not implemented in this example).
 
         Visitor pattern: visit_* methods follow stdlib ast.NodeVisitor convention.

@@ -28,7 +28,7 @@ Python 3.13+. Zero external dependencies.
 from __future__ import annotations
 
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from inspect import signature
 from typing import Any
@@ -64,6 +64,24 @@ class FunctionRegistry:
         - Python uses snake_case (minimum_fraction_digits)
 
     The registry handles the conversion transparently.
+
+    Supports dict-like introspection:
+        - list_functions(): List all registered function names
+        - get_function_info(name): Get function metadata
+        - __iter__: Iterate over function names
+        - __len__: Count registered functions
+        - __contains__: Check if function exists (supports 'in' operator)
+
+    Example:
+        >>> registry = FunctionRegistry()
+        >>> registry.register(my_func, ftl_name="CUSTOM")
+        >>> "CUSTOM" in registry
+        True
+        >>> len(registry)
+        1
+        >>> for name in registry:
+        ...     print(name)
+        CUSTOM
     """
 
     def __init__(self) -> None:
@@ -186,6 +204,93 @@ class FunctionRegistry:
         """
         sig = self._functions.get(ftl_name)
         return sig.python_name if sig else None
+
+    def list_functions(self) -> list[str]:
+        """List all registered function names (FTL names).
+
+        Returns:
+            List of FTL function names (e.g., ["NUMBER", "DATETIME", "CURRENCY"])
+
+        Example:
+            >>> registry = FunctionRegistry()
+            >>> registry.register(lambda x: str(x), ftl_name="CUSTOM")
+            >>> registry.list_functions()
+            ['CUSTOM']
+        """
+        return list(self._functions.keys())
+
+    def get_function_info(self, ftl_name: str) -> FunctionSignature | None:
+        """Get function metadata by FTL name.
+
+        Args:
+            ftl_name: Function name from FTL (e.g., "NUMBER")
+
+        Returns:
+            FunctionSignature with metadata, or None if not found
+
+        Example:
+            >>> registry = FunctionRegistry()
+            >>> def my_func(value, *, min_digits=0): return str(value)
+            >>> registry.register(my_func, ftl_name="MYFUNC")
+            >>> info = registry.get_function_info("MYFUNC")
+            >>> info.python_name
+            'my_func'
+            >>> info.ftl_name
+            'MYFUNC'
+        """
+        return self._functions.get(ftl_name)
+
+    def __iter__(self) -> Iterator[str]:
+        """Iterate over FTL function names.
+
+        Returns:
+            Iterator over FTL function names
+
+        Example:
+            >>> registry = FunctionRegistry()
+            >>> registry.register(lambda x: str(x), ftl_name="FUNC1")
+            >>> registry.register(lambda x: str(x), ftl_name="FUNC2")
+            >>> for name in registry:
+            ...     print(name)
+            FUNC1
+            FUNC2
+        """
+        return iter(self._functions)
+
+    def __len__(self) -> int:
+        """Count of registered functions.
+
+        Returns:
+            Number of registered functions
+
+        Example:
+            >>> registry = FunctionRegistry()
+            >>> len(registry)
+            0
+            >>> registry.register(lambda x: str(x), ftl_name="FUNC")
+            >>> len(registry)
+            1
+        """
+        return len(self._functions)
+
+    def __contains__(self, ftl_name: str) -> bool:
+        """Check if function is registered using 'in' operator.
+
+        Args:
+            ftl_name: Function name from FTL
+
+        Returns:
+            True if function is registered
+
+        Example:
+            >>> registry = FunctionRegistry()
+            >>> registry.register(lambda x: str(x), ftl_name="CUSTOM")
+            >>> "CUSTOM" in registry
+            True
+            >>> "MISSING" in registry
+            False
+        """
+        return ftl_name in self._functions
 
     def copy(self) -> FunctionRegistry:
         """Create a shallow copy of this registry.

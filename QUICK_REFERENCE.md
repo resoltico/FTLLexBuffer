@@ -457,6 +457,28 @@ print(info.get_function_names())
 # → frozenset({'NUMBER'})
 ```
 
+### Function Introspection (v0.4.0+)
+
+```python
+# List all available functions
+functions = bundle._function_registry.list_functions()
+print(functions)  # ["NUMBER", "DATETIME", "CURRENCY"]
+
+# Check if function exists
+if "CURRENCY" in bundle._function_registry:
+    print("CURRENCY available")
+
+# Get function metadata
+info = bundle._function_registry.get_function_info("NUMBER")
+print(f"Python name: {info.python_name}")
+print(f"Parameters: {info.param_mapping}")
+
+# Iterate over all functions
+for func_name in bundle._function_registry:
+    info = bundle._function_registry.get_function_info(func_name)
+    print(f"{func_name}: {info.python_name}")
+```
+
 ---
 
 ## Type Annotations

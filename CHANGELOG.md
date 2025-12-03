@@ -5,6 +5,124 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2025-12-02
+
+### Added
+
+- **FunctionRegistry Introspection API**: Dict-like API for discovering and inspecting registered functions at runtime
+  - `list_functions()`: List all registered function names
+  - `get_function_info(name)`: Get function metadata including parameter mappings
+  - `__iter__`: Iterate over function names
+  - `__len__`: Count registered functions
+  - `__contains__`: Check function existence with `in` operator
+  - **FunctionSignature** dataclass: Exported for working with function metadata
+  - **Use cases**: Auto-documentation generation, function validation, debugging, IDE auto-complete
+
+- **Comprehensive property-based test suite** (121 new tests):
+  - **FunctionRegistry introspection** (24 Hypothesis tests):
+    - List/iteration/contains invariants
+    - Copy isolation and function overwriting behavior
+    - Empty registry edge cases
+    - Large registry performance (100-1000 functions)
+  - **Function metadata** (26 coverage tests):
+    - Locale injection detection with malformed registries
+    - Custom functions overriding built-in names
+    - Metadata consistency validation
+  - **Integration tests** (21 tests):
+    - Built-in functions (NUMBER, DATETIME, CURRENCY) introspection
+    - Financial validation workflows (VAT calculations, invoice totals)
+    - Function discovery patterns for auto-documentation
+  - **Plural rules** (28 Hypothesis tests):
+    - CLDR compliance for English, Latvian, Slavic (Russian/Polish), Arabic
+    - Financial use cases (invoice line items, VAT amounts, product quantities)
+    - Metamorphic properties and edge cases
+  - **Bundle operations** (22 Hypothesis tests):
+    - Term attribute cycle detection
+    - Source path error logging
+    - Validation error handling
+    - Currency/VAT formatting robustness
+
+- **Enhanced NUMBER() documentation** in README.md:
+  - Detailed parameter descriptions with financial precision guidelines
+  - 10+ real-world examples: VAT calculations, price display, quantities, percentages
+  - Financial use cases section with invoice totals and currency formatting
+  - Locale-specific formatting examples (en-US, lv-LV, de-DE)
+  - Parameter combination reference
+
+- **Comprehensive custom function examples**:
+  - Enhanced README.md add_function() documentation with 8 detailed examples
+  - Parameter conversion (snake_case ↔ camelCase) demonstration
+  - Error handling patterns for robust function implementations
+  - Locale-aware custom functions (Latvian registration numbers, VAT calculations)
+  - Financial domain functions (VAT breakdowns, percentages)
+  - Type coercion best practices
+  - Function discovery patterns using new introspection API
+
+- **New example file**: `examples/function_introspection.py`
+  - 7 comprehensive examples demonstrating all introspection capabilities
+  - Basic introspection operations walkthrough
+  - Function metadata inspection patterns
+  - Custom function introspection workflows
+  - Financial app validation patterns
+  - Auto-documentation generation demo
+  - Safe function usage with existence checks
+  - Registry copying for isolated customization
+
+### Changed
+
+- **FunctionRegistry** now implements dict-like protocol
+  - Can iterate: `for func_name in registry:`
+  - Can check length: `len(registry)`
+  - Can check membership: `"NUMBER" in registry`
+  - Improves developer ergonomics for function management
+
+### Internal
+
+- Added `Iterator[str]` type annotation to `FunctionRegistry.__iter__`
+- Exported `FunctionSignature` from main `ftllexbuffer` module
+- Added per-file linting rules for new test and example files
+- **All 2,950 tests pass** with **96.92% coverage** (exceeds 95% requirement)
+- All lint checks pass: ruff, mypy (strict), pylint (10.00/10)
+- **GitHub Actions workflow fixes**:
+  - Added `__pycache__` filter to package detection in verification jobs
+  - Added proper error messages on PyPI install failure
+  - Prevents silent failures in CI/CD pipeline
+
+### Migration Notes
+
+#### For Users
+
+**No breaking changes** - This release is fully backward compatible.
+
+**New capabilities**:
+- You can now discover functions at runtime: `bundle._function_registry.list_functions()`
+- You can inspect parameter mappings: `bundle._function_registry.get_function_info("NUMBER")`
+- Enhanced documentation makes NUMBER() parameters clearer for financial applications
+
+**Recommended**: Review the new NUMBER() documentation examples for best practices in financial formatting
+
+#### For Library Developers
+
+**New public exports**:
+- `ftllexbuffer.FunctionSignature`: Access function metadata dataclass
+- New methods on `FunctionRegistry`: `list_functions()`, `get_function_info()`, `__iter__`, `__len__`, `__contains__`
+
+**Example usage**:
+```python
+from ftllexbuffer import FluentBundle
+
+bundle = FluentBundle("en_US")
+
+# List all available functions
+for func_name in bundle._function_registry:
+    info = bundle._function_registry.get_function_info(func_name)
+    print(f"{func_name}: {info.python_name}")
+
+# Check if function exists before use
+if "CURRENCY" in bundle._function_registry:
+    bundle.add_resource('price = { CURRENCY($amount, currency: "EUR") }')
+```
+
 ## [0.3.0] - 2025-12-02
 
 ### Fixed

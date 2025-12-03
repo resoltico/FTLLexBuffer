@@ -2,7 +2,7 @@
 
 Complete reference documentation for FTLLexBuffer's public API.
 
-**Latest Version**: 0.2.0 | [Changelog](CHANGELOG.md)
+**Latest Version**: 0.4.0 | [Changelog](CHANGELOG.md)
 
 **Package**: `ftllexbuffer`
 **Python Version**: 3.13+
@@ -113,6 +113,8 @@ from ftllexbuffer import (
 from ftllexbuffer import (
     FluentParserV1,          # Direct parser access
     FUNCTION_REGISTRY,        # Global function registry
+    FunctionRegistry,         # Function registry class (for custom instances)
+    FunctionSignature,        # Function metadata dataclass (Added in v0.4.0)
     ValidationResult,         # Validation result type
 )
 ```
@@ -341,7 +343,7 @@ Parse and load FTL source into bundle.
 **Parameters**:
 
 - **`source`** (FTLSource): FTL source (UTF-8 encoded string)
-- **`source_path`** (str | None, optional): File path for error messages (Added in 0.2.0)
+- **`source_path`** (str | None, optional): File path for error messages (Added in v0.2.0)
 
 **Returns**:
 
@@ -882,7 +884,7 @@ print(f"Functions: {info.get_function_names()}")
 
 #### get_babel_locale
 
-> **Added in**: 0.2.0
+**Added in v0.2.0**
 
 ```python
 get_babel_locale() -> str
@@ -1370,6 +1372,126 @@ print(python_name)  # "number_format"
 
 missing = FUNCTION_REGISTRY.get_python_name("UNKNOWN")
 print(missing)  # None
+```
+
+---
+
+#### list_functions()
+
+**Added in v0.4.0**
+
+```python
+FunctionRegistry.list_functions() -> list[str]
+```
+
+List all registered function names (FTL names).
+
+**Returns**: list[str] - List of registered FTL function names
+
+**Example**:
+```python
+from ftllexbuffer import FUNCTION_REGISTRY
+
+functions = FUNCTION_REGISTRY.list_functions()
+print(functions)  # ["NUMBER", "DATETIME", "CURRENCY", ...]
+
+# Count available functions
+print(f"Available functions: {len(functions)}")
+```
+
+---
+
+#### get_function_info()
+
+**Added in v0.4.0**
+
+```python
+FunctionRegistry.get_function_info(ftl_name: str) -> FunctionSignature | None
+```
+
+Get comprehensive metadata for a registered function.
+
+**Parameters**:
+- **`ftl_name`** (str): FTL function name (e.g., "NUMBER")
+
+**Returns**: FunctionSignature | None - Function metadata, or None if not found
+
+**FunctionSignature attributes**:
+- **`ftl_name`** (str): FTL function name
+- **`python_name`** (str): Python function name
+- **`param_mapping`** (dict[str, str]): Maps FTL parameter names to Python parameter names
+- **`callable`** (Callable): The actual Python function
+
+**Example**:
+```python
+from ftllexbuffer import FUNCTION_REGISTRY
+
+# Get function metadata
+info = FUNCTION_REGISTRY.get_function_info("NUMBER")
+if info:
+    print(f"FTL name: {info.ftl_name}")
+    print(f"Python name: {info.python_name}")
+    print("Parameter mappings:")
+    for ftl_param, py_param in info.param_mapping.items():
+        print(f"  {ftl_param} → {py_param}")
+```
+
+**Use cases**:
+- Auto-documentation generation
+- Function validation before use
+- IDE auto-complete integration
+- Debugging parameter mappings
+
+---
+
+#### `__iter__()`, `__len__()`, `__contains__()`
+
+**Added in v0.4.0**
+
+FunctionRegistry implements dict-like protocol for convenient iteration and membership testing.
+
+```python
+# Iterate over function names
+for func_name in registry:
+    print(func_name)
+
+# Count registered functions
+count = len(registry)
+
+# Check membership
+if "NUMBER" in registry:
+    print("NUMBER is available")
+```
+
+**Example - Auto-documentation**:
+```python
+from ftllexbuffer import FluentBundle
+
+bundle = FluentBundle("en_US")
+
+print("Available Functions:")
+print("=" * 60)
+
+for func_name in bundle._function_registry:
+    info = bundle._function_registry.get_function_info(func_name)
+    print(f"\n{info.ftl_name} (Python: {info.python_name})")
+    if info.param_mapping:
+        print("  Parameters:")
+        for ftl_param, py_param in sorted(info.param_mapping.items()):
+            print(f"    - {ftl_param} → {py_param}")
+```
+
+**Example - Safe function usage**:
+```python
+from ftllexbuffer import FluentBundle
+
+bundle = FluentBundle("en_US")
+
+# Check if function exists before use
+if "CURRENCY" in bundle._function_registry:
+    bundle.add_resource('price = { CURRENCY($amount, currency: "EUR") }')
+else:
+    print("CURRENCY function not available")
 ```
 
 ---
@@ -2093,7 +2215,7 @@ bundle.format_pattern("timestamp", {"time": dt})
 
 ### CURRENCY
 
-> **Added in**: 0.2.0
+**Added in v0.2.0**
 
 ```python
 CURRENCY(value, options)
@@ -2368,7 +2490,7 @@ datetime_format("2025-10-27T14:30:00Z", "en-US", date_style="long")
 
 ### currency_format()
 
-> **Added in**: 0.2.0
+**Added in v0.2.0**
 
 ```python
 def currency_format(

@@ -215,6 +215,25 @@ Demonstrates:
 
 ---
 
+### [function_introspection.py](function_introspection.py)
+
+**Runtime function discovery and introspection** - Discover and inspect functions at runtime.
+
+Demonstrates:
+1. Basic introspection operations (list, iterate, check membership)
+2. Function metadata inspection (parameter mappings, Python names)
+3. Custom function introspection workflows
+4. Financial application validation patterns
+5. Auto-documentation generation
+6. Safe function usage with existence checks
+7. Registry copying for isolated customization
+
+**Run**: `python examples/function_introspection.py`
+
+**Note**: Uses the new FunctionRegistry introspection API (`list_functions()`, `get_function_info()`, `__iter__`, `__len__`, `__contains__`) added in v0.4.0 for runtime function discovery.
+
+---
+
 ### [thread_safety.py](thread_safety.py)
 
 **Thread-safe FluentBundle usage** - Patterns for multi-threaded applications.
@@ -278,6 +297,7 @@ python examples/locale_fallback.py
 python examples/ftl_transform.py
 python examples/ftl_linter.py
 python examples/custom_functions.py
+python examples/function_introspection.py
 python examples/thread_safety.py
 python examples/benchmark_loaders.py
 python examples/property_based_testing.py  # Requires: pip install hypothesis

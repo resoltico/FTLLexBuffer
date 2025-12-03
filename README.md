@@ -616,15 +616,22 @@ Main API for Fluent message formatting.
 
 - `add_function(name: str, func: Callable) -> None`
 
-  Register custom function.
+  Register custom function for use in FTL messages.
 
   **Parameters:**
-  - `name` (str): Function name (UPPERCASE by convention)
-  - `func` (Callable): Function implementation
+  - `name` (str): Function name in FTL (UPPERCASE by convention)
+  - `func` (Callable): Python function implementation (must return str)
 
-  **Example:**
+  **Parameter Conversion:**
+  - Python functions use `snake_case` parameters (PEP 8)
+  - FTL uses `camelCase` parameters (JavaScript/ICU heritage)
+  - FunctionRegistry automatically converts between conventions
+  - Example: `minimum_value` (Python) ↔ `minimumValue` (FTL)
+
+  **Basic Example:**
   ```python
   def UPPER(value: str) -> str:
+      """Convert text to uppercase."""
       return value.upper()
 
   bundle = FluentBundle("en_US")
@@ -632,6 +639,125 @@ Main API for Fluent message formatting.
   bundle.add_resource("msg = { UPPER($text) }")
   result, errors = bundle.format_pattern("msg", {"text": "hello"})
   print(result)  # "HELLO"
+  ```
+
+  **With Parameters (snake_case → camelCase conversion):**
+  ```python
+  def TRUNCATE(text: str, *, max_length: int = 50) -> str:
+      """Truncate text to maximum length."""
+      if len(text) <= max_length:
+          return text
+      return text[:max_length - 3] + "..."
+
+  bundle.add_function("TRUNCATE", TRUNCATE)
+  bundle.add_resource("""
+  short = { TRUNCATE($text, maxLength: 20) }
+  """)
+  # FTL uses maxLength (camelCase), Python receives max_length (snake_case)
+  result, _ = bundle.format_pattern("short", {"text": "This is a very long text"})
+  print(result)  # "This is a very lo..."
+  ```
+
+  **Error Handling:**
+  ```python
+  def SAFE_DIVIDE(numerator: float, denominator: float) -> str:
+      """Divide with error handling."""
+      try:
+          if denominator == 0:
+              return "N/A"
+          result = numerator / denominator
+          return f"{result:.2f}"
+      except Exception:
+          return "ERROR"
+
+  bundle.add_function("SAFE_DIVIDE", SAFE_DIVIDE)
+  bundle.add_resource("ratio = { SAFE_DIVIDE($a, $b) }")
+  result, _ = bundle.format_pattern("ratio", {"a": 10, "b": 0})
+  print(result)  # "N/A" (graceful handling)
+  ```
+
+  **Locale-Aware Custom Functions:**
+  ```python
+  def LATVIAN_REGISTRATION(regno: str, *, format_style: str = "full") -> str:
+      """Format Latvian company registration number.
+
+      Args:
+          regno: Registration number (e.g., "40003000000")
+          format_style: "full" (40003000000) or "grouped" (40 003 000 000)
+      """
+      if format_style == "grouped" and len(regno) == 11:
+          return f"{regno[0:2]} {regno[2:5]} {regno[5:8]} {regno[8:11]}"
+      return regno
+
+  bundle = FluentBundle("lv_LV")
+  bundle.add_function("LATVIAN_REGISTRATION", LATVIAN_REGISTRATION)
+  bundle.add_resource("""
+  company-reg = Company: { LATVIAN_REGISTRATION($regno, formatStyle: "grouped") }
+  """)
+  # FTL: formatStyle (camelCase) → Python: format_style (snake_case)
+  result, _ = bundle.format_pattern("company-reg", {"regno": "40003123456"})
+  print(result)  # "Company: 40 003 123 456"
+  ```
+
+  **Financial Domain Functions:**
+  ```python
+  def VAT_BREAKDOWN(amount: float, rate: float = 0.21) -> str:
+      """Calculate VAT breakdown for Latvian/EU invoices.
+
+      Args:
+          amount: Net amount
+          rate: VAT rate (default: 21% Latvia)
+      """
+      vat = amount * rate
+      total = amount + vat
+      return f"Net: €{amount:.2f} + VAT: €{vat:.2f} = Total: €{total:.2f}"
+
+  bundle = FluentBundle("lv_LV")
+  bundle.add_function("VAT_BREAKDOWN", VAT_BREAKDOWN)
+  bundle.add_resource("invoice = { VAT_BREAKDOWN($amount, rate: 0.21) }")
+  result, _ = bundle.format_pattern("invoice", {"amount": 100.0})
+  print(result)  # "Net: €100.00 + VAT: €21.00 = Total: €121.00"
+  ```
+
+  **Type Coercion:**
+  ```python
+  def FORMAT_PERCENTAGE(value: float, *, decimal_places: int = 1) -> str:
+      """Format value as percentage.
+
+      Fluent may pass strings from FTL, coerce to float.
+      """
+      # Coerce value to float (FTL might pass string)
+      if isinstance(value, str):
+          value = float(value)
+
+      return f"{value:.{decimal_places}f}%"
+
+  bundle.add_function("FORMAT_PERCENTAGE", FORMAT_PERCENTAGE)
+  bundle.add_resource("vat-rate = VAT: { FORMAT_PERCENTAGE($rate, decimalPlaces: 2) }")
+  result, _ = bundle.format_pattern("vat-rate", {"rate": 21.5})
+  print(result)  # "VAT: 21.50%"
+  ```
+
+  **Discovering Registered Functions:**
+  ```python
+  # List all available functions
+  from ftllexbuffer import FluentBundle
+
+  bundle = FluentBundle("en_US")
+  bundle.add_function("CUSTOM", lambda x: str(x))
+
+  # Use introspection API
+  if "CUSTOM" in bundle._function_registry:
+      print("CUSTOM function is available")
+
+  # List all functions
+  for func_name in bundle._function_registry:
+      info = bundle._function_registry.get_function_info(func_name)
+      print(f"{func_name}: {info.python_name}")
+  # NUMBER: number_format
+  # DATETIME: datetime_format
+  # CURRENCY: currency_format
+  # CUSTOM: <lambda>
   ```
 
 - `validate_resource(source: str) -> ValidationResult`
@@ -743,14 +869,93 @@ Formats numeric values with locale-aware thousand separators and decimal points.
 - Automatically adapts to bundle's locale (`en-US` → "1,234.5", `de-DE` → "1.234,5")
 - Thread-safe (no global locale state)
 
-**Options:**
-- `minimumFractionDigits` (int): Minimum decimal places (default: 0)
-- `maximumFractionDigits` (int): Maximum decimal places (default: 3)
-- `useGrouping` (bool): Use thousand separators (default: true)
+**Parameters:**
+- `value` (required): Number to format (int or float)
+- `minimumFractionDigits` (int, optional): Minimum decimal places (default: 0)
+  - Pads with zeros if value has fewer decimal places
+  - Critical for financial precision (e.g., always show 2 decimals for currency)
+- `maximumFractionDigits` (int, optional): Maximum decimal places (default: 3)
+  - Rounds value if it has more decimal places
+  - Works with minimumFractionDigits to control precision
+- `useGrouping` (bool, optional): Use thousand separators (default: true)
+  - When true: `1234` → `1,234` (en-US), `1 234` (lv-LV), `1.234` (de-DE)
+  - When false: `1234` → `1234` (all locales)
 
-**Example:**
+**Examples:**
+
 ```ftl
+# Basic number formatting
+count = { NUMBER($value) }
+# $value = 1234 → "1,234" (en-US), "1 234" (lv-LV)
+
+# Financial precision (always 2 decimal places)
 price = { NUMBER($amount, minimumFractionDigits: 2) }
+# $amount = 42 → "42.00" (en-US)
+# $amount = 123.5 → "123.50" (en-US)
+
+# VAT calculations (2 decimal minimum, 2 decimal maximum)
+vat-amount = VAT: { NUMBER($vat, minimumFractionDigits: 2, maximumFractionDigits: 2) }
+# $vat = 23.456 → "VAT: 23.46" (en-US) - rounded
+# $vat = 23.4 → "VAT: 23.40" (en-US) - padded
+
+# Large numbers with grouping
+total = Total: { NUMBER($sum, minimumFractionDigits: 2, useGrouping: true) }
+# $sum = 1234567.89 → "Total: 1,234,567.89" (en-US)
+# $sum = 1234567.89 → "Total: 1 234 567,89" (lv-LV)
+
+# Disable grouping for compact display
+compact = { NUMBER($value, useGrouping: false) }
+# $value = 1234 → "1234" (all locales)
+
+# Percentage display (up to 1 decimal place)
+percentage = { NUMBER($rate, maximumFractionDigits: 1) }%
+# $rate = 21.45678 → "21.5%" (en-US)
+
+# Whole numbers only (no decimals)
+quantity = { NUMBER($qty, maximumFractionDigits: 0) }
+# $qty = 42.7 → "43" (rounded, all locales)
+```
+
+**Financial Use Cases:**
+
+```ftl
+# Price display (always 2 decimals)
+product-price = €{ NUMBER($price, minimumFractionDigits: 2, maximumFractionDigits: 2) }
+
+# VAT rate (1-2 decimals)
+vat-rate = VAT { NUMBER($rate, minimumFractionDigits: 1, maximumFractionDigits: 2) }%
+# $rate = 21 → "VAT 21.0%"
+# $rate = 21.5 → "VAT 21.5%"
+
+# Invoice total (thousands separator, 2 decimals)
+invoice-total = Total: { NUMBER($total, minimumFractionDigits: 2) }
+# $total = 12345.67 → "Total: 12,345.67" (en-US)
+
+# Quantity (whole numbers, no separator)
+item-count = { NUMBER($count, maximumFractionDigits: 0, useGrouping: false) } items
+# $count = 1000 → "1000 items"
+```
+
+**Locale-Specific Formatting:**
+
+```python
+# English (US): comma separator, period decimal
+bundle_us = FluentBundle("en_US")
+bundle_us.add_resource('num = { NUMBER($x) }')
+bundle_us.format_pattern("num", {"x": 1234.5})
+# → "1,234.5"
+
+# Latvian: space separator, comma decimal
+bundle_lv = FluentBundle("lv_LV")
+bundle_lv.add_resource('num = { NUMBER($x) }')
+bundle_lv.format_pattern("num", {"x": 1234.5})
+# → "1 234,5"
+
+# German: period separator, comma decimal
+bundle_de = FluentBundle("de_DE")
+bundle_de.add_resource('num = { NUMBER($x) }')
+bundle_de.format_pattern("num", {"x": 1234.5})
+# → "1.234,5"
 ```
 
 **DATETIME(value, options)**
