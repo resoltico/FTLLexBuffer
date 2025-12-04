@@ -6,6 +6,7 @@ Validates FormatCache and FluentBundle caching behavior.
 import pytest
 
 from ftllexbuffer import FluentBundle
+from ftllexbuffer.runtime.cache import FormatCache
 
 
 class TestCacheDisabled:
@@ -252,3 +253,89 @@ class TestCacheStats:
         stats = bundle.get_cache_stats()
         assert stats is not None
         assert stats["hit_rate"] == 75  # 3/4 = 75%
+
+
+class TestCacheIntrospection:
+    """Test cache introspection APIs."""
+
+    def test_cache_len(self) -> None:
+        """__len__ returns cache size."""
+        bundle = FluentBundle("en", enable_cache=True, cache_size=10)
+        bundle.add_resource("msg1 = Message 1\nmsg2 = Message 2")
+
+        # Cache is empty initially
+        cache = bundle._cache
+        assert cache is not None  # Type narrowing for mypy
+        assert len(cache) == 0
+
+        # Add entries
+        bundle.format_pattern("msg1")
+        assert len(cache) == 1
+
+        bundle.format_pattern("msg2")
+        assert len(cache) == 2
+
+    def test_cache_maxsize_property(self) -> None:
+        """maxsize property returns configured max size."""
+        bundle = FluentBundle("en", enable_cache=True, cache_size=500)
+        cache = bundle._cache
+        assert cache is not None  # Type narrowing for mypy
+        assert cache.maxsize == 500
+
+    def test_cache_hits_property(self) -> None:
+        """hits property returns hit count."""
+        bundle = FluentBundle("en", enable_cache=True, use_isolating=False)
+        bundle.add_resource("msg = Hello")
+        cache = bundle._cache
+        assert cache is not None  # Type narrowing for mypy
+
+        # No hits initially
+        assert cache.hits == 0
+
+        # First call is miss
+        bundle.format_pattern("msg")
+        assert cache.hits == 0
+
+        # Second call is hit
+        bundle.format_pattern("msg")
+        assert cache.hits == 1
+
+        # Third call is hit
+        bundle.format_pattern("msg")
+        assert cache.hits == 2
+
+    def test_cache_misses_property(self) -> None:
+        """misses property returns miss count."""
+        bundle = FluentBundle("en", enable_cache=True, use_isolating=False)
+        bundle.add_resource("msg = Hello")
+        cache = bundle._cache
+        assert cache is not None  # Type narrowing for mypy
+
+        # No misses initially
+        assert cache.misses == 0
+
+        # First call is miss
+        bundle.format_pattern("msg")
+        assert cache.misses == 1
+
+        # Second call is hit (miss count unchanged)
+        bundle.format_pattern("msg")
+        assert cache.misses == 1
+
+    def test_cache_put_updates_existing_key(self) -> None:
+        """Updating existing cache entry moves it to end (LRU)."""
+        # Test FormatCache.put() directly
+        cache = FormatCache(maxsize=2)
+
+        # Put initial value
+        cache.put("msg1", {"name": "Alice"}, None, "en", ("Hello Alice", []))
+        assert len(cache) == 1
+
+        # Put same key again (should call move_to_end)
+        cache.put("msg1", {"name": "Alice"}, None, "en", ("Hello Alice!", []))
+        assert len(cache) == 1  # Size unchanged
+
+        # Verify value was updated
+        result = cache.get("msg1", {"name": "Alice"}, None, "en")
+        assert result is not None
+        assert result[0] == "Hello Alice!"  # Updated value

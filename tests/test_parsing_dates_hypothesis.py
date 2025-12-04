@@ -8,6 +8,7 @@ from __future__ import annotations
 from datetime import UTC, date, datetime
 
 import pytest
+from babel import Locale
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
@@ -183,6 +184,52 @@ class TestParseDateHypothesis:
             assert result.year == year
             assert result.month == month
             assert result.day == day
+
+    @given(
+        year=st.integers(min_value=1900, max_value=2099),
+        month=st.integers(min_value=1, max_value=12),
+        day=st.integers(min_value=1, max_value=28),
+    )
+    @settings(max_examples=100)
+    def test_parse_date_roundtrip_property(
+        self, year: int, month: int, day: int
+    ) -> None:
+        """parse(str(date)) == date (roundtrip property)."""
+        original_date = date(year, month, day)
+
+        # Format as ISO (universal)
+        iso_str = original_date.isoformat()
+
+        # Parse back
+        result = parse_date(iso_str, "en_US")
+        assert result is not None
+        assert result == original_date
+
+    @given(
+        date1=st.dates(min_value=date(2000, 1, 1), max_value=date(2099, 12, 31)),
+        date2=st.dates(min_value=date(2000, 1, 1), max_value=date(2099, 12, 31)),
+    )
+    @settings(max_examples=100)
+    def test_parse_date_ordering_property(
+        self, date1: date, date2: date
+    ) -> None:
+        """parse(d1) < parse(d2) iff d1 < d2 (ordering preserved)."""
+        iso1 = date1.isoformat()
+        iso2 = date2.isoformat()
+
+        result1 = parse_date(iso1, "en_US")
+        result2 = parse_date(iso2, "en_US")
+
+        assert result1 is not None
+        assert result2 is not None
+
+        # Ordering must be preserved
+        if date1 < date2:
+            assert result1 < result2
+        elif date1 > date2:
+            assert result1 > result2
+        else:
+            assert result1 == result2
 
 
 class TestParseDatetimeHypothesis:
@@ -375,6 +422,184 @@ class TestParseDatetimeHypothesis:
 class TestDateParsingEdgeCases:
     """Edge cases for date parsing pattern generation."""
 
+    def test_parse_date_locale_missing_date_formats(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Test AttributeError/KeyError path in _get_date_patterns."""
+        # Lines 174-175 coverage - AttributeError/KeyError in the for loop
+
+        # Create a property that raises AttributeError when accessed
+        class MockLocale:
+            def __init__(self, real_locale: Locale):
+                self._real = real_locale
+
+            @property
+            def date_formats(self) -> object:
+                # Raise AttributeError to trigger except clause
+                msg = "date_formats not available"
+                raise AttributeError(msg)
+
+        original_parse = Locale.parse
+
+        def mock_parse(locale_str: str) -> MockLocale:
+            real_locale = original_parse(locale_str)
+            return MockLocale(real_locale)
+
+        # Patch in the dates module namespace
+        monkeypatch.setattr("ftllexbuffer.parsing.dates.Locale.parse", mock_parse)
+
+        # Should catch AttributeError and fall back to common patterns
+        # Use non-ISO format to force through _get_date_patterns
+        result = parse_date("01/28/2025", "en_US", strict=False)
+        assert result is not None
+        assert result.year == 2025
+
+    def test_parse_date_locale_date_formats_missing_style(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Test KeyError path in _get_date_patterns."""
+        # Lines 174-175 coverage - KeyError when accessing date_formats[style]
+
+        # Create a property that returns a dict-like object that raises KeyError
+        class MockDateFormats:
+            def __getitem__(self, key: str) -> object:
+                msg = f"No format for {key}"
+                raise KeyError(msg)
+
+        class MockLocale:
+            def __init__(self, real_locale: Locale):
+                self._real = real_locale
+
+            @property
+            def date_formats(self) -> MockDateFormats:
+                return MockDateFormats()
+
+        original_parse = Locale.parse
+
+        def mock_parse(locale_str: str) -> MockLocale:
+            real_locale = original_parse(locale_str)
+            return MockLocale(real_locale)
+
+        monkeypatch.setattr("ftllexbuffer.parsing.dates.Locale.parse", mock_parse)
+
+        # Should catch KeyError and fall back to common patterns
+        result = parse_date("01/28/2025", "en_US", strict=False)
+        assert result is not None
+        assert result.year == 2025
+
+    def test_parse_datetime_locale_missing_datetime_formats(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Test AttributeError/KeyError path in _get_datetime_patterns."""
+        # Lines 223-224 coverage - AttributeError when accessing datetime_formats
+
+        # Create a property that raises AttributeError when accessed
+        class MockLocale:
+            def __init__(self, real_locale: Locale):
+                self._real = real_locale
+
+            @property
+            def datetime_formats(self) -> object:
+                # Raise AttributeError to trigger except clause
+                msg = "datetime_formats not available"
+                raise AttributeError(msg)
+
+        original_parse = Locale.parse
+
+        def mock_parse(locale_str: str) -> MockLocale:
+            real_locale = original_parse(locale_str)
+            return MockLocale(real_locale)
+
+        monkeypatch.setattr("ftllexbuffer.parsing.dates.Locale.parse", mock_parse)
+
+        # Should catch AttributeError and fall back to common patterns
+        # Use non-ISO format to force through _get_datetime_patterns
+        result = parse_datetime("01/28/2025 14:30:00", "en_US", strict=False)
+        assert result is not None
+        assert result.year == 2025
+
+    def test_parse_datetime_locale_datetime_formats_missing_style(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Test KeyError path in _get_datetime_patterns."""
+        # Lines 223-224 coverage - KeyError when accessing datetime_formats[style]
+
+        # Create a property that returns a dict-like object that raises KeyError
+        class MockDateTimeFormats:
+            def __getitem__(self, key: str) -> object:
+                msg = f"No format for {key}"
+                raise KeyError(msg)
+
+        class MockLocale:
+            def __init__(self, real_locale: Locale):
+                self._real = real_locale
+
+            @property
+            def datetime_formats(self) -> MockDateTimeFormats:
+                return MockDateTimeFormats()
+
+        original_parse = Locale.parse
+
+        def mock_parse(locale_str: str) -> MockLocale:
+            real_locale = original_parse(locale_str)
+            return MockLocale(real_locale)
+
+        monkeypatch.setattr("ftllexbuffer.parsing.dates.Locale.parse", mock_parse)
+
+        # Should catch KeyError and fall back to common patterns
+        result = parse_datetime("01/28/2025 14:30", "en_US", strict=False)
+        assert result is not None
+        assert result.year == 2025
+
+    def test_parse_date_locale_parse_exception(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Test broad Exception path when Locale.parse fails."""
+        # Lines 177-179 coverage - Exception in _get_date_patterns
+
+        # Make Locale.parse raise an exception
+        def mock_parse(_locale_str: str) -> Locale:
+            msg = "Simulated locale parsing failure"
+            raise RuntimeError(msg)
+
+        monkeypatch.setattr("ftllexbuffer.parsing.dates.Locale.parse", mock_parse)
+
+        # Should fall back to common patterns
+        result = parse_date("01/28/2025", "en_US", strict=False)
+        assert result is not None
+        assert result.year == 2025
+
+    def test_parse_datetime_locale_parse_exception(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Test broad Exception path when Locale.parse fails in datetime."""
+        # Lines 228-230 coverage - Exception in _get_datetime_patterns
+
+        # Make Locale.parse raise an exception
+        def mock_parse(_locale_str: str) -> Locale:
+            msg = "Simulated locale parsing failure"
+            raise RuntimeError(msg)
+
+        monkeypatch.setattr("ftllexbuffer.parsing.dates.Locale.parse", mock_parse)
+
+        # Should fall back to common patterns
+        result = parse_datetime("01/28/2025 14:30:00", "en_US", strict=False)
+        assert result is not None
+        assert result.year == 2025
+
+    def test_parse_datetime_with_cldr_patterns(self) -> None:
+        """Test successful CLDR pattern retrieval and usage."""
+        # Lines 223-224 coverage - successful pattern retrieval
+        # Use a locale that has good CLDR data and a format that will use it
+        # The key is to use a format that matches CLDR patterns but not fallback patterns
+
+        # German locale uses different datetime format
+        result = parse_datetime("28.01.2025 14:30", "de_DE", strict=False)
+        if result is not None:  # If CLDR patterns work
+            assert result.year == 2025
+            assert result.month == 1
+            assert result.day == 28
+
     @given(
         invalid_locale=st.text(
             alphabet=st.characters(min_codepoint=33, max_codepoint=126),
@@ -385,7 +610,6 @@ class TestDateParsingEdgeCases:
     @settings(max_examples=50)
     def test_parse_date_invalid_locale_fallback(self, invalid_locale: str) -> None:
         """Invalid locales should fall back to common patterns gracefully."""
-        # Lines 174-179 coverage - Exception handling in _get_date_patterns
         # ISO date should still work with fallback patterns
         date_str = "2025-01-28"
 

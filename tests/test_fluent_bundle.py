@@ -725,3 +725,39 @@ def test_use_isolating_with_multiple_placeables():
     # Each placeable wrapped independently
     assert result == "\u2068Alice\u2069 و \u2068Bob\u2069"
     assert errors == [], f"Unexpected errors: {errors}"
+
+
+def test_cache_enabled_property_when_enabled():
+    """cache_enabled property returns True when caching enabled."""
+    bundle = FluentBundle("en", enable_cache=True)
+    assert bundle.cache_enabled is True
+
+
+def test_cache_enabled_property_when_disabled():
+    """cache_enabled property returns False when caching disabled."""
+    bundle = FluentBundle("en", enable_cache=False)
+    assert bundle.cache_enabled is False
+
+
+def test_cache_enabled_property_default():
+    """cache_enabled property returns False by default."""
+    bundle = FluentBundle("en")
+    assert bundle.cache_enabled is False
+
+
+def test_cache_size_property_when_enabled():
+    """cache_size property returns configured size when caching enabled."""
+    bundle = FluentBundle("en", enable_cache=True, cache_size=500)
+    assert bundle.cache_size == 500
+
+
+def test_cache_size_property_when_disabled():
+    """cache_size property returns 0 when caching disabled."""
+    bundle = FluentBundle("en", enable_cache=False, cache_size=500)
+    assert bundle.cache_size == 0
+
+
+def test_cache_size_property_default():
+    """cache_size property returns 0 by default (cache disabled)."""
+    bundle = FluentBundle("en")
+    assert bundle.cache_size == 0

@@ -198,3 +198,177 @@ class TestCacheInvalidationProperties:
             stats_after = bundle.get_cache_stats()
             assert stats_after is not None
             assert stats_after["size"] == 0  # Cache cleared
+
+
+class TestCacheInternalProperties:
+    """Property-based tests for cache internals."""
+
+    @given(
+        cache_size=st.integers(min_value=1, max_value=100),
+        num_operations=st.integers(min_value=0, max_value=200),
+    )
+    def test_cache_len_property(self, cache_size: int, num_operations: int) -> None:
+        """Cache __len__ always returns correct size.
+
+        Property: len(cache) ≤ maxsize and len(cache) = stats["size"]
+        """
+        bundle = FluentBundle("en", enable_cache=True, cache_size=cache_size)
+
+        # Add messages
+        ftl_source = "\n".join([f"msg{i} = Message {i}" for i in range(num_operations)])
+        bundle.add_resource(ftl_source)
+
+        # Format messages
+        for i in range(num_operations):
+            bundle.format_pattern(f"msg{i}")
+
+        # len() should match stats
+        cache = bundle._cache
+        assert cache is not None  # Type narrowing for mypy
+        stats = bundle.get_cache_stats()
+        assert stats is not None
+        assert len(cache) == stats["size"]
+        assert len(cache) <= cache_size
+
+    @given(
+        cache_size=st.integers(min_value=1, max_value=50),
+    )
+    def test_cache_properties_consistent(self, cache_size: int) -> None:
+        """Cache properties (maxsize, hits, misses) are consistent.
+
+        Property: Properties always match internal state.
+        """
+        bundle = FluentBundle("en", enable_cache=True, cache_size=cache_size)
+        bundle.add_resource("msg = Hello")
+        cache = bundle._cache
+        assert cache is not None  # Type narrowing for mypy
+
+        # maxsize property matches constructor
+        assert cache.maxsize == cache_size
+
+        # hits and misses start at zero
+        assert cache.hits == 0
+        assert cache.misses == 0
+
+        # After one call: 1 miss, 0 hits
+        bundle.format_pattern("msg")
+        assert cache.hits == 0
+        assert cache.misses == 1
+
+        # After second call: 1 miss, 1 hit
+        bundle.format_pattern("msg")
+        assert cache.hits == 1
+        assert cache.misses == 1
+
+    @given(
+        num_updates=st.integers(min_value=1, max_value=50),
+    )
+    def test_cache_update_existing_key_property(self, num_updates: int) -> None:
+        """Updating existing cache entry doesn't increase size.
+
+        Property: Repeatedly formatting same message keeps cache size at 1.
+        """
+        bundle = FluentBundle("en", enable_cache=True, cache_size=10)
+        bundle.add_resource("msg = Hello")
+        cache = bundle._cache
+        assert cache is not None  # Type narrowing for mypy
+
+        # Format same message multiple times
+        for _ in range(num_updates):
+            bundle.format_pattern("msg")
+
+        # Cache size should be 1 (same entry updated)
+        assert len(cache) == 1
+        assert cache.hits == num_updates - 1
+        assert cache.misses == 1
+
+    @given(
+        args_list=st.lists(
+            st.dictionaries(
+                keys=st.text(alphabet="abcdefghij", min_size=1, max_size=3),
+                values=st.integers(min_value=0, max_value=100),
+                min_size=0,
+                max_size=3,
+            ),
+            min_size=1,
+            max_size=20,
+        )
+    )
+    def test_cache_key_uniqueness_property(self, args_list: list[dict[str, int]]) -> None:
+        """Each unique args dict creates separate cache entry.
+
+        Property: Distinct args → distinct cache keys → separate entries.
+        """
+        bundle = FluentBundle("en", enable_cache=True, cache_size=100, use_isolating=False)
+        bundle.add_resource("msg = { $a } { $b } { $c }")
+        cache = bundle._cache
+        assert cache is not None  # Type narrowing for mypy
+
+        # Format with different args
+        for args in args_list:
+            bundle.format_pattern("msg", args)
+
+        # Cache size equals number of unique args
+        unique_args = len({tuple(sorted(args.items())) for args in args_list})
+        assert len(cache) == min(unique_args, 100)  # Min with cache_size
+
+    @given(
+        message_ids=st.lists(
+            st.text(alphabet="abcdefghij", min_size=3, max_size=10),
+            min_size=1,
+            max_size=20,
+            unique=True,
+        )
+    )
+    def test_cache_message_id_isolation_property(
+        self, message_ids: list[str]
+    ) -> None:
+        """Different message IDs create separate cache entries.
+
+        Property: Each message_id → separate cache entry.
+        """
+        bundle = FluentBundle("en", enable_cache=True, cache_size=100)
+
+        # Add all messages
+        ftl_source = "\n".join([f"{msg_id} = Message {i}" for i, msg_id in enumerate(message_ids)])
+        bundle.add_resource(ftl_source)
+        cache = bundle._cache
+        assert cache is not None  # Type narrowing for mypy
+
+        # Format all messages
+        for msg_id in message_ids:
+            bundle.format_pattern(msg_id)
+
+        # Cache should have one entry per message
+        assert len(cache) == min(len(message_ids), 100)
+
+    @given(
+        attributes=st.lists(
+            st.one_of(st.none(), st.text(alphabet="abcdefghij", min_size=1, max_size=10)),
+            min_size=1,
+            max_size=10,
+        )
+    )
+    def test_cache_attribute_isolation_property(
+        self, attributes: list[str | None]
+    ) -> None:
+        """Different attributes create separate cache entries.
+
+        Property: Each attribute → separate cache entry.
+        """
+        bundle = FluentBundle("en", enable_cache=True, cache_size=100, use_isolating=False)
+
+        # Create message with multiple attributes
+        attrs_ftl = "\n    ".join([f".{attr} = Attr {attr}" for attr in attributes if attr])
+        bundle.add_resource(f"msg = Value\n    {attrs_ftl}")
+        cache = bundle._cache
+        assert cache is not None  # Type narrowing for mypy
+
+        # Format with different attributes
+        seen_attrs = set()
+        for attr in attributes:
+            bundle.format_pattern("msg", attribute=attr)
+            seen_attrs.add(attr)
+
+        # Cache should have one entry per unique attribute
+        assert len(cache) == len(seen_attrs)

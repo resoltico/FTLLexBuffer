@@ -408,3 +408,135 @@ payment-error = Payment failed: { $reason }
 
         assert hello == "Hello!"
         assert error == "Page not found"
+
+
+class TestCacheConfiguration:
+    """Test cache configuration in FluentLocalization."""
+
+    def test_cache_disabled_by_default(self) -> None:
+        """Cache is disabled by default."""
+        l10n = FluentLocalization(["en"])
+        l10n.add_resource("en", "msg = Hello")
+
+        # Format twice
+        l10n.format_value("msg")
+        l10n.format_value("msg")
+
+        # Get stats from first bundle
+        bundles = list(l10n.get_bundles())
+        stats = bundles[0].get_cache_stats()
+
+        # Cache disabled - stats should be None
+        assert stats is None
+
+    def test_cache_enabled_with_parameter(self) -> None:
+        """Cache can be enabled via constructor parameter."""
+        l10n = FluentLocalization(["en"], enable_cache=True)
+        l10n.add_resource("en", "msg = Hello")
+
+        # Format twice - should hit cache on second call
+        l10n.format_value("msg")
+        l10n.format_value("msg")
+
+        # Get stats from first bundle
+        bundles = list(l10n.get_bundles())
+        stats = bundles[0].get_cache_stats()
+
+        # Cache enabled - should have stats
+        assert stats is not None
+        assert stats["hits"] == 1
+        assert stats["misses"] == 1
+
+    def test_cache_size_configurable(self) -> None:
+        """Cache size can be configured via constructor parameter."""
+        l10n = FluentLocalization(["en"], enable_cache=True, cache_size=500)
+        l10n.add_resource("en", "msg = Hello")
+
+        # Format message
+        l10n.format_value("msg")
+
+        # Verify cache is enabled (size configuration is internal)
+        bundles = list(l10n.get_bundles())
+        stats = bundles[0].get_cache_stats()
+        assert stats is not None
+
+    def test_cache_works_across_multiple_locales(self) -> None:
+        """Cache enabled for all bundles in multi-locale setup."""
+        l10n = FluentLocalization(["lv", "en"], enable_cache=True)
+        l10n.add_resource("lv", "msg = Sveiki")
+        l10n.add_resource("en", "msg = Hello")
+
+        # Format from primary locale (lv)
+        l10n.format_value("msg")
+        l10n.format_value("msg")
+
+        # Verify lv bundle has cache hits
+        bundles = list(l10n.get_bundles())
+        lv_stats = bundles[0].get_cache_stats()
+        assert lv_stats is not None
+        assert lv_stats["hits"] == 1
+
+    def test_clear_cache_on_all_bundles(self) -> None:
+        """clear_cache() clears cache on all bundles."""
+        l10n = FluentLocalization(["lv", "en"], enable_cache=True)
+        l10n.add_resource("lv", "msg = Sveiki")
+        l10n.add_resource("en", "msg = Hello")
+
+        # Format messages to populate cache
+        l10n.format_value("msg")
+        l10n.format_value("msg")
+
+        # Clear cache
+        l10n.clear_cache()
+
+        # Format again - should be cache miss
+        l10n.format_value("msg")
+
+        # Verify cache was cleared (only 1 miss after clear)
+        bundles = list(l10n.get_bundles())
+        lv_stats = bundles[0].get_cache_stats()
+        assert lv_stats is not None
+        assert lv_stats["misses"] == 1  # Only the post-clear miss
+
+
+class TestCacheIntrospection:
+    """Test cache introspection properties."""
+
+    def test_cache_enabled_property_when_enabled(self) -> None:
+        """cache_enabled property returns True when caching enabled."""
+        l10n = FluentLocalization(["en"], enable_cache=True)
+        assert l10n.cache_enabled is True
+
+    def test_cache_enabled_property_when_disabled(self) -> None:
+        """cache_enabled property returns False when caching disabled."""
+        l10n = FluentLocalization(["en"], enable_cache=False)
+        assert l10n.cache_enabled is False
+
+    def test_cache_enabled_property_default(self) -> None:
+        """cache_enabled property returns False by default."""
+        l10n = FluentLocalization(["en"])
+        assert l10n.cache_enabled is False
+
+    def test_cache_size_property_when_enabled(self) -> None:
+        """cache_size property returns configured size when caching enabled."""
+        l10n = FluentLocalization(["en"], enable_cache=True, cache_size=500)
+        assert l10n.cache_size == 500
+
+    def test_cache_size_property_when_disabled(self) -> None:
+        """cache_size property returns 0 when caching disabled."""
+        l10n = FluentLocalization(["en"], enable_cache=False, cache_size=500)
+        assert l10n.cache_size == 0
+
+    def test_cache_size_property_default(self) -> None:
+        """cache_size property returns 0 by default (cache disabled)."""
+        l10n = FluentLocalization(["en"])
+        assert l10n.cache_size == 0
+
+    def test_bundle_cache_properties_reflect_localization_config(self) -> None:
+        """Individual bundles reflect FluentLocalization cache config."""
+        l10n = FluentLocalization(["lv", "en"], enable_cache=True, cache_size=250)
+
+        # Check all bundles have matching config
+        for bundle in l10n.get_bundles():
+            assert bundle.cache_enabled is True
+            assert bundle.cache_size == 250

@@ -333,3 +333,71 @@ class TestParsingMetamorphicProperties:
 
         # Should stabilize
         assert parsed1 == parsed2
+
+    @given(
+        value=st.decimals(
+            min_value=Decimal("0.00"),
+            max_value=Decimal("0.00"),
+        ),
+    )
+    @settings(max_examples=10)
+    def test_parse_zero_handling(self, value: Decimal) -> None:  # noqa: ARG002
+        """Zero values parse correctly."""
+        result = parse_decimal("0.00", "en_US")
+        assert result is not None
+        assert result == Decimal("0.00")
+
+    @given(
+        value=st.decimals(
+            min_value=Decimal("0.01"),
+            max_value=Decimal("999999999999.99"),
+            places=2,
+        ),
+    )
+    @settings(max_examples=100)
+    def test_parse_very_large_numbers(self, value: Decimal) -> None:
+        """Very large numbers parse correctly without loss of precision."""
+        from ftllexbuffer.runtime.functions import number_format
+
+        formatted = number_format(float(value), "en_US", minimum_fraction_digits=2)
+        parsed = parse_decimal(formatted, "en_US")
+
+        assert parsed is not None
+        # Large numbers must not lose precision
+        assert abs(parsed - value) < Decimal("0.01")
+
+    @given(
+        thousands_sep=st.sampled_from([",", ".", " ", "'"]),
+        decimal_sep=st.sampled_from([".", ","]),
+    )
+    @settings(max_examples=50)
+    def test_parse_separator_combinations(
+        self, thousands_sep: str, decimal_sep: str
+    ) -> None:
+        """Different separator combinations should be handled correctly."""
+        # Skip if separators are the same (invalid)
+        if thousands_sep == decimal_sep:
+            return
+
+        # This tests locale-specific separator handling
+        # Each locale has its own separator conventions
+        locales = {
+            (",", "."): "en_US",  # 1,234.56
+            (".", ","): "de_DE",  # 1.234,56
+            (" ", ","): "fr_FR",  # 1 234,56
+        }
+
+        locale_key = (thousands_sep, decimal_sep)
+        if locale_key in locales:
+            locale = locales[locale_key]
+            # Test that parse_decimal handles this locale correctly
+            from ftllexbuffer.runtime.functions import number_format
+
+            value = Decimal("1234.56")
+            formatted = number_format(
+                float(value), locale, use_grouping=True, minimum_fraction_digits=2
+            )
+            parsed = parse_decimal(formatted, locale)
+
+            assert parsed is not None
+            assert parsed == value

@@ -163,6 +163,7 @@ class FluentBundle:
 
         # Format cache (opt-in)
         self._cache: FormatCache | None = None
+        self._cache_size = cache_size
         if enable_cache:
             self._cache = FormatCache(maxsize=cache_size)
 
@@ -200,6 +201,44 @@ class FluentBundle:
             True
         """
         return self._use_isolating
+
+    @property
+    def cache_enabled(self) -> bool:
+        """Get whether format caching is enabled (read-only).
+
+        Returns:
+            bool: True if caching is enabled, False otherwise
+
+        Example:
+            >>> bundle = FluentBundle("en", enable_cache=True)
+            >>> bundle.cache_enabled
+            True
+            >>> bundle_no_cache = FluentBundle("en")
+            >>> bundle_no_cache.cache_enabled
+            False
+        """
+        return self._cache is not None
+
+    @property
+    def cache_size(self) -> int:
+        """Get maximum cache size configuration (read-only).
+
+        Returns:
+            int: Maximum cache entries (0 if caching disabled)
+
+        Example:
+            >>> bundle = FluentBundle("en", enable_cache=True, cache_size=500)
+            >>> bundle.cache_size
+            500
+            >>> bundle_no_cache = FluentBundle("en")
+            >>> bundle_no_cache.cache_size
+            0
+
+        Note:
+            Returns configured size even if cache is disabled.
+            Use cache_enabled to check if caching is active.
+        """
+        return self._cache_size if self.cache_enabled else 0
 
     def get_babel_locale(self) -> str:
         """Get the Babel locale identifier for this bundle (introspection API).

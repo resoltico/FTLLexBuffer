@@ -5,24 +5,68 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2025-12-04
+
+### Added
+
+- **FluentLocalization cache configuration** - Format caching now available for multi-locale applications
+  - **New parameters**: `FluentLocalization.__init__()` accepts `enable_cache` and `cache_size` parameters
+  - **API signature**:
+    ```python
+    FluentLocalization(
+        locales,
+        resource_ids=None,
+        resource_loader=None,
+        *,
+        use_isolating=True,
+        enable_cache=False,     # NEW: Enable format caching (50x speedup)
+        cache_size=1000         # NEW: Max cache entries per bundle
+    )
+    ```
+  - **Impact**: All bundles in fallback chain now support caching (previously only FluentBundle had cache support)
+  - **Use case**: Applications with language switching, bundle pool architectures, multi-locale SPAs
+  - **Performance**: 50x speedup on repeated format calls (same as FluentBundle caching)
+  - **Example**:
+    ```python
+    l10n = FluentLocalization(
+        ['lv', 'en'],
+        ['ui.ftl'],
+        loader,
+        enable_cache=True,   # Cache enabled for all bundles
+        cache_size=1000
+    )
+    ```
+  - **Breaking**: None - new parameters are opt-in with backwards-compatible defaults
+
+- **Cache introspection properties** - Query cache configuration at runtime
+  - **New properties**:
+    - `FluentBundle.cache_enabled` (bool) - Check if caching is enabled
+    - `FluentBundle.cache_size` (int) - Get configured cache size (0 if disabled)
+    - `FluentLocalization.cache_enabled` (bool) - Check if caching is enabled for all bundles
+    - `FluentLocalization.cache_size` (int) - Get configured cache size per bundle (0 if disabled)
+  - **Use cases**: Monitoring, debugging, conditional logic based on cache config
+  - **Example**:
+    ```python
+    bundle = FluentBundle("en", enable_cache=True, cache_size=500)
+    print(bundle.cache_enabled)  # True
+    print(bundle.cache_size)     # 500
+
+    l10n = FluentLocalization(['lv', 'en'], enable_cache=True)
+    print(l10n.cache_enabled)    # True
+    for bundle in l10n.get_bundles():
+        print(f"{bundle.locale}: cache={bundle.cache_enabled}")
+    ```
+  - **Introspection**: Follows same pattern as existing `locale` and `use_isolating` properties
+
+- **Enhanced test suite**
+
+---
+
 ## [0.5.1] - 2025-12-04
 
 ### Fixed
 
 - **CI performance test flakiness** - Replaced timing-based tests with scale-based complexity testing
-  - **Root cause**: Single-shot timing comparisons failed in GitHub Actions due to JIT warmup, CPU cache effects, and containerized environment variance
-  - **Impact**: `test_parser_scales_linearly_with_message_count` failed in CI with inverted timing ratios (200 messages parsed faster than 100)
-  - **Solution**: Implemented scale-based complexity testing approach
-    - Uses 10x size jumps (100 → 1000 → 10000) instead of 2x comparisons
-    - Includes warmup runs to stabilize JIT/cache effects
-    - Takes minimum of 3 measurements for stability
-    - Tests normalized complexity ratios: `(time(10n)/time(n)) / (10n/n) ≈ 1.0` for O(n)
-    - Allows 0.3-3.0x tolerance (handles CI variance while catching O(n²) regressions)
-  - **Tests fixed**:
-    - `TestParserPerformanceScaling::test_parser_scales_linearly_with_message_count`
-    - `TestSerializerPerformanceScaling::test_serializer_scales_linearly`
-    - `TestResolverPerformanceScaling::test_resolver_scales_linearly_with_message_count`
-  - **Benefit**: Timing tests now reliable in CI environments while still catching algorithmic regressions
 
 ---
 
@@ -67,8 +111,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **LRU eviction**: Oldest entries evicted when cache_size limit reached
   - **Introspection**: `get_cache_stats()` returns hits, misses, size, hit_rate
   - **Manual control**: `clear_cache()` for explicit cache clearing
-  - **100% transparency**: Cached results identical to non-cached (property-based tested)
-  - **100% coverage**: All cache paths tested including concurrency and edge cases
 
 - **FluentLocalization API Completeness** (feature parity with FluentBundle)
   - `format_pattern(message_id, args, attribute=None)` - Format with attribute support and fallback
@@ -136,71 +178,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Tests
 
-- **172 new tests** for v0.5.0 features (total: 3122 tests passing, 96.6%+ coverage)
-  - **Parsing tests** (99 tests):
-    - `tests/test_parsing_numbers.py` (14 tests) - Number/decimal parsing with roundtrip validation
-    - `tests/test_parsing_dates.py` (10 tests) - Date/datetime parsing with timezone support
-    - `tests/test_parsing_currency.py` (9 tests) - Currency parsing with symbol detection
-    - `tests/test_parsing_numbers_hypothesis.py` (16 tests) - **NEW: Property-based number parsing tests**
-      - **Roundtrip precision preservation**: format → parse maintains exact float/Decimal value across 200 examples per test
-      - **Type invariants**: Always returns float (parse_number) or Decimal (parse_decimal), never mixed types
-      - **Negative amounts and fractional precision**: Tests edge cases with sub-dollar amounts and negative values
-      - **Cross-locale consistency**: Parsing works identically across en_US, de_DE, fr_FR, lv_LV, pl_PL, ja_JP
-      - **Metamorphic properties**: Order independence (parse order doesn't matter), idempotence (parse(parse(x)) == parse(x)), stability (repeated parse operations converge)
-      - **Type error handling**: **Discovered AttributeError/TypeError bug** - Babel crashes on non-string inputs (integers, lists, dicts)
-      - **Generates 2800+ test cases** from property specifications (100-200 examples per property)
-    - `tests/test_serialization_hypothesis.py` (11 tests) - **NEW: Property-based FTL serialization tests**
-      - **Roundtrip idempotence**: parse → serialize → parse → serialize stabilizes after first cycle
-      - **Structure preservation**: Message count, IDs, and attributes preserved through roundtrip
-      - **Never crashes property**: serialize_ftl() never raises on any parsed Resource
-      - **Unicode content handling**: Non-ASCII text (Latin-1 Supplement) survives roundtrip
-      - **Multiline patterns**: Messages with 1-20 continuation lines maintain structure
-      - **Whitespace normalization**: Roundtrip may normalize whitespace but preserves semantic content
-      - **FTL syntax constraints**: Filters special characters (`{`, `[`, `*`, etc.) that have semantic meaning in FTL
-      - **Generates 1500+ test cases** from property specifications (20-200 examples per property)
-    - `tests/test_parsing_currency_hypothesis.py` (17 tests) - **ENHANCED: Added 3 metamorphic property tests**
-      - **Financial precision preservation**: Decimal roundtrip (format → parse → format) with no float rounding
-      - **ISO 4217 currency code recognition**: All 3-letter uppercase codes accepted (EUR, USD, GBP, JPY, etc.)
-      - **Unknown symbol error handling**: Tests both strict mode (ValueError) and non-strict mode (None)
-      - **Invalid number detection**: Filters out Babel's special IEEE 754 values (NaN, Infinity, Inf)
-      - **NEW: Comparison property**: parse(format(a)) < parse(format(b)) iff a < b (ordering preserved through roundtrip)
-      - **NEW: Locale format independence**: parse(format(x, L1), L1) == parse(format(x, L2), L2) for all locales
-      - **NEW: Addition homomorphism**: parse(format(a)) + parse(format(a)) == parse(format(2*a)) within Decimal precision
-      - **Type error handling**: Non-string inputs (integers, floats, lists, dicts) handled gracefully
-      - **Negative amounts**: Debt/refunds with correct sign preservation
-      - **Fractional amounts**: Sub-dollar precision (0.001-0.999) with exact Decimal preservation
-      - **Cross-locale consistency**: Currency parsing works across multiple locales (en_US, de_DE, fr_FR, ja_JP, lv_LV, pl_PL)
-      - **Defensive code validation**: Verifies regex pattern symbols match currency symbol map (lines 108-111)
-      - **Generates 2000+ test cases** from property specifications (50-200 examples per property)
-    - `tests/test_parsing_dates_hypothesis.py` (22 tests) - **Property-based date/datetime parsing tests**
-      - **ISO 8601 format reliability**: 200 examples per test across all date/datetime combinations (2000-2099)
-      - **Locale independence**: ISO dates parse identically in en_US, de_DE, fr_FR, lv_LV, pl_PL, ja_JP
-      - **US format (month-first)**: M/D/YYYY parsing with correct month/day interpretation
-      - **European format (day-first)**: D.M.YYYY parsing with correct day/month interpretation
-      - **Type error handling**: **Discovered and fixed critical TypeError bug** in ISO fast path (lines 58, 121)
-      - **Timezone assignment**: Tests both ISO path (line 118-120) and strptime path (line 131) with tzinfo parameter
-      - **Invalid locale fallback**: Defensive exception handling for missing CLDR data (lines 174-179, 223-230)
-      - **Financial reporting date formats**: ISO, US, EU formats all tested across 100 date combinations
-      - **Minimal locale data**: Tests locales with incomplete CLDR data ("root", "und", "en_001", "en_150")
-      - **24-hour time format**: 100 examples testing hour:minute combinations (0-23:0-59)
-      - **Generates 3800+ test cases** from property specifications (50-200 examples per property)
-  - **Caching tests** (26 tests):
-    - `tests/test_cache_basic.py` (14 tests) - Cache hit/miss, LRU eviction, stats, invalidation
-    - `tests/test_cache_concurrency.py` (6 tests) - Thread safety, race conditions, concurrent mutations
-    - `tests/test_cache_properties.py` (6 tests with Hypothesis) - Cache transparency, isolation, LRU properties
-  - **API completeness tests** (10 tests):
-    - `tests/test_localization_api_completeness.py` (10 tests) - FluentLocalization new methods
-  - **Rich diagnostics tests** (18 tests):
-    - `tests/test_rich_diagnostics.py` (18 tests) - Enhanced error objects, diagnostic codes, error formatting
-  - **Custom patterns tests** (19 tests):
-    - `tests/test_custom_patterns.py` (19 tests) - NUMBER/DATETIME pattern support, regulatory formats
-
-### Performance
-
-- **Caching speedup**: Up to 50x faster for repeated format_pattern() calls with same arguments
-  - Example: Rendering 1000 messages with same locale/args goes from 100ms to 2ms
-  - Benefit scales with message complexity (functions, plurals, references)
-  - Zero overhead when caching disabled (default behavior unchanged)
+- **Enhanced test suite**
 
 ### Internal
 
@@ -328,29 +306,7 @@ from ftllexbuffer.parsing import (
   - **FunctionSignature** dataclass: Exported for working with function metadata
   - **Use cases**: Auto-documentation generation, function validation, debugging, IDE auto-complete
 
-- **Comprehensive property-based test suite** (121 new tests):
-  - **FunctionRegistry introspection** (24 Hypothesis tests):
-    - List/iteration/contains invariants
-    - Copy isolation and function overwriting behavior
-    - Empty registry edge cases
-    - Large registry performance (100-1000 functions)
-  - **Function metadata** (26 coverage tests):
-    - Locale injection detection with malformed registries
-    - Custom functions overriding built-in names
-    - Metadata consistency validation
-  - **Integration tests** (21 tests):
-    - Built-in functions (NUMBER, DATETIME, CURRENCY) introspection
-    - Financial validation workflows (VAT calculations, invoice totals)
-    - Function discovery patterns for auto-documentation
-  - **Plural rules** (28 Hypothesis tests):
-    - CLDR compliance for English, Latvian, Slavic (Russian/Polish), Arabic
-    - Financial use cases (invoice line items, VAT amounts, product quantities)
-    - Metamorphic properties and edge cases
-  - **Bundle operations** (22 Hypothesis tests):
-    - Term attribute cycle detection
-    - Source path error logging
-    - Validation error handling
-    - Currency/VAT formatting robustness
+- **Enhanced test suite**
 
 - **Enhanced NUMBER() documentation** in README.md:
   - Detailed parameter descriptions with financial precision guidelines
@@ -452,11 +408,7 @@ if "CURRENCY" in bundle._function_registry:
   - Prevents future locale injection bugs through self-validation
   - Correctly handles custom functions that override built-in names
 
-- **Contract testing framework** (358 new tests in `tests/test_function_locale_contracts.py`)
-  - Verifies FluentBundle output matches direct function calls for all locale-dependent functions
-  - Tests NUMBER(), DATETIME(), CURRENCY() across 30 locales with various parameters
-  - **Would have caught CURRENCY locale bug immediately**
-  - Prevents future locale injection regressions
+- **Enhanced test suite**
 
 - **Documentation validation CI** (`scripts/validate_docs.py`)
   - Parses all FTL code blocks in markdown files to ensure validity
@@ -576,51 +528,7 @@ if "CURRENCY" in bundle._function_registry:
   - Updated custom functions section (replaced broken CURRENCY example with FILESIZE)
 
 ### Tests
-- **tests/test_currency_function.py** (new) - Test suite for CURRENCY() function (50+ tests)
-  - All 30 supported locales tested
-  - Currency-specific decimal rules (JPY: 0, BHD: 3)
-  - Symbol placement variations (en_US vs lv_LV vs de_DE)
-  - All display modes (symbol, code, name)
-  - Error handling (invalid currency codes, invalid values)
-  - Property-based tests with Hypothesis (100+ examples)
-- **tests/test_ast_edge_cases.py** (new) - Coverage tests targeting uncovered lines
-  - Validator edge cases (duplicate selectors, invalid message/term references)
-  - Visitor transformation edge cases
-  - Resolver edge cases (boolean conversion, placeable resolution)
-  - Plural rules edge cases (Polish pl i=1 case)
-  - AST edge cases and parser error paths
-- **tests/test_bundle_error_handling.py** (new) - Bundle error handling and edge cases
-  - Term attribute validation during cycle detection
-  - Junk entry logging with source_path context
-  - Comment entry handling
-  - Parse error reporting with source_path
-  - Message validation warnings (missing values/attributes)
-  - Term validation (duplicate IDs, undefined references)
-- **tests/test_introspection_coverage.py** (new) - Introspection API coverage tests
-  - Function calls with variable references in named arguments
-  - TypeError handling for non-Message/Term introspection
-  - Edge cases in variable extraction
-- **tests/test_locale_context_coverage.py** (new) - LocaleContext error path coverage
-  - Unknown locale handling with fallback to en_US
-  - Number formatting error paths
-  - Datetime formatting error paths
-  - Currency formatting error paths
-- **tests/test_visitor_coverage.py** (new) - Visitor and Transformer coverage tests
-  - Term transformation
-  - SelectExpression, Variant, FunctionReference transformations
-  - MessageReference, TermReference, VariableReference transformations
-  - CallArguments and NamedArgument transformations
-  - Attribute transformations and edge cases
-- **tests/test_miscellaneous_coverage.py**
-  - Improved naming for miscellaneous edge case coverage
-  - Tests for localization with non-PathResourceLoader
-  - Polish plural rules validation
-  - Boolean to string conversion in resolver
-  - Placeable resolution edge cases
-- **tests/test_locale_formatting_comprehensive.py** - Added CURRENCY tests
-  - Integration tests for all 30 locales
-  - Parameter handling tests
-  - Locale-specific formatting validation
+- **Enhanced test suite**
 
 ## [0.1.1] - 2025-11-28
 

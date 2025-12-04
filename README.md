@@ -1230,7 +1230,7 @@ FTLLexBuffer ships with CLDR-compliant plural rules for 30 languages:
 | Punjabi | pa | one, other | 0 or 1 → one |
 | Latvian | lv | zero, one, other | Special rules |
 
-**Number/Date Formatting**: Uses Babel for CLDR-compliant NUMBER() and DATETIME() functions.
+**Number/Date/Currency Formatting**: Uses Babel for CLDR-compliant NUMBER(), DATETIME(), and CURRENCY() functions.
 
 **Technical note:** Locale codes use language prefix extraction. `"en_US"` → `"en"`, `"ar-SA"` → `"ar"`.
 
