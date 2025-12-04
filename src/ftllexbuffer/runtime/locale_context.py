@@ -106,6 +106,7 @@ class LocaleContext:
         minimum_fraction_digits: int = 0,
         maximum_fraction_digits: int = 3,
         use_grouping: bool = True,
+        pattern: str | None = None,
     ) -> str:
         """Format number with locale-specific separators.
 
@@ -116,6 +117,7 @@ class LocaleContext:
             minimum_fraction_digits: Minimum decimal places (default: 0)
             maximum_fraction_digits: Maximum decimal places (default: 3)
             use_grouping: Use thousands separator (default: True)
+            pattern: Custom number pattern (overrides other parameters)
 
         Returns:
             Formatted number string according to locale rules
@@ -133,12 +135,26 @@ class LocaleContext:
             >>> ctx.format_number(1234.5)
             '1 234,5'
 
+            >>> ctx = LocaleContext('en-US')
+            >>> ctx.format_number(-1234.56, pattern="#,##0.00;(#,##0.00)")
+            '(1,234.56)'
+
         CLDR Compliance:
             Uses Babel's format_decimal() which implements CLDR rules.
             Matches Intl.NumberFormat behavior in JavaScript.
         """
         try:
-            # Build format pattern
+            # Use custom pattern if provided
+            if pattern is not None:
+                return str(
+                    babel_numbers.format_decimal(
+                        value,
+                        format=pattern,
+                        locale=self.babel_locale,
+                    )
+                )
+
+            # Build format pattern from parameters
             # '#,##0' = integer with grouping
             # '#,##0.0##' = 1-3 decimal places with grouping
             # '0.00' = exactly 2 decimal places, no grouping
@@ -150,22 +166,22 @@ class LocaleContext:
             if maximum_fraction_digits == 0:
                 # No decimals - round to integer
                 value = round(value)
-                pattern = integer_part
+                format_pattern = integer_part
             elif minimum_fraction_digits == maximum_fraction_digits:
                 # Fixed decimals (e.g., '0.00' for exactly 2)
                 decimal_part = "0" * minimum_fraction_digits
-                pattern = f"{integer_part}.{decimal_part}"
+                format_pattern = f"{integer_part}.{decimal_part}"
             else:
                 # Variable decimals (e.g., '0.0##' for 1-3)
                 required = "0" * minimum_fraction_digits
                 optional = "#" * (maximum_fraction_digits - minimum_fraction_digits)
-                pattern = f"{integer_part}.{required}{optional}"
+                format_pattern = f"{integer_part}.{required}{optional}"
 
             # Format using Babel
             return str(
                 babel_numbers.format_decimal(
                     value,
-                    format=pattern,
+                    format=format_pattern,
                     locale=self.babel_locale,
                 )
             )
@@ -192,6 +208,7 @@ class LocaleContext:
         *,
         date_style: Literal["short", "medium", "long", "full"] = "medium",
         time_style: Literal["short", "medium", "long", "full"] | None = None,
+        pattern: str | None = None,
     ) -> str:
         """Format datetime with locale-specific formatting.
 
@@ -201,6 +218,7 @@ class LocaleContext:
             value: datetime object or ISO string
             date_style: Date format style (default: "medium")
             time_style: Time format style (default: None - date only)
+            pattern: Custom datetime pattern (overrides style parameters)
 
         Returns:
             Formatted datetime string according to locale rules
@@ -215,6 +233,10 @@ class LocaleContext:
             >>> ctx = LocaleContext('de-DE')
             >>> ctx.format_datetime(dt, date_style='short')
             '27.10.25'
+
+            >>> ctx = LocaleContext('en-US')
+            >>> ctx.format_datetime(dt, pattern='yyyy-MM-dd')
+            '2025-10-27'
 
         CLDR Compliance:
             Uses Babel's format_datetime() which implements CLDR rules.
@@ -233,6 +255,16 @@ class LocaleContext:
             dt_value = value
 
         try:
+            # Use custom pattern if provided
+            if pattern is not None:
+                return str(
+                    babel_dates.format_datetime(
+                        dt_value,
+                        format=pattern,
+                        locale=self.babel_locale,
+                    )
+                )
+
             # Map Fluent styles to Babel format strings
             if time_style:
                 # Both date and time

@@ -929,6 +929,6 @@ class TestFileSizeHypothesis:
 
 ---
 
-**Document Last Updated**: November 30, 2025
-**FTLLexBuffer Version**: 0.2.0
+**Document Last Updated**: December 4, 2025
+**FTLLexBuffer Version**: 0.5.0
 **Python Requirement**: 3.13+

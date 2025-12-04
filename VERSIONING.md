@@ -15,7 +15,7 @@ FTLLexBuffer uses **automatic version synchronization** from package metadata. V
 ```toml
 # pyproject.toml
 [project]
-version = "0.1.0"  # ← ONLY place to edit version
+version = "0.5.0"  # ← ONLY place to edit version
 ```
 
 **Automatic runtime population:**
@@ -265,13 +265,14 @@ FTLLexBuffer follows [Semantic Versioning 2.0.0](https://semver.org/):
 
 **Examples:**
 - `0.1.0` - Initial release
-- `0.1.1` - Bug fix release
-- `0.2.0` - New feature (backward-compatible)
+- `0.5.0` - Current development version
+- `0.5.1` - Bug fix release
+- `0.6.0` - New feature (backward-compatible)
 - `1.0.0` - First stable release
 - `1.0.0-alpha` - Pre-release version
 - `1.0.0+build.123` - Build metadata
 
-**Pre-1.0.0 status:** FTLLexBuffer is currently `0.1.0` (development), indicating API may change before `1.0.0` stable release.
+**Pre-1.0.0 status:** FTLLexBuffer is currently `0.5.0` (development), indicating API may change before `1.0.0` stable release.
 
 ---
 
@@ -285,7 +286,7 @@ FTLLexBuffer follows [Semantic Versioning 2.0.0](https://semver.org/):
 ```bash
 pip install -e .
 python -c "import ftllexbuffer; print(ftllexbuffer.__version__)"
-# Should now show: 0.1.0 (or current version)
+# Should now show: 0.5.0 (or current version)
 ```
 
 ### Issue: Test fails with "Version mismatch"
@@ -335,9 +336,9 @@ Automates version bumping to eliminate manual errors.
 **Usage:**
 
 ```bash
-./scripts/bump-version.sh patch  # 0.1.0 -> 0.1.1 (bug fixes)
-./scripts/bump-version.sh minor  # 0.1.0 -> 0.2.0 (new features)
-./scripts/bump-version.sh major  # 0.1.0 -> 1.0.0 (breaking changes)
+./scripts/bump-version.sh patch  # 0.5.0 -> 0.5.1 (bug fixes)
+./scripts/bump-version.sh minor  # 0.5.0 -> 0.6.0 (new features)
+./scripts/bump-version.sh major  # 0.5.0 -> 1.0.0 (breaking changes)
 ```
 
 **Benefits:**

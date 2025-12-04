@@ -253,8 +253,14 @@ class TestCurrencyFormattingErrorPaths:
 
         # Should always return a string
         assert isinstance(result, str)
-        # Should contain currency code and value
-        assert currency_code in result or "99.99" in result or "99,99" in result
+        # Should contain currency code OR numeric value (including currencies with 0 decimals)
+        # Some currencies like VND have 0 decimal places, so 99.99 becomes 100
+        assert (
+            currency_code in result
+            or "99.99" in result
+            or "99,99" in result
+            or "100" in result  # For currencies with 0 decimals (e.g., VND: ₫100)
+        )
 
 
 class TestLocaleContextUnexpectedErrors:

@@ -86,6 +86,15 @@ from .localization import (
     ResourceId,
     ResourceLoader,
 )
+
+# Parsing API - Bi-directional localization
+from .parsing import (
+    parse_currency,
+    parse_date,
+    parse_datetime,
+    parse_decimal,
+    parse_number,
+)
 from .runtime import FluentBundle
 from .runtime.bundle import ValidationResult
 from .runtime.function_bridge import FunctionRegistry, FunctionSignature
@@ -196,6 +205,12 @@ __all__ = [
     "number_format",
     "datetime_format",
     "currency_format",
+    # Parsing API - Bi-directional
+    "parse_number",
+    "parse_decimal",
+    "parse_date",
+    "parse_datetime",
+    "parse_currency",
     # AST - Core entry types
     "Resource",
     "Message",

@@ -41,6 +41,7 @@ def number_format(
     minimum_fraction_digits: int = 0,
     maximum_fraction_digits: int = 3,
     use_grouping: bool = True,
+    pattern: str | None = None,
 ) -> str:
     """Format number with locale-specific separators.
 
@@ -53,6 +54,11 @@ def number_format(
         minimum_fraction_digits: Minimum decimal places (default: 0)
         maximum_fraction_digits: Maximum decimal places (default: 3)
         use_grouping: Use thousands separator (default: True)
+        pattern: Custom number pattern (overrides CLDR defaults)
+            Examples:
+            - "#,##0.00": Always show 2 decimals
+            - "#,##0.00;(#,##0.00)": Negatives in parentheses (accounting)
+            - "0.000": Scientific notation with 3 decimals
 
     Returns:
         Formatted number string
@@ -66,9 +72,12 @@ def number_format(
         '1 234,5'
         >>> number_format(42, "en-US", minimum_fraction_digits=2)
         '42.00'
+        >>> number_format(-1234.56, "en-US", pattern="#,##0.00;(#,##0.00)")
+        '(1,234.56)'
 
     FTL Usage:
         price = { $amount NUMBER(minimumFractionDigits: 2) }
+        accounting = { $amount NUMBER(pattern: "#,##0.00;(#,##0.00)") }
 
     Thread Safety:
         Thread-safe. Uses Babel (no global locale state mutation).
@@ -76,6 +85,7 @@ def number_format(
     CLDR Compliance:
         Implements CLDR formatting rules via Babel.
         Matches Intl.NumberFormat semantics.
+        Custom patterns follow Babel number pattern syntax.
     """
     # Delegate to LocaleContext (immutable, thread-safe)
     ctx = LocaleContext(locale_code)
@@ -84,6 +94,7 @@ def number_format(
         minimum_fraction_digits=minimum_fraction_digits,
         maximum_fraction_digits=maximum_fraction_digits,
         use_grouping=use_grouping,
+        pattern=pattern,
     )
 
 
@@ -93,6 +104,7 @@ def datetime_format(
     *,
     date_style: Literal["short", "medium", "long", "full"] = "medium",
     time_style: Literal["short", "medium", "long", "full"] | None = None,
+    pattern: str | None = None,
 ) -> str:
     """Format datetime with locale-specific formatting.
 
@@ -104,6 +116,12 @@ def datetime_format(
         locale_code: BCP 47 locale identifier (e.g., 'en-US', 'de-DE')
         date_style: Date format style (default: "medium")
         time_style: Time format style (default: None - date only)
+        pattern: Custom datetime pattern (overrides CLDR defaults)
+            Examples:
+            - "yyyy-MM-dd": ISO 8601 date (2025-01-28)
+            - "HH:mm:ss": 24-hour time (14:30:00)
+            - "MMM d, yyyy": Short month name (Jan 28, 2025)
+            - "EEEE, MMMM d, yyyy": Full format (Monday, January 28, 2025)
 
     Returns:
         Formatted datetime string
@@ -118,10 +136,13 @@ def datetime_format(
         >>> dt_with_time = datetime(2025, 10, 27, 14, 30, tzinfo=UTC)
         >>> datetime_format(dt_with_time, "en-US", date_style="medium", time_style="short")
         'Oct 27, 2025, 2:30 PM'
+        >>> datetime_format(dt, "en-US", pattern="yyyy-MM-dd")
+        '2025-10-27'
 
     FTL Usage:
         today = { $date DATETIME(dateStyle: "short") }
         timestamp = { $time DATETIME(dateStyle: "medium", timeStyle: "short") }
+        iso-date = { $date DATETIME(pattern: "yyyy-MM-dd") }
 
     Thread Safety:
         Thread-safe. Uses Babel (no global locale state mutation).
@@ -129,6 +150,7 @@ def datetime_format(
     CLDR Compliance:
         Implements CLDR formatting rules via Babel.
         Matches Intl.DateTimeFormat semantics.
+        Custom patterns follow Babel datetime pattern syntax.
     """
     # Delegate to LocaleContext (immutable, thread-safe)
     ctx = LocaleContext(locale_code)
@@ -136,6 +158,7 @@ def datetime_format(
         value,
         date_style=date_style,
         time_style=time_style,
+        pattern=pattern,
     )
 
 

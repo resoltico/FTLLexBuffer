@@ -382,11 +382,13 @@ file-size = { FILESIZE($bytes) }
 - `minimumFractionDigits` (int): Minimum decimal places (default: 0)
 - `maximumFractionDigits` (int): Maximum decimal places (default: 3)
 - `useGrouping` (bool): Use thousand separators (default: true)
+- `pattern` (string): Custom number pattern (overrides other options) - **Added in v0.5.0**
 
 **Examples**:
 ```ftl
 price = { NUMBER($amount, minimumFractionDigits: 2) }
 percent = { NUMBER($value, maximumFractionDigits: 0) }%
+accounting = { NUMBER($amount, pattern: "#,##0.00;(#,##0.00)") }
 ```
 
 ### DATETIME(value, options)
@@ -394,11 +396,13 @@ percent = { NUMBER($value, maximumFractionDigits: 0) }%
 **Options**:
 - `dateStyle`: "short" | "medium" | "long" | "full" (default: "medium")
 - `timeStyle`: "short" | "medium" | "long" | "full" | null (default: null)
+- `pattern` (string): Custom datetime pattern (overrides style options) - **Added in v0.5.0**
 
 **Examples**:
 ```ftl
 short-date = { DATETIME($timestamp, dateStyle: "short") }
 full-datetime = { DATETIME($timestamp, dateStyle: "long", timeStyle: "short") }
+iso-date = { DATETIME($timestamp, pattern: "yyyy-MM-dd") }
 ```
 
 ### CURRENCY(value, options)
@@ -427,6 +431,36 @@ price-name = { CURRENCY($amount, currency: "EUR", currencyDisplay: "name") }
 - Currency-specific decimals: JPY (0), BHD/KWD/OMR (3), most others (2)
 - Locale-specific symbol placement: en_US (before), lv_LV/de_DE (after with space)
 - Uses Babel for CLDR-compliant formatting
+
+---
+
+## Parsing API (v0.5.0+)
+
+**Bi-directional localization**: Parse locale-formatted strings back to Python types.
+
+```python
+from ftllexbuffer.parsing import parse_number, parse_decimal, parse_date, parse_datetime, parse_currency
+
+# Parse numbers
+amount = parse_decimal("1 234,56", "lv_LV")  # → Decimal('1234.56')
+
+# Parse dates
+date = parse_date("28.01.2025", "lv_LV")  # → date(2025, 1, 28)
+
+# Parse currency
+amount, currency = parse_currency("1 234,56 €", "lv_LV")  # → (Decimal('1234.56'), 'EUR')
+```
+
+**Key Functions**:
+- `parse_number(value, locale)` → `float`
+- `parse_decimal(value, locale)` → `Decimal` (financial precision)
+- `parse_date(value, locale)` → `date`
+- `parse_datetime(value, locale, tzinfo=None)` → `datetime`
+- `parse_currency(value, locale)` → `(Decimal, currency_code)`
+
+**Implementation**: Uses Babel for number parsing, Python 3.13 stdlib (`strptime`, `fromisoformat`) with Babel CLDR patterns for date parsing.
+
+**See**: [PARSING.md](PARSING.md) for complete guide with best practices and examples.
 
 ---
 
@@ -689,6 +723,6 @@ print(f"Fluent Specification {__fluent_spec_version__}")
 
 ---
 
-**Quick Reference Last Updated**: November 27, 2025
-**FTLLexBuffer Version**: 0.1.0
+**Quick Reference Last Updated**: December 4, 2025
+**FTLLexBuffer Version**: 0.5.0
 **Python Requirement**: 3.13+

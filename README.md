@@ -17,6 +17,7 @@ Python 3.13+ implementation of the Fluent Localization System v1.0 specification
 
 **Documentation**:
 - [API Reference](https://github.com/resoltico/ftllexbuffer/blob/main/API.md) - Complete API documentation
+- [Parsing Guide](https://github.com/resoltico/ftllexbuffer/blob/main/PARSING.md) - Bi-directional localization (format + parse)
 - [Type Hints Guide](https://github.com/resoltico/ftllexbuffer/blob/main/TYPE_HINTS.md) - Python 3.13+ type safety patterns
 - [Terminology](https://github.com/resoltico/ftllexbuffer/blob/main/TERMINOLOGY.md) - Standard terminology reference
 - [Migration Guide](https://github.com/resoltico/ftllexbuffer/blob/main/MIGRATION.md) - Migrating from fluent.runtime
@@ -27,8 +28,9 @@ Python 3.13+ implementation of the Fluent Localization System v1.0 specification
 
 **Key Features**:
 - Full Fluent v1.0 specification compliance
+- Bi-directional localization (format and parse)
 - 30 locale plural rules (CLDR-compliant)
-- Zero runtime dependencies (except Babel for formatting)
+- Optional performance caching (50x speedup)
 
 ---
 
@@ -215,7 +217,8 @@ l10n = FluentLocalization(['lv', 'en'], ['main.ftl'], loader)
 
 - Python 3.13 and later. The codebase leverages Python 3.13+ features including `type` keyword type aliases (PEP 695) and `TypeIs` type guards (PEP 742).
 - Runtime dependencies:
-  - `Babel>=2.17.0` (CLDR-compliant i18n formatting)
+  - `Babel>=2.17.0` (CLDR-compliant i18n formatting and parsing)
+  - **Note**: Date/datetime parsing uses Python 3.13 stdlib (`strptime`, `fromisoformat`) with Babel CLDR patterns - no external date libraries required
 
 **Legal Note:** FTLLexBuffer is licensed under MIT. For patent considerations and licensing details, see [PATENTS.md](https://github.com/resoltico/ftllexbuffer/blob/main/PATENTS.md) and [NOTICE](https://github.com/resoltico/ftllexbuffer/blob/main/NOTICE).
 
@@ -269,6 +272,40 @@ result, errors = bundle.format_value("greeting", {"name": "Alice"})
 # format_pattern() - use when accessing attributes
 result, errors = bundle.format_pattern("button", attribute="tooltip")
 ```
+
+### Bi-Directional Localization (v0.5.0+)
+
+FTLLexBuffer provides **full bi-directional localization** - both formatting (data → display) and parsing (display → data). This is critical for forms, invoices, and any user input that needs to be locale-aware:
+
+```python
+from ftllexbuffer import FluentBundle
+from ftllexbuffer.parsing import parse_decimal, parse_currency
+
+# Create bundle for Latvian locale
+bundle = FluentBundle("lv_LV", use_isolating=False)
+bundle.add_resource("""
+price = Cena: { CURRENCY($amount, currency: "EUR") }
+""")
+
+# Format for display (data → user)
+formatted, _ = bundle.format_pattern("price", {"amount": 1234.56})
+print(formatted)  # "Cena: 1 234,56 €"
+
+# Parse user input back to data (user → data)
+user_input = "1 234,56"
+amount = parse_decimal(user_input, "lv_LV")
+print(amount)  # Decimal('1234.56')
+
+# Parse currency with automatic symbol detection
+user_input_currency = "1 234,56 €"
+amount, currency = parse_currency(user_input_currency, "lv_LV")
+print(f"{amount} {currency}")  # Decimal('1234.56') EUR
+
+# Roundtrip validation: format → parse → format preserves value
+assert float(amount) == 1234.56
+```
+
+**See [PARSING.md](https://github.com/resoltico/ftllexbuffer/blob/main/PARSING.md) for complete parsing guide with best practices, common patterns, and troubleshooting.**
 
 ---
 
@@ -504,13 +541,27 @@ Yes! `FluentLocalization` uses `FluentBundle` internally. You can:
 ### FluentBundle
 
 ```python
-FluentBundle(locale: str, *, use_isolating: bool = True)
+FluentBundle(
+    locale: str,
+    *,
+    use_isolating: bool = True,
+    enable_cache: bool = False,
+    cache_size: int = 1000
+)
 ```
 
 Main API for Fluent message formatting.
 
 **Parameters:**
 - `locale` (str): Locale code (e.g., "en_US", "lv_LV", "de_DE", "pl_PL")
+- `enable_cache` (bool, default=False): Enable format result caching (v0.5.0+)
+- `cache_size` (int, default=1000): Maximum cache entries (v0.5.0+)
+
+**Caching (v0.5.0+)**:
+- Opt-in LRU cache for `format_pattern()` results
+- Up to 50x speedup for repeated formatting calls
+- Thread-safe with automatic invalidation on bundle mutations
+- See [API.md - Caching](https://github.com/resoltico/ftllexbuffer/blob/main/API.md#caching) for details
 
 **Methods:**
 
@@ -779,6 +830,25 @@ Main API for Fluent message formatting.
           print(f"Error: {error.content}")
   ```
 
+- `clear_cache() -> None` (v0.5.0+)
+
+  Clear format result cache manually.
+
+  Cache is automatically cleared on `add_resource()` and `add_function()`.
+
+- `get_cache_stats() -> dict[str, int] | None` (v0.5.0+)
+
+  Get cache statistics (hits, misses, size, hit rate).
+
+  Returns `None` if caching not enabled.
+
+  **Example:**
+  ```python
+  bundle = FluentBundle("en", enable_cache=True)
+  stats = bundle.get_cache_stats()
+  print(f"Hit rate: {stats['hit_rate']}%")
+  ```
+
 ### FluentLocalization
 
 Multi-locale message formatting with automatic fallback chains.
@@ -832,6 +902,47 @@ FluentLocalization(
   # result → "Goodbye!" (falls back to English)
   ```
 
+- `format_pattern(message_id: str, args: dict[str, object] | None = None, *, attribute: str | None = None) -> tuple[str, list[FluentError]]` (v0.5.0+)
+
+  Format message with attribute support and fallback chain.
+
+  **Parameters:**
+  - `message_id` (str): Message identifier
+  - `args` (dict, optional): Variable arguments for interpolation
+  - `attribute` (str, optional): Attribute name to access
+
+  **Returns:** Tuple of `(formatted_value, errors)`
+
+- `add_function(name: str, func: Callable) -> None` (v0.5.0+)
+
+  Register custom function on all bundles in fallback chain.
+
+  **Parameters:**
+  - `name` (str): Function name in FTL (UPPERCASE by convention)
+  - `func` (Callable): Python function implementation
+
+- `introspect_message(message_id: str) -> MessageIntrospection | None` (v0.5.0+)
+
+  Get message introspection from first bundle containing the message.
+
+  **Returns:** `MessageIntrospection` or `None` if message not found
+
+- `get_babel_locale() -> str` (v0.5.0+)
+
+  Get Babel locale identifier from primary (first) bundle.
+
+  **Returns:** Locale string (e.g., "lv", "en")
+
+- `validate_resource(ftl_source: str) -> ValidationResult` (v0.5.0+)
+
+  Validate FTL resource using primary bundle.
+
+  **Returns:** `ValidationResult` with parse errors and warnings
+
+- `clear_cache() -> None` (v0.5.0+)
+
+  Clear format cache on all bundles in fallback chain.
+
 - `has_message(message_id: str) -> bool`
 
   Check if message exists in any locale.
@@ -880,6 +991,8 @@ Formats numeric values with locale-aware thousand separators and decimal points.
 - `useGrouping` (bool, optional): Use thousand separators (default: true)
   - When true: `1234` → `1,234` (en-US), `1 234` (lv-LV), `1.234` (de-DE)
   - When false: `1234` → `1234` (all locales)
+- `pattern` (string, optional): Custom number pattern (overrides other options) - **Added in v0.5.0**
+  - Uses Babel number patterns (e.g., `"#,##0.00;(#,##0.00)"` for accounting format with negative values in parentheses)
 
 **Examples:**
 
@@ -970,10 +1083,14 @@ Formats datetime values with locale-specific patterns.
 **Options:**
 - `dateStyle`: "short" | "medium" | "long" | "full" (default: "medium")
 - `timeStyle`: "short" | "medium" | "long" | "full" | null (default: null)
+- `pattern` (string, optional): Custom datetime pattern (overrides style options) - **Added in v0.5.0**
+  - Uses Babel/CLDR patterns (e.g., `"yyyy-MM-dd"` for ISO 8601 dates, `"HH:mm:ss"` for time)
 
-**Example:**
+**Examples:**
 ```ftl
 date = { DATETIME($timestamp, dateStyle: "short") }
+iso-date = { DATETIME($timestamp, pattern: "yyyy-MM-dd") }
+custom-time = { DATETIME($timestamp, pattern: "HH:mm:ss") }
 ```
 
 **CURRENCY(value, options)**
@@ -1209,7 +1326,7 @@ result, errors = bundle.format_pattern("a")
 
 Comprehensive comparison of localization libraries available in the Python ecosystem (versions verified as of November 2025):
 
-| Feature | **FTLLexBuffer** (0.1.0) | fluent.runtime (0.4.0) | fluent-compiler (1.1) | gettext (stdlib) | Babel (2.17.0) | PySide6 (6.x LGPL) | python-i18n (0.3.9) |
+| Feature | **FTLLexBuffer** (0.5.0) | fluent.runtime (0.4.0) | fluent-compiler (1.1) | gettext (stdlib) | Babel (2.17.0) | PySide6 (6.x LGPL) | python-i18n (0.3.9) |
 |---------|----------|----------------|-------------------|-----------------|----------------|---------------------|-------------------|
 | **Format** | .ftl (FTL v1.0) | .ftl (FTL v1.0) | .ftl (FTL v1.0) | .po/.mo (gettext) | .po/.mo (gettext) | .ts/.qm (Qt XML) | .yml/.json |
 | **File Type** | Human-readable text | Human-readable text | Human-readable text | Text (.po) + Compiled binary (.mo) | Text (.po) + Compiled binary (.mo) | XML (.ts) + Compiled binary (.qm) | Human-readable text |
@@ -1221,6 +1338,7 @@ Comprehensive comparison of localization libraries available in the Python ecosy
 | **Context Support** | Terms (`-brand`), Attributes | Terms, Attributes | Terms, Attributes | **pgettext()** (Python 3.8+) | **pgettext()** | **QCoreApplication.translate()** with disambiguation | Namespaces |
 | **Number Formatting** | Babel CLDR (NUMBER, CURRENCY functions) | Babel CLDR | Babel CLDR | Manual (use Babel separately) | **CLDR (format_number, format_currency)** | **Qt CLDR** | Manual |
 | **Date Formatting** | Babel CLDR (DATETIME function) | Babel CLDR | Babel CLDR | Manual (use Babel separately) | **CLDR (format_datetime, format_date, format_time)** | **Qt CLDR** | Manual |
+| **Bi-directional Localization** | **Yes** (parse_number, parse_decimal, parse_date, parse_datetime, parse_currency) | No | No | No | **Yes** (parse_number, parse_decimal, parse_date, parse_time) | No | No |
 | **Bidi Isolation** | **Yes** (Unicode FSI/PDI marks) | **Yes** | **Yes** | No (manual \u2068/\u2069) | No (manual) | **Yes** (Qt handles RTL) | No |
 | **Error Handling** | (value, errors) tuples | (value, errors) tuples | (value, errors) tuples | Fallback to msgid | Fallback to msgid | Fallback to source text | Fallback to key |
 | **Message References** | **Yes** (message-id, -term) | **Yes** | **Yes** | No | No | No | No |
@@ -1229,11 +1347,11 @@ Comprehensive comparison of localization libraries available in the Python ecosy
 | **Type Safety** | **mypy --strict** compatible | Partial (uses attrs) | Partial | No type stubs | Partial type stubs | PyQt6-stubs available | No type stubs |
 | **Validation API** | **validate_resource()** (CI/tooling) | No dedicated API | No dedicated API | msgfmt --check | msgfmt --check | Qt Linguist GUI | No validation |
 | **Circular Reference Detection** | **Yes** (runtime) | **Yes** | **Yes** | N/A | N/A | N/A | N/A |
-| **Use Cases** | Modern apps needing asymmetric grammar | Firefox, Thunderbird extensions | Django (django-ftl), performance-critical | Linux, GNOME, legacy Django | Flask, Pyramid, date/number formatting | PyQt/PySide GUI apps, also non-GUI | Simple YAML-based apps |
+| **Use Cases** | Modern apps needing asymmetric grammar, forms/invoices with bi-directional localization | Firefox, Thunderbird extensions | Django (django-ftl), performance-critical | Linux, GNOME, legacy Django | Flask, Pyramid, date/number formatting | PyQt/PySide GUI apps, also non-GUI | Simple YAML-based apps |
 | **GUI-Specific** | No | No | No | No | No | **No** (works with QCoreApplication for non-GUI) | No |
 | **Ecosystem Maturity** | New (2025) | Mozilla reference (2023) | Mature (django-ftl) | **Very mature** (1990s) | **Very mature** (2013+) | **Very mature** (Qt 6.x) | Low maintenance (2018) |
 | **License** | MIT ([see PATENTS.md](https://github.com/resoltico/ftllexbuffer/blob/main/PATENTS.md)) | Apache 2.0 | Apache 2.0 | **Python (stdlib)** | BSD | **LGPL** (PySide6) | MIT |
-| **Performance** | Interpreter (moderate) | Interpreter (moderate) | **Bytecode (very fast)** | Binary .mo (fast) | Binary .mo (fast) | **Binary .qm (very fast)** | YAML/JSON parse (slow) |
+| **Performance** | Interpreter (moderate), optional LRU cache (50x speedup) | Interpreter (moderate) | **Bytecode (very fast)** | Binary .mo (fast) | Binary .mo (fast) | **Binary .qm (very fast)** | YAML/JSON parse (slow) |
 | **Translator Tools** | Pontoon, generic text editors | Pontoon, generic text editors | Pontoon, generic text editors | **Poedit, Lokalize, Weblate** | **Poedit, Lokalize, Weblate** | **Qt Linguist GUI** | Generic text editors |
 | **Update Workflow** | Edit .ftl → reload | Edit .ftl → reload | Edit .ftl → **recompile** | Edit .po → **msgfmt** → restart | Edit .po → **pybabel compile** → restart | Edit .ts → **lrelease** → restart | Edit .yml/.json → reload |
 | **Django Integration** | Manual | Manual | **django-ftl** package | **Built-in** (makemessages, compilemessages) | **django-babel** | Manual (via PyQt) | Manual |
@@ -1275,6 +1393,7 @@ Comprehensive comparison of localization libraries available in the Python ecosy
 | Your Situation | Recommended Solution | Reason |
 |----------------|---------------------|---------|
 | New project, modern Python 3.13+, need asymmetric grammar | **FTLLexBuffer** | Clean API, mypy --strict, no compilation step |
+| Forms/invoices with locale-aware user input (parsing) | **FTLLexBuffer** | Bi-directional localization (format + parse) |
 | Django project, asymmetric grammar, performance-critical | **fluent-compiler** | django-ftl integration, bytecode speed |
 | PyQt/PySide GUI application | **Qt Linguist** | Native Qt integration, fast binary .qm format |
 | Flask/Pyramid web app, need CLDR formatting | **Babel + gettext** | Flask-Babel package, mature ecosystem |

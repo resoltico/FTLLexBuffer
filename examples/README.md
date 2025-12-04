@@ -165,6 +165,30 @@ Demonstrates:
 
 ---
 
+### [bidirectional_formatting.py](bidirectional_formatting.py)
+
+**Bi-directional localization (v0.5.0+)** - Parse locale-formatted strings back to Python types.
+
+Demonstrates:
+1. Invoice processing with bi-directional localization (Latvian)
+2. Form input validation with locale-aware parsing (German)
+3. Currency parsing with automatic symbol detection (multiple locales)
+4. Date parsing with locale-aware format detection (US vs European)
+5. Roundtrip validation (format → parse → format)
+6. CSV data import with locale-aware parsing
+
+**Run**: `python examples/bidirectional_formatting.py`
+
+**Key Features**:
+- Number/currency parsing via Babel (CLDR-compliant)
+- Date/datetime parsing via Python 3.13 stdlib with Babel CLDR patterns
+- Financial precision with Decimal type
+- Form validation patterns
+- Import/export workflows
+- **Note**: Babel's `parse_decimal()` accepts `NaN`, `Infinity`, and `Inf` (case-insensitive) as valid Decimal values - add validation if your application needs to reject these
+
+---
+
 ### [ftl_transform.py](ftl_transform.py)
 
 **AST transformation and manipulation** - Build tools that modify FTL files programmatically.
@@ -294,6 +318,7 @@ Demonstrates:
 # Run each example individually
 python examples/quickstart.py
 python examples/locale_fallback.py
+python examples/bidirectional_formatting.py
 python examples/ftl_transform.py
 python examples/ftl_linter.py
 python examples/custom_functions.py

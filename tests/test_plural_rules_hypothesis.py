@@ -268,12 +268,14 @@ class TestPluralRuleEdgeCases:
 class TestPluralRuleMetamorphic:
     """Metamorphic property tests."""
 
-    @given(n=st.integers(min_value=0, max_value=1000), locale=locale_codes)
+    @given(
+        n=st.integers(min_value=0, max_value=1000),
+        locale=st.sampled_from(["fr_FR", "it_IT", "pt_PT", "pt_BR"]),
+    )
     def test_adding_hundred_preserves_category_for_romance(
         self, n: int, locale: str
     ) -> None:
         """For Romance languages, adding 100 may change category."""
-        assume(locale.startswith(("fr", "it", "pt")))
 
         result1 = select_plural_category(n, locale)
         result2 = select_plural_category(n + 100, locale)

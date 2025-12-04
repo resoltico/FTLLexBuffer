@@ -214,6 +214,135 @@ class ErrorTemplate:
             span=None,
             hint="Check the function arguments and their types",
             help_url=f"{ErrorTemplate._DOCS_BASE}/functions.html",
+            function_name=function_name,
+        )
+
+    @staticmethod
+    def type_mismatch(
+        function_name: str,
+        argument_name: str,
+        expected_type: str,
+        received_type: str,
+        *,
+        ftl_location: str | None = None,
+    ) -> Diagnostic:
+        """Type mismatch in function argument.
+
+        Args:
+            function_name: Function where type mismatch occurred
+            argument_name: Argument name that has wrong type
+            expected_type: Expected type (e.g., "Number", "String")
+            received_type: Actual type received
+            ftl_location: FTL file location (optional)
+
+        Returns:
+            Diagnostic for TYPE_MISMATCH
+        """
+        msg = f"Type mismatch in {function_name}(): expected {expected_type}, got {received_type}"
+        hint = f"Convert '{argument_name}' to {expected_type} before passing to {function_name}()"
+        return Diagnostic(
+            code=DiagnosticCode.TYPE_MISMATCH,
+            message=msg,
+            span=None,
+            hint=hint,
+            help_url=f"{ErrorTemplate._DOCS_BASE}/functions.html",
+            function_name=function_name,
+            argument_name=argument_name,
+            expected_type=expected_type,
+            received_type=received_type,
+            ftl_location=ftl_location,
+        )
+
+    @staticmethod
+    def invalid_argument(
+        function_name: str,
+        argument_name: str,
+        reason: str,
+        *,
+        ftl_location: str | None = None,
+    ) -> Diagnostic:
+        """Invalid argument value.
+
+        Args:
+            function_name: Function where invalid argument was provided
+            argument_name: Argument name that is invalid
+            reason: Why the argument is invalid
+            ftl_location: FTL file location (optional)
+
+        Returns:
+            Diagnostic for INVALID_ARGUMENT
+        """
+        msg = f"Invalid argument '{argument_name}' in {function_name}(): {reason}"
+        return Diagnostic(
+            code=DiagnosticCode.INVALID_ARGUMENT,
+            message=msg,
+            span=None,
+            hint=f"Check the value of '{argument_name}' argument",
+            help_url=f"{ErrorTemplate._DOCS_BASE}/functions.html",
+            function_name=function_name,
+            argument_name=argument_name,
+            ftl_location=ftl_location,
+        )
+
+    @staticmethod
+    def argument_required(
+        function_name: str,
+        argument_name: str,
+        *,
+        ftl_location: str | None = None,
+    ) -> Diagnostic:
+        """Required argument not provided.
+
+        Args:
+            function_name: Function missing required argument
+            argument_name: Name of required argument
+            ftl_location: FTL file location (optional)
+
+        Returns:
+            Diagnostic for ARGUMENT_REQUIRED
+        """
+        msg = f"Required argument '{argument_name}' not provided for {function_name}()"
+        return Diagnostic(
+            code=DiagnosticCode.ARGUMENT_REQUIRED,
+            message=msg,
+            span=None,
+            hint=f"Add '{argument_name}' argument to {function_name}() call",
+            help_url=f"{ErrorTemplate._DOCS_BASE}/functions.html",
+            function_name=function_name,
+            argument_name=argument_name,
+            ftl_location=ftl_location,
+        )
+
+    @staticmethod
+    def pattern_invalid(
+        function_name: str,
+        pattern: str,
+        reason: str,
+        *,
+        ftl_location: str | None = None,
+    ) -> Diagnostic:
+        """Invalid format pattern.
+
+        Args:
+            function_name: Function with invalid pattern
+            pattern: The invalid pattern string
+            reason: Why the pattern is invalid
+            ftl_location: FTL file location (optional)
+
+        Returns:
+            Diagnostic for PATTERN_INVALID
+        """
+        msg = f"Invalid pattern in {function_name}(): {reason}"
+        return Diagnostic(
+            code=DiagnosticCode.PATTERN_INVALID,
+            message=msg,
+            span=None,
+            hint=f"Check pattern syntax: '{pattern}'",
+            help_url=f"{ErrorTemplate._DOCS_BASE}/functions.html",
+            function_name=function_name,
+            argument_name="pattern",
+            ftl_location=ftl_location,
+            severity="error",
         )
 
     @staticmethod

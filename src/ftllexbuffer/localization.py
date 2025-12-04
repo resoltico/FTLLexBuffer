@@ -25,7 +25,8 @@ from .diagnostics.errors import FluentError
 from .runtime.bundle import FluentBundle
 
 if TYPE_CHECKING:
-    pass
+    from .introspection import MessageIntrospection
+    from .runtime.bundle import ValidationResult
 
 # Type aliases using Python 3.13 type keyword
 type MessageId = str
@@ -309,6 +310,148 @@ class FluentLocalization:
             True if message exists in at least one locale
         """
         return any(bundle.has_message(message_id) for bundle in self._bundles.values())
+
+    def format_pattern(
+        self,
+        message_id: MessageId,
+        args: dict[str, object] | None = None,
+        *,
+        attribute: str | None = None,
+    ) -> tuple[str, list[FluentError]]:
+        """Format message with attribute support (fallback chain).
+
+        Extends format_value() with attribute access.
+
+        Args:
+            message_id: Message identifier
+            args: Variable arguments
+            attribute: Attribute name (e.g., "tooltip", "aria-label")
+
+        Returns:
+            Tuple of (formatted_value, errors)
+
+        Example:
+            >>> l10n = FluentLocalization(['lv', 'en'])
+            >>> l10n.add_resource('lv', '''
+            ... button = Klikšķināt
+            ...     .tooltip = Klikšķiniet, lai iesniegtu
+            ... ''')
+            >>> result, errors = l10n.format_pattern("button", attribute="tooltip")
+            >>> result
+            'Klikšķiniet, lai iesniegtu'
+        """
+        errors: list[FluentError] = []
+
+        # Try each locale in fallback order
+        for locale in self._locales:
+            bundle = self._bundles[locale]
+
+            if bundle.has_message(message_id):
+                value, bundle_errors = bundle.format_pattern(
+                    message_id, args, attribute=attribute
+                )
+                errors.extend(bundle_errors)
+                return (value, errors)
+
+        # Not found - return fallback
+        diagnostic = Diagnostic(
+            code=DiagnosticCode.MESSAGE_NOT_FOUND,
+            message=f"Message '{message_id}' not found in any locale",
+        )
+        errors.append(FluentError(diagnostic))
+        return (f"{{{message_id}}}", errors)
+
+    def add_function(self, name: str, func: object) -> None:
+        """Register custom function on all bundles.
+
+        Convenience method to avoid manual bundle iteration.
+
+        Args:
+            name: Function name (UPPERCASE by convention)
+            func: Python function implementation
+
+        Example:
+            >>> l10n = FluentLocalization(['lv', 'en'])
+            >>> def CUSTOM(value: str) -> str:
+            ...     return value.upper()
+            >>> l10n.add_function("CUSTOM", CUSTOM)
+            >>> l10n.add_resource('en', 'msg = { CUSTOM($text) }')
+            >>> result, _ = l10n.format_value('msg', {'text': 'hello'})
+            >>> result
+            'HELLO'
+        """
+        for bundle in self._bundles.values():
+            bundle.add_function(name, func)
+
+    def introspect_message(self, message_id: MessageId) -> MessageIntrospection | None:
+        """Get message introspection from first bundle with message.
+
+        Args:
+            message_id: Message identifier
+
+        Returns:
+            MessageIntrospection or None if not found
+
+        Example:
+            >>> l10n = FluentLocalization(['lv', 'en'])
+            >>> l10n.add_resource('en', 'msg = { $name } has { $count } items')
+            >>> info = l10n.introspect_message('msg')
+            >>> info.get_variable_names() if info else set()
+            frozenset({'name', 'count'})
+        """
+        for locale in self._locales:
+            bundle = self._bundles[locale]
+            if bundle.has_message(message_id):
+                return bundle.introspect_message(message_id)
+        return None
+
+    def get_babel_locale(self) -> str:
+        """Get Babel locale identifier from primary bundle.
+
+        Returns Babel Locale for the first locale in fallback chain.
+        Useful for integrating with Babel's formatting functions.
+
+        Returns:
+            Babel locale identifier
+
+        Example:
+            >>> l10n = FluentLocalization(['lv', 'en'])
+            >>> locale = l10n.get_babel_locale()
+            >>> locale
+            'lv'
+        """
+        primary_locale = self._locales[0]
+        bundle = self._bundles[primary_locale]
+        return bundle.get_babel_locale()
+
+    def validate_resource(self, ftl_source: FTLSource) -> ValidationResult:
+        """Validate FTL resource without adding to bundles.
+
+        Uses primary locale's bundle for validation.
+
+        Args:
+            ftl_source: FTL source code
+
+        Returns:
+            ValidationResult with errors and warnings
+
+        Example:
+            >>> l10n = FluentLocalization(['lv', 'en'])
+            >>> result = l10n.validate_resource("msg = Hello")
+            >>> result.is_valid
+            True
+        """
+        primary_locale = self._locales[0]
+        bundle = self._bundles[primary_locale]
+        return bundle.validate_resource(ftl_source)
+
+    def clear_cache(self) -> None:
+        """Clear format cache on all bundles.
+
+        Calls clear_cache() on each bundle in the localization.
+        """
+        for bundle in self._bundles.values():
+            bundle.clear_cache()
 
     def get_bundles(self) -> Generator[FluentBundle]:
         """Lazy generator yielding bundles in fallback order.

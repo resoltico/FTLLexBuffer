@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+from typing import Literal
 
 
 class DiagnosticCode(Enum):
@@ -33,6 +34,10 @@ class DiagnosticCode(Enum):
     FUNCTION_NOT_FOUND = 2003
     FUNCTION_FAILED = 2004
     UNKNOWN_EXPRESSION = 2005
+    TYPE_MISMATCH = 2006
+    INVALID_ARGUMENT = 2007
+    ARGUMENT_REQUIRED = 2008
+    PATTERN_INVALID = 2009
 
     # Syntax errors (3000-3999)
     UNEXPECTED_EOF = 3001
@@ -70,6 +75,12 @@ class Diagnostic:
         span: Source location (None for non-syntax errors)
         hint: Suggestion for fixing the error
         help_url: Documentation URL for this error
+        function_name: Function name where error occurred (format errors)
+        argument_name: Argument name that caused error (format errors)
+        expected_type: Expected type for argument (format errors)
+        received_type: Actual type received (format errors)
+        ftl_location: FTL file location (format errors)
+        severity: Error severity level
     """
 
     code: DiagnosticCode
@@ -77,6 +88,12 @@ class Diagnostic:
     span: SourceSpan | None = None
     hint: str | None = None
     help_url: str | None = None
+    function_name: str | None = None
+    argument_name: str | None = None
+    expected_type: str | None = None
+    received_type: str | None = None
+    ftl_location: str | None = None
+    severity: Literal["error", "warning"] = "error"
 
     def format_error(self) -> str:
         """Format diagnostic like Rust compiler.
@@ -87,13 +104,37 @@ class Diagnostic:
               = help: Check that the message is defined in the loaded resources
               = note: see https://projectfluent.org/fluent/guide/messages.html
 
+        Example with format context:
+            error[TYPE_MISMATCH]: Invalid argument type for NUMBER() function
+              --> ui.ftl:509
+              = function: NUMBER
+              = argument: value
+              = expected: Number
+              = received: String
+              = help: Convert the string to a number first
+
         Returns:
             Formatted error message
         """
-        parts = [f"error[{self.code.name}]: {self.message}"]
+        severity_prefix = self.severity if self.severity == "warning" else "error"
+        parts = [f"{severity_prefix}[{self.code.name}]: {self.message}"]
 
         if self.span:
             parts.append(f"  --> line {self.span.line}, column {self.span.column}")
+        elif self.ftl_location:
+            parts.append(f"  --> {self.ftl_location}")
+
+        if self.function_name:
+            parts.append(f"  = function: {self.function_name}")
+
+        if self.argument_name:
+            parts.append(f"  = argument: {self.argument_name}")
+
+        if self.expected_type:
+            parts.append(f"  = expected: {self.expected_type}")
+
+        if self.received_type:
+            parts.append(f"  = received: {self.received_type}")
 
         if self.hint:
             parts.append(f"  = help: {self.hint}")

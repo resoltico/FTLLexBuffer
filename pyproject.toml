@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "ftllexbuffer"
-version = "0.4.3"
+version = "0.5.0"
 description = "Python implementation of the FTL (Fluent Translation List) specification"
 readme = "README.md"
 requires-python = ">=3.13"
@@ -226,7 +226,8 @@ ignore = [
 # Guards must import at runtime since they're used by the modules they guard
 "src/ftllexbuffer/guards.py" = ["PLC0415"]
 "src/ftllexbuffer/diagnostics/errors.py" = ["PLC0415"]
-"src/ftllexbuffer/runtime/bundle.py" = ["PLC0415"]
+"src/ftllexbuffer/runtime/bundle.py" = ["PLC0415", "PLR0912"]  # Runtime imports, add_resource complexity
+"src/ftllexbuffer/runtime/cache.py" = ["PLR0917"]  # Cache put() needs many params
 "src/ftllexbuffer/syntax/cursor.py" = ["PLC0415"]
 "src/ftllexbuffer/syntax/type_guards.py" = ["PLC0415"]
 
@@ -250,6 +251,29 @@ ignore = [
 
 # test_fluent_bundle.py: N802 (UPPERCASE FTL functions), N806 (MockResolver naming)
 "tests/test_fluent_bundle.py" = ["N802", "N806"]
+
+# test_cache_basic.py: N802 (CUSTOM FTL function name must be UPPERCASE)
+"tests/test_cache_basic.py" = ["N802"]
+
+# test_cache_properties.py: Long hypothesis strategy line, unused result variables
+"tests/test_cache_properties.py" = ["E501"]
+
+# test_parsing_numbers_hypothesis.py: Runtime import for formatting functions
+"tests/test_parsing_numbers_hypothesis.py" = ["PLC0415"]
+
+# test_parsing_currency_hypothesis.py: Runtime import for formatting functions
+"tests/test_parsing_currency_hypothesis.py" = ["PLC0415"]
+
+# test_serialization_hypothesis.py: AST manipulation tests
+"tests/test_serialization_hypothesis.py" = ["PLC0415"]
+
+# test_localization_api_completeness.py: N802 (CUSTOM FTL function name)
+"tests/test_localization_api_completeness.py" = ["N802"]
+
+# test_parsing_*.py: Runtime imports for roundtrip validation, DTZ001 for datetime tests
+"tests/test_parsing_currency.py" = ["PLC0415"]
+"tests/test_parsing_dates.py" = ["DTZ001"]
+"tests/test_parsing_numbers.py" = ["PLC0415"]
 
 # test_ast_validation_coverage.py: PLC0415 (import inside test to verify TypeIs guards)
 "tests/test_ast_validation_coverage.py" = ["PLC0415"]
@@ -358,6 +382,11 @@ ignore = [
 # test_visitor_coverage.py: Visitor pattern transformation tests
 # N802: Visitor pattern methods (visit_Identifier) follow stdlib ast.NodeVisitor convention
 "tests/test_visitor_coverage.py" = ["N802"]
+
+# parsing/dates.py: DTZ007 (naive datetime from strptime)
+# Intentional: parsing user input which may not have timezone info
+# Caller can specify tzinfo parameter to add timezone if needed
+"src/ftllexbuffer/parsing/dates.py" = ["DTZ007"]
 
 # Pylint configuration
 [tool.pylint.main]
