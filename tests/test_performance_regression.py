@@ -9,11 +9,20 @@ Strategy:
 3. Detect performance regressions via property-based bounds
 4. Test memory efficiency via stress testing
 
+CI-Friendly Testing Approach:
+- Uses SCALE-BASED complexity testing (10x size jumps) instead of absolute timing
+- Includes warmup runs to minimize JIT/cache effects
+- Takes minimum of multiple measurements for stability
+- Tests normalized ratios: (time(10n)/time(n)) / (10n/n) ≈ 1.0 for O(n)
+- Allows 3x tolerance to handle CI variance while catching O(n²) regressions
+- Avoids flaky single-shot timing comparisons that fail in containerized environments
+
 This catches performance bugs that don't affect correctness but impact production.
 
 References:
 - Hypothesis deadline parameter for performance bounds
 - Algorithmic complexity testing via scaling properties
+- "Testing in Production" patterns for CI-resistant performance tests
 """
 
 from __future__ import annotations
@@ -88,26 +97,45 @@ class TestParserPerformanceScaling:
     def test_parser_scales_linearly_with_message_count(self):
         """Property: Parsing time grows linearly with message count.
 
-        Tests O(n) complexity: parse(2n messages) ≈ 2 * parse(n messages)
+        Tests O(n) complexity using scale-based measurement to avoid CI timing flakiness.
+        Uses 10x size jumps and warmup runs to minimize JIT/cache effects.
+
+        Strategy: Test normalized scaling ratios across size ranges.
+        If O(n): time(10n)/time(n) / (10n/n) ≈ 1.0
+        If O(n²): time(10n)/time(n) / (10n/n) ≈ 10.0
         """
-        # Generate test data
-        messages_small = [f"msg{i} = Value {i}\n" for i in range(100)]
-        messages_large = [f"msg{i} = Value {i}\n" for i in range(200)]
+        # Use 10x size jumps to amplify algorithmic differences
+        sizes = [100, 1000, 10000]
+        times = []
 
-        ftl_small = "".join(messages_small)
-        ftl_large = "".join(messages_large)
+        for size in sizes:
+            messages = [f"msg{i} = Value {i}\n" for i in range(size)]
+            ftl = "".join(messages)
 
-        # Measure parsing time
-        time_small = measure_parse_time(ftl_small)
-        time_large = measure_parse_time(ftl_large)
+            # Warmup run to stabilize JIT/cache
+            _ = measure_parse_time(ftl)
 
-        # Should scale roughly linearly (allow 3x tolerance for variance)
-        # time_large / time_small should be ~2.0 (200/100)
-        # But allow ratio between 1.5 and 3.0 to account for overhead
-        ratio = time_large / time_small if time_small > 0 else 1.0
-        assert 1.0 < ratio < 4.0, (
-            f"Parser scaling is non-linear: {time_small:.4f}s for 100 msgs, "
-            f"{time_large:.4f}s for 200 msgs (ratio {ratio:.2f})"
+            # Take minimum of 3 runs (more stable than mean/median)
+            time_measurements = [measure_parse_time(ftl) for _ in range(3)]
+            times.append(min(time_measurements))
+
+        # Calculate normalized complexity ratios
+        # For O(n): these should be close to 1.0
+        # For O(n²): these would be ~10.0
+        ratio_1_to_2 = (times[1] / times[0]) / (sizes[1] / sizes[0])
+        ratio_2_to_3 = (times[2] / times[1]) / (sizes[2] / sizes[1])
+
+        # Allow 3x tolerance for overhead and CI variance
+        # Catches O(n²) (ratio ≈ 10) while tolerating measurement noise
+        assert 0.3 < ratio_1_to_2 < 3.0, (
+            f"Parser scaling is non-linear (100→1000): "
+            f"{times[0]:.4f}s → {times[1]:.4f}s, "
+            f"normalized ratio {ratio_1_to_2:.2f} (expected ~1.0 for O(n))"
+        )
+        assert 0.3 < ratio_2_to_3 < 3.0, (
+            f"Parser scaling is non-linear (1000→10000): "
+            f"{times[1]:.4f}s → {times[2]:.4f}s, "
+            f"normalized ratio {ratio_2_to_3:.2f} (expected ~1.0 for O(n))"
         )
 
     @pytest.mark.parametrize("message_count", [10, 50, 100, 200])
@@ -158,25 +186,41 @@ class TestSerializerPerformanceScaling:
     """Test serializer scales linearly with AST size."""
 
     def test_serializer_scales_linearly(self):
-        """Property: Serialization time grows linearly with node count."""
+        """Property: Serialization time grows linearly with node count.
+
+        Uses scale-based measurement with warmup to avoid CI timing flakiness.
+        """
         parser = FluentParserV1()
 
-        # Generate resources of different sizes
-        messages_small = [f"msg{i} = Value {i}\n" for i in range(100)]
-        messages_large = [f"msg{i} = Value {i}\n" for i in range(200)]
+        # Use 10x size jumps to amplify algorithmic differences
+        sizes = [100, 1000, 10000]
+        times = []
 
-        resource_small = parser.parse("".join(messages_small))
-        resource_large = parser.parse("".join(messages_large))
+        for size in sizes:
+            messages = [f"msg{i} = Value {i}\n" for i in range(size)]
+            resource = parser.parse("".join(messages))
 
-        # Measure serialization time
-        time_small = measure_serialize_time(resource_small)
-        time_large = measure_serialize_time(resource_large)
+            # Warmup run
+            _ = measure_serialize_time(resource)
 
-        # Should scale roughly linearly
-        ratio = time_large / time_small if time_small > 0 else 1.0
-        assert 1.0 < ratio < 4.0, (
-            f"Serializer scaling is non-linear: {time_small:.4f}s for 100 msgs, "
-            f"{time_large:.4f}s for 200 msgs (ratio {ratio:.2f})"
+            # Take minimum of 3 runs
+            time_measurements = [measure_serialize_time(resource) for _ in range(3)]
+            times.append(min(time_measurements))
+
+        # Calculate normalized complexity ratios
+        ratio_1_to_2 = (times[1] / times[0]) / (sizes[1] / sizes[0])
+        ratio_2_to_3 = (times[2] / times[1]) / (sizes[2] / sizes[1])
+
+        # Allow 3x tolerance for overhead and CI variance
+        assert 0.3 < ratio_1_to_2 < 3.0, (
+            f"Serializer scaling is non-linear (100→1000): "
+            f"{times[0]:.4f}s → {times[1]:.4f}s, "
+            f"normalized ratio {ratio_1_to_2:.2f} (expected ~1.0 for O(n))"
+        )
+        assert 0.3 < ratio_2_to_3 < 3.0, (
+            f"Serializer scaling is non-linear (1000→10000): "
+            f"{times[1]:.4f}s → {times[2]:.4f}s, "
+            f"normalized ratio {ratio_2_to_3:.2f} (expected ~1.0 for O(n))"
         )
 
     def test_serializer_performance_baseline(self):
@@ -204,36 +248,49 @@ class TestResolverPerformanceScaling:
     """Test resolver scales linearly with pattern complexity."""
 
     def test_resolver_scales_linearly_with_message_count(self):
-        """Property: Resolution time grows linearly with message count."""
-        # Create bundle with many messages
-        messages_small = [f"msg{i} = Value {i}" for i in range(50)]
-        messages_large = [f"msg{i} = Value {i}" for i in range(100)]
+        """Property: Resolution time grows linearly with message count.
 
-        ftl_small = "\n".join(messages_small)
-        ftl_large = "\n".join(messages_large)
+        Uses scale-based measurement with warmup to avoid CI timing flakiness.
+        """
+        # Use 10x size jumps
+        sizes = [50, 500, 5000]
+        times = []
 
-        bundle_small = FluentBundle("en-US")
-        bundle_small.add_resource(ftl_small)
+        for size in sizes:
+            messages = [f"msg{i} = Value {i}" for i in range(size)]
+            ftl = "\n".join(messages)
 
-        bundle_large = FluentBundle("en-US")
-        bundle_large.add_resource(ftl_large)
+            bundle = FluentBundle("en-US")
+            bundle.add_resource(ftl)
 
-        # Measure resolution time for all messages
-        start_small = time.perf_counter()
-        for i in range(50):
-            _ = bundle_small.format_pattern(f"msg{i}", {})
-        time_small = time.perf_counter() - start_small
+            # Warmup run
+            for i in range(min(10, size)):
+                _ = bundle.format_pattern(f"msg{i}", {})
 
-        start_large = time.perf_counter()
-        for i in range(100):
-            _ = bundle_large.format_pattern(f"msg{i}", {})
-        time_large = time.perf_counter() - start_large
+            # Measure resolution time with 3 runs
+            time_measurements = []
+            for _ in range(3):
+                start = time.perf_counter()
+                for i in range(size):
+                    _ = bundle.format_pattern(f"msg{i}", {})
+                time_measurements.append(time.perf_counter() - start)
 
-        # Should scale roughly linearly
-        ratio = time_large / time_small if time_small > 0 else 1.0
-        assert 1.0 < ratio < 4.0, (
-            f"Resolver scaling is non-linear: {time_small:.4f}s for 50 resolutions, "
-            f"{time_large:.4f}s for 100 resolutions (ratio {ratio:.2f})"
+            times.append(min(time_measurements))
+
+        # Calculate normalized complexity ratios
+        ratio_1_to_2 = (times[1] / times[0]) / (sizes[1] / sizes[0])
+        ratio_2_to_3 = (times[2] / times[1]) / (sizes[2] / sizes[1])
+
+        # Allow 3x tolerance for overhead and CI variance
+        assert 0.3 < ratio_1_to_2 < 3.0, (
+            f"Resolver scaling is non-linear (50→500): "
+            f"{times[0]:.4f}s → {times[1]:.4f}s, "
+            f"normalized ratio {ratio_1_to_2:.2f} (expected ~1.0 for O(n))"
+        )
+        assert 0.3 < ratio_2_to_3 < 3.0, (
+            f"Resolver scaling is non-linear (500→5000): "
+            f"{times[1]:.4f}s → {times[2]:.4f}s, "
+            f"normalized ratio {ratio_2_to_3:.2f} (expected ~1.0 for O(n))"
         )
 
     def test_resolver_performance_baseline(self):

@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1] - 2025-12-04
+
+### Fixed
+
+- **CI performance test flakiness** - Replaced timing-based tests with scale-based complexity testing
+  - **Root cause**: Single-shot timing comparisons failed in GitHub Actions due to JIT warmup, CPU cache effects, and containerized environment variance
+  - **Impact**: `test_parser_scales_linearly_with_message_count` failed in CI with inverted timing ratios (200 messages parsed faster than 100)
+  - **Solution**: Implemented scale-based complexity testing approach
+    - Uses 10x size jumps (100 → 1000 → 10000) instead of 2x comparisons
+    - Includes warmup runs to stabilize JIT/cache effects
+    - Takes minimum of 3 measurements for stability
+    - Tests normalized complexity ratios: `(time(10n)/time(n)) / (10n/n) ≈ 1.0` for O(n)
+    - Allows 0.3-3.0x tolerance (handles CI variance while catching O(n²) regressions)
+  - **Tests fixed**:
+    - `TestParserPerformanceScaling::test_parser_scales_linearly_with_message_count`
+    - `TestSerializerPerformanceScaling::test_serializer_scales_linearly`
+    - `TestResolverPerformanceScaling::test_resolver_scales_linearly_with_message_count`
+  - **Benefit**: Timing tests now reliable in CI environments while still catching algorithmic regressions
+
+---
+
 ## [0.5.0] - 2025-12-04
 
 ### Added
@@ -32,7 +53,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - **Fast path**: ISO 8601 dates use native `datetime.fromisoformat()` (fastest)
     - **Pattern fallback chain**: CLDR patterns → common formats (US, EU, ISO)
     - **Thread-safe**: No global state, immutable pattern lists
-    - **Zero external date libraries**: Pure Python 3.13 + Babel (already a dependency)
   - **Implementation** (Number/Currency parsing):
     - Uses Babel's `parse_decimal()` for CLDR-compliant number parsing
     - Returns `Decimal` for financial precision (no float rounding errors)
@@ -613,6 +633,12 @@ if "CURRENCY" in bundle._function_registry:
 
 Initial release.
 
+[0.5.1]: https://github.com/resoltico/ftllexbuffer/releases/tag/v0.5.1
+[0.5.0]: https://github.com/resoltico/ftllexbuffer/releases/tag/v0.5.0
+[0.4.3]: https://github.com/resoltico/ftllexbuffer/releases/tag/v0.4.3
+[0.4.2]: https://github.com/resoltico/ftllexbuffer/releases/tag/v0.4.2
+[0.4.1]: https://github.com/resoltico/ftllexbuffer/releases/tag/v0.4.1
+[0.4.0]: https://github.com/resoltico/ftllexbuffer/releases/tag/v0.4.0
 [0.3.0]: https://github.com/resoltico/ftllexbuffer/releases/tag/v0.3.0
 [0.2.0]: https://github.com/resoltico/ftllexbuffer/releases/tag/v0.2.0
 [0.1.1]: https://github.com/resoltico/ftllexbuffer/releases/tag/v0.1.1
