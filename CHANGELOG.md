@@ -113,29 +113,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **FluentBundle constructor**: Added `enable_cache` and `cache_size` parameters (default: disabled)
-- **pyproject.toml**: Updated version from 0.4.3 to 0.5.0
-
-### Fixed
-
-**Note**: These bugs were discovered and fixed during v0.5.0 development via Hypothesis property-based testing. They were never released in a broken state.
-
-- **TypeError handling in date/datetime parsing** (caught before release)
-  - **Discovered by**: Hypothesis property-based tests during v0.5.0 development
-  - **Issue**: `datetime.fromisoformat()` raised `TypeError` for non-string inputs, but exception handler only caught `ValueError`
-  - **Impact**: Non-string inputs to `parse_date()` and `parse_datetime()` would have crashed instead of being handled gracefully
-  - **Fix**: Changed exception handler from `except ValueError:` to `except (ValueError, TypeError):` in ISO 8601 fast path
-  - **Lines affected**: `src/ftllexbuffer/parsing/dates.py:58, 121`
-  - **Test coverage**: Hypothesis tests verify TypeError handling in both strict and non-strict modes
-
-- **AttributeError/TypeError handling in number parsing** (caught before release)
-  - **Discovered by**: Hypothesis property-based tests during v0.5.0 development
-  - **Issue**: Babel's `parse_decimal()` raised `AttributeError` for non-string inputs (e.g., integer 0, lists, dicts), but exception handler only caught `NumberFormatError`, `InvalidOperation`, and `ValueError`
-  - **Root cause**: Babel expects string input and calls `.replace()` method, which doesn't exist on int/float/list/dict types
-  - **Impact**: Applications passing wrong types to `parse_number()` or `parse_decimal()` would have crashed with AttributeError instead of being handled gracefully
-  - **Fix**: Added `AttributeError` and `TypeError` to exception handlers in both `parse_number()` and `parse_decimal()`
-  - **Lines affected**: `src/ftllexbuffer/parsing/numbers.py:57, 112`
-  - **Test coverage**: Hypothesis tests generate edge cases (integer 0, lists, dicts) that caught this bug before release
-  - **Example**: `parse_number(0, "en_US")` would have raised `AttributeError: 'int' object has no attribute 'replace'` instead of returning None (non-strict) or raising ValueError (strict)
 
 ### Tests
 
