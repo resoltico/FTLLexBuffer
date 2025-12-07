@@ -258,3 +258,54 @@ class TestFunctionMetadataStructure:
             assert isinstance(ftl_name, str)
             assert isinstance(metadata, FunctionMetadata)
             assert ftl_name == metadata.ftl_name
+
+
+# ============================================================================
+# COVERAGE TESTS - is_builtin_function_unmodified Edge Cases
+# ============================================================================
+
+
+class TestShouldInjectLocaleCoverage:
+    """Test edge cases for should_inject_locale (lines 177, 187)."""
+
+    def test_python_name_none_returns_false_line_177(self) -> None:
+        """COVERAGE: get_python_name returns None for malformed function (line 177)."""
+        # pylint: disable=import-outside-toplevel
+        from ftllexbuffer.runtime.function_bridge import FunctionRegistry  # noqa: PLC0415
+        from ftllexbuffer.runtime.function_metadata import should_inject_locale  # noqa: PLC0415
+
+        registry = FunctionRegistry()
+
+        # Use a non-existent function name that will return None from get_python_name
+        # Line 176: python_name is None
+        # Line 177: return False
+        result = should_inject_locale("INVALID_BUILTIN", registry)
+        assert result is False
+
+    def test_bundle_func_none_returns_false_line_187(self) -> None:
+        """COVERAGE: bundle_func is None returns False (line 187)."""
+        # pylint: disable=import-outside-toplevel
+        from unittest.mock import Mock  # noqa: PLC0415
+
+        from ftllexbuffer.runtime.function_bridge import FunctionRegistry  # noqa: PLC0415
+        from ftllexbuffer.runtime.function_metadata import should_inject_locale  # noqa: PLC0415
+
+        # Create a mock registry that claims to have the function but returns None from _functions
+        mock_registry = Mock(spec=FunctionRegistry)
+        mock_registry.has_function.return_value = True  # Claims to have NUMBER
+
+        # Create a mock _functions dict that returns None for any key
+        mock_functions = Mock()
+        mock_functions.get.return_value = None  # Returns None when accessed
+        mock_registry._functions = mock_functions
+
+        # This should trigger line 186-187: bundle_func is None
+        # Line 166: requires_locale_injection("NUMBER") returns True
+        # Line 171: has_function returns True (mocked)
+        # Line 175: get_python_name("NUMBER") returns "number_format"
+        # Line 176: python_name is not None, continues
+        # Line 183: bundle_func = None (mocked)
+        # Line 186: bundle_func is None -> True
+        # Line 187: return False
+        result = should_inject_locale("NUMBER", mock_registry)
+        assert result is False

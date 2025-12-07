@@ -1012,12 +1012,12 @@ vat-amount = VAT: { NUMBER($vat, minimumFractionDigits: 2, maximumFractionDigits
 # $vat = 23.4 → "VAT: 23.40" (en-US) - padded
 
 # Large numbers with grouping
-total = Total: { NUMBER($sum, minimumFractionDigits: 2, useGrouping: true) }
+total = Total: { NUMBER($sum, minimumFractionDigits: 2, useGrouping: "true") }
 # $sum = 1234567.89 → "Total: 1,234,567.89" (en-US)
 # $sum = 1234567.89 → "Total: 1 234 567,89" (lv-LV)
 
 # Disable grouping for compact display
-compact = { NUMBER($value, useGrouping: false) }
+compact = { NUMBER($value, useGrouping: "false") }
 # $value = 1234 → "1234" (all locales)
 
 # Percentage display (up to 1 decimal place)
@@ -1045,7 +1045,7 @@ invoice-total = Total: { NUMBER($total, minimumFractionDigits: 2) }
 # $total = 12345.67 → "Total: 12,345.67" (en-US)
 
 # Quantity (whole numbers, no separator)
-item-count = { NUMBER($count, maximumFractionDigits: 0, useGrouping: false) } items
+item-count = { NUMBER($count, maximumFractionDigits: 0, useGrouping: "false") } items
 # $count = 1000 → "1000 items"
 ```
 
@@ -1326,7 +1326,7 @@ result, errors = bundle.format_pattern("a")
 
 Comprehensive comparison of localization libraries available in the Python ecosystem (versions verified as of November 2025):
 
-| Feature | **FTLLexBuffer** (0.5.0) | fluent.runtime (0.4.0) | fluent-compiler (1.1) | gettext (stdlib) | Babel (2.17.0) | PySide6 (6.x LGPL) | python-i18n (0.3.9) |
+| Feature | **FTLLexBuffer** (0.7.0) | fluent.runtime (0.4.0) | fluent-compiler (1.1) | gettext (stdlib) | Babel (2.17.0) | PySide6 (6.x LGPL) | python-i18n (0.3.9) |
 |---------|----------|----------------|-------------------|-----------------|----------------|---------------------|-------------------|
 | **Format** | .ftl (FTL v1.0) | .ftl (FTL v1.0) | .ftl (FTL v1.0) | .po/.mo (gettext) | .po/.mo (gettext) | .ts/.qm (Qt XML) | .yml/.json |
 | **File Type** | Human-readable text | Human-readable text | Human-readable text | Text (.po) + Compiled binary (.mo) | Text (.po) + Compiled binary (.mo) | XML (.ts) + Compiled binary (.qm) | Human-readable text |

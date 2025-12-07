@@ -550,3 +550,59 @@ class TestResolverErrorRecovery:
         result, _errors = bundle.format_pattern(msg_id, {})
 
         assert partial_text.strip() in result, "Static text should be present even with missing var"
+
+
+# ============================================================================
+# COVERAGE TESTS - Resolver Edge Cases
+# ============================================================================
+
+
+class TestResolverCoverageEdgeCases:
+    """Test resolver edge cases for 100% coverage (lines 142->138, 190, 375-376)."""
+
+    @given(
+        msg_id=ftl_identifiers(),
+        text=ftl_simple_text(),
+    )
+    @settings(max_examples=100)
+    def test_placeable_error_handling_in_pattern(
+        self, msg_id: str, text: str
+    ) -> None:
+        """COVERAGE: Placeable error handling in _resolve_pattern (line 142->138)."""
+        bundle = FluentBundle("en_US", use_isolating=False)
+
+        # Create FTL with placeable that will error (missing variable)
+        ftl_source = f"{msg_id} = {text} {{ $missing }}"
+        bundle.add_resource(ftl_source)
+
+        # Line 142->138: try-except around placeable resolution
+        result, errors = bundle.format_pattern(msg_id, {})
+
+        # Should have error but still return fallback
+        assert len(errors) > 0
+        assert "{$missing}" in result  # Fallback representation
+
+    @given(
+        msg_id=ftl_identifiers(),
+        var_name=ftl_identifiers(),
+        value=st.integers(),
+    )
+    @settings(max_examples=100)
+    def test_nested_placeable_expression_resolution(
+        self, msg_id: str, var_name: str, value: int
+    ) -> None:
+        """COVERAGE: Placeable expression resolution (line 190)."""
+        # pylint: disable=import-outside-toplevel
+        from ftllexbuffer import FluentBundle  # noqa: PLC0415
+
+        bundle = FluentBundle("en_US", use_isolating=False)
+
+        # Create message with nested placeable structure
+        # This exercises line 190: case Placeable() in _resolve_expression
+        ftl_source = f"{msg_id} = Value: {{ ${ var_name} }}"
+        bundle.add_resource(ftl_source)
+
+        result, _errors = bundle.format_pattern(msg_id, {var_name: value})
+
+        # Should resolve the nested placeable expression
+        assert str(value) in result

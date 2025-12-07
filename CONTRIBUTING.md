@@ -140,7 +140,7 @@ The `__version__` attribute auto-populates from package metadata via `importlib.
 
 1. **Edit version in pyproject.toml only:**
    ```bash
-   # Edit: version = "0.6.0" in pyproject.toml
+   # Edit: version = "0.8.0" in pyproject.toml
    vim pyproject.toml
    ```
 
@@ -152,7 +152,7 @@ The `__version__` attribute auto-populates from package metadata via `importlib.
 3. **Verify auto-sync worked:**
    ```bash
    python -c "import ftllexbuffer; print(ftllexbuffer.__version__)"
-   # Output: 0.6.0
+   # Output: 0.8.0
    ```
 
 4. **Run tests to validate:**
@@ -188,14 +188,14 @@ Use the release automation script for safer releases:
 
 ```bash
 # 1. Update version in pyproject.toml
-vim pyproject.toml  # Change version to 0.6.0
+vim pyproject.toml  # Change version to 0.8.0
 
 # 2. Refresh metadata
 pip install -e .
 
 # 3. Commit version change
 git add pyproject.toml
-git commit -m "Bump version to 0.6.0"
+git commit -m "Bump version to 0.8.0"
 
 # 4. Run release script (validates + creates tag)
 ./scripts/release.sh

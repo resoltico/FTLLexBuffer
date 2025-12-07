@@ -14,16 +14,18 @@ class TestParseDate:
     """Test parse_date() function."""
 
     def test_parse_date_us_format(self) -> None:
-        """Parse US date format (MM/DD/YYYY)."""
-        result = parse_date("1/28/2025", "en_US")
+        """Parse US date format (M/d/yy - CLDR short format)."""
+        # v0.7.0: Uses CLDR short format (2-digit year)
+        result = parse_date("1/28/25", "en_US")
         assert result == date(2025, 1, 28)
 
     def test_parse_date_european_format(self) -> None:
-        """Parse European date format (DD.MM.YYYY)."""
-        result = parse_date("28.01.2025", "lv_LV")
+        """Parse European date format (d.M.yy - CLDR short format)."""
+        # v0.7.0: Uses CLDR short format (2-digit year)
+        result = parse_date("28.1.25", "lv_LV")
         assert result == date(2025, 1, 28)
 
-        result = parse_date("28.01.2025", "de_DE")
+        result = parse_date("28.01.25", "de_DE")
         assert result == date(2025, 1, 28)
 
     def test_parse_date_iso_format(self) -> None:
@@ -45,13 +47,15 @@ class TestParseDatetime:
     """Test parse_datetime() function."""
 
     def test_parse_datetime_us_format(self) -> None:
-        """Parse US datetime format."""
-        result = parse_datetime("1/28/2025 14:30", "en_US")
+        """Parse US datetime format (M/d/yy + time - CLDR)."""
+        # v0.7.0: Uses CLDR short format (2-digit year) + 24-hour time
+        result = parse_datetime("1/28/25 14:30", "en_US")
         assert result == datetime(2025, 1, 28, 14, 30)
 
     def test_parse_datetime_european_format(self) -> None:
-        """Parse European datetime format."""
-        result = parse_datetime("28.01.2025 14:30", "lv_LV")
+        """Parse European datetime format (d.M.yy + time - CLDR)."""
+        # v0.7.0: Uses CLDR short format (2-digit year) + 24-hour time
+        result = parse_datetime("28.1.25 14:30", "lv_LV")
         assert result == datetime(2025, 1, 28, 14, 30)
 
     def test_parse_datetime_with_timezone(self) -> None:

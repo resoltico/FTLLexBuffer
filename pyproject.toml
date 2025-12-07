@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "ftllexbuffer"
-version = "0.6.0"
+version = "0.7.0"
 description = "Python implementation of the FTL (Fluent Translation List) specification"
 readme = "README.md"
 requires-python = ">=3.13"
@@ -42,12 +42,12 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=9.0.1",
+    "pytest>=9.0.2",
     "pytest-cov>=7.0.0",
-    "hypothesis>=6.148.5",
+    "hypothesis>=6.148.7",
     "mypy>=1.19.0",
     "pylint>=4.0.4",
-    "ruff>=0.14.7",
+    "ruff>=0.14.8",
     "pytest-benchmark>=5.2.3",
 ]
 publish = [
@@ -86,6 +86,7 @@ only-include = [
     "LICENSE",
     "MIGRATION.md",
     "NOTICE",
+    "PARSING.md",
     "PATENTS.md",
     "QUICK_REFERENCE.md",
     "README.md",
@@ -207,6 +208,11 @@ ignore = [
 # Parser expression dispatch - match statement over AST expression types
 # Refactoring would harm readability (strategy pattern adds indirection for no benefit)
 "src/ftllexbuffer/syntax/parser.py" = ["PLR0912"]
+
+# Visitor pattern tests - AST visitor methods follow stdlib convention (visit_NodeName)
+# N802: visit_NodeName intentionally PascalCase per ast.NodeVisitor pattern
+# ARG002: node parameter intentionally unused in removal transformers
+"tests/test_visitor_hypothesis.py" = ["N802", "ARG002"]
 
 # Visitor pattern (Python stdlib ast.NodeVisitor convention)
 # visit_NodeName is the standard pattern - snake_case would break it
@@ -388,6 +394,11 @@ ignore = [
 # Caller can specify tzinfo parameter to add timezone if needed
 "src/ftllexbuffer/parsing/dates.py" = ["DTZ007"]
 
+# parsing/currency.py: PLR0911/PLR0912 (complexity in ambiguous symbol handling)
+# v0.7.0: High complexity unavoidable for safe currency symbol disambiguation
+# Each ambiguous symbol ($, ¢, ₨, etc.) requires explicit default_currency handling
+"src/ftllexbuffer/parsing/currency.py" = ["PLR0911", "PLR0912"]
+
 # Pylint configuration
 [tool.pylint.main]
 py-version = "3.13"
@@ -415,4 +426,5 @@ max-line-length = 100
 max-args = 7
 max-attributes = 10
 max-locals = 20  # Parser methods need local variables for token tracking
-max-branches = 15  # Parser dispatch methods need multiple branches
+max-branches = 20  # Parser dispatch methods + v0.7.0 currency disambiguation
+max-nested-blocks = 6  # v0.7.0 currency ambiguous symbol handling

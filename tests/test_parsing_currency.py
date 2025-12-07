@@ -28,8 +28,8 @@ class TestParseCurrency:
         assert code == "EUR"
 
     def test_parse_currency_usd_symbol(self) -> None:
-        """Parse USD with $ symbol."""
-        result = parse_currency("$1,234.56", "en_US")
+        """Parse USD with $ symbol (v0.7.0: requires default_currency)."""
+        result = parse_currency("$1,234.56", "en_US", default_currency="USD")
 
         assert result is not None
 
@@ -99,7 +99,8 @@ class TestRoundtripCurrency:
         formatted = currency_format(
             float(original_amount), "en-US", currency="USD", currency_display="symbol"
         )
-        result = parse_currency(formatted, "en_US")
+        # v0.7.0: $ is ambiguous - specify default_currency for roundtrip
+        result = parse_currency(formatted, "en_US", default_currency="USD")
 
         assert result is not None
 

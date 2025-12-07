@@ -333,3 +333,49 @@ class TestPluralRulesFinancialUseCases:
 
         # Polish uses all four categories
         assert category in {"one", "few", "many", "other"}
+
+
+# ============================================================================
+# COVERAGE TESTS - Slavic Rule "other" Category
+# ============================================================================
+
+
+class TestSlavicRuleOtherCategory:
+    """Test coverage for Polish/Slavic rule final 'other' return (line 223)."""
+
+    @given(
+        fraction=st.floats(
+            min_value=0.01, max_value=999.99, allow_nan=False, allow_infinity=False
+        )
+    )
+    def test_polish_fractional_numbers_return_other(self, fraction: float) -> None:
+        """COVERAGE: Fractional numbers return 'other' in Polish (line 223)."""
+        assume(not fraction.is_integer())  # Ensure it's fractional
+
+        # Line 223: Final "other" return for non-integer cases
+        category = select_plural_category(fraction, "pl_PL")
+        assert category == "other"
+
+    @given(
+        fraction=st.floats(
+            min_value=0.01, max_value=999.99, allow_nan=False, allow_infinity=False
+        )
+    )
+    def test_russian_fractional_numbers_return_other(self, fraction: float) -> None:
+        """COVERAGE: Fractional numbers return 'other' in Russian (line 223)."""
+        assume(not fraction.is_integer())
+
+        category = select_plural_category(fraction, "ru_RU")
+        assert category == "other"
+
+    @given(
+        fraction=st.floats(
+            min_value=1.1, max_value=999.9, allow_nan=False, allow_infinity=False
+        )
+    )
+    def test_latvian_fractional_numbers_return_other(self, fraction: float) -> None:
+        """COVERAGE: Fractional numbers return 'other' in Latvian (line 223)."""
+        assume(not fraction.is_integer())
+
+        category = select_plural_category(fraction, "lv_LV")
+        assert category == "other"

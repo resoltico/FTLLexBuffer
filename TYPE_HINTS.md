@@ -802,8 +802,8 @@ if is_message(msg):
 
 ---
 
-**Type Hints Guide Last Updated**: December 4, 2025
-**FTLLexBuffer Version**: 0.5.0
+**Type Hints Guide Last Updated**: December 7, 2025
+**FTLLexBuffer Version**: 0.7.0
 **Python Version**: 3.13+
 
 **See Also**:

@@ -2,7 +2,7 @@
 
 Complete reference documentation for FTLLexBuffer's public API.
 
-**Latest Version**: 0.5.0 | [Changelog](CHANGELOG.md)
+**Latest Version**: 0.7.0 | [Changelog](CHANGELOG.md)
 
 **Package**: `ftllexbuffer`
 **Python Version**: 3.13+
@@ -6527,7 +6527,7 @@ Package version string (PEP 440 compliant).
 import ftllexbuffer
 
 print(f"FTLLexBuffer version: {ftllexbuffer.__version__}")
-# Output: FTLLexBuffer version: 0.5.0
+# Output: FTLLexBuffer version: 0.7.0
 ```
 
 **Note**: In development mode (package not installed), `__version__` returns `"0.0.0+dev"`. Run `pip install -e .` to populate from `pyproject.toml`.
@@ -6630,8 +6630,142 @@ def format_message(bundle: FluentBundle, msg_id: str, **args: Any) -> str:
 ### Message Formatting
 
 - **Fast**: `format_pattern()` walks AST and interpolates variables (no re-parsing)
-- **No caching**: Each call re-resolves message (stateless design)
-- **Recommendation**: Cache formatted results if same message+args used repeatedly
+- **Caching available**: v0.6.0+ supports format caching with `enable_cache=True` (50x speedup)
+- **Recommendation**: Enable caching for production web/mobile apps
+
+### Format Caching (v0.6.0+)
+
+**Overview:**
+FTLLexBuffer supports optional LRU format caching for significant performance improvements. When enabled, formatted message results are cached by (message_id, args_hash), avoiding repeated AST walks and interpolation.
+
+#### Performance Impact
+
+**Cached vs Uncached:**
+- **Uncached**: ~50μs per format call (AST walk + interpolation)
+- **Cached hit**: ~1μs per format call (dictionary lookup)
+- **Speedup**: **~50x faster** on repeated calls with same arguments
+
+**When to Enable:**
+- ✅ Web applications (repeated message formatting across requests)
+- ✅ Desktop applications (UI labels formatted on every render)
+- ✅ Mobile applications (memory-constrained but high format volume)
+- ❌ CLI tools (one-time format calls, no benefit)
+- ❌ Batch processing (each message formatted once with unique args)
+
+#### Cache Size Recommendations
+
+**Decision Matrix:**
+
+| Application Type | Recommended cache_size | Memory Usage | Reasoning |
+|-----------------|------------------------|--------------|-----------|
+| **Web server** | 1000-5000 | ~200KB-1MB | High volume, repeated messages across requests |
+| **Desktop app** | 500-1000 | ~100KB-200KB | Moderate volume, language switching |
+| **Mobile app** | 100-500 | ~20KB-100KB | Memory-constrained, UI labels |
+| **Embedded device** | 50-100 | ~10KB-20KB | Very memory-constrained |
+| **CLI tool** | 0 (disabled) | 0 | One-time format calls, no benefit |
+
+**Memory Cost Analysis:**
+- **Per cache entry**: ~200 bytes (message_id + args_hash + formatted_result + metadata)
+- **cache_size=100**: ~20 KB
+- **cache_size=500**: ~100 KB
+- **cache_size=1000**: ~200 KB
+- **cache_size=5000**: ~1 MB
+
+**Multi-locale Cost:**
+Each bundle (locale) has its own cache. With 3 locales and `cache_size=1000`, total memory = 3 × 200KB = 600KB.
+
+#### Cache Invalidation
+
+**Automatic Invalidation:**
+Cache is **fully cleared** on these operations:
+- `add_resource()` - New or modified resource added
+- `add_function()` - Custom function registered
+- Bundle destruction
+
+**NOT Invalidated:**
+- ✅ Locale switching (each bundle has independent cache)
+- ✅ Different arguments to same message (separate cache entries)
+- ✅ `format_value()` vs `format_pattern()` (same cache key if message_id + args match)
+
+**Cache Persistence:**
+- Cache lifetime = bundle lifetime
+- Use bundle pooling pattern to preserve cache across requests (see Framework Integration examples)
+
+#### Configuration Examples
+
+**Example 1: Web Application (High Performance)**
+```python
+from ftllexbuffer import FluentLocalization, PathResourceLoader
+
+loader = PathResourceLoader('locales/{locale}')
+l10n = FluentLocalization(
+    ['lv', 'en', 'ru'],  # 3 locales
+    ['ui.ftl', 'validation.ftl'],
+    loader,
+    enable_cache=True,  # Enable caching
+    cache_size=5000      # 5000 entries × 3 locales = 15,000 total (3MB)
+)
+
+# Cache benefit: Repeated UI messages across thousands of requests
+result, _ = l10n.format_value('common-button-save')  # Cached after first call
+```
+
+**Example 2: Mobile Application (Memory-Constrained)**
+```python
+l10n = FluentLocalization(
+    ['en', 'es'],  # 2 locales
+    ['app.ftl'],
+    loader,
+    enable_cache=True,
+    cache_size=200  # 200 entries × 2 locales = 400 total (~80KB)
+)
+
+# Cache benefit: UI labels formatted on every screen render
+```
+
+**Example 3: CLI Tool (No Caching)**
+```python
+l10n = FluentLocalization(
+    ['en'],
+    ['cli.ftl'],
+    loader,
+    enable_cache=False  # Default - no caching overhead
+)
+
+# No cache benefit: Each message formatted once during tool execution
+```
+
+#### Cache Introspection (v0.6.0+)
+
+**Monitor cache performance:**
+```python
+# FluentBundle API
+bundle = FluentBundle('en', enable_cache=True, cache_size=1000)
+stats = bundle.get_cache_stats()
+print(f"Hits: {stats['hits']}, Misses: {stats['misses']}, Hit Rate: {stats['hit_rate']:.1%}")
+print(f"Current Size: {stats['current_size']}/{stats['max_size']}")
+
+# FluentLocalization API
+l10n = FluentLocalization(['lv', 'en'], enable_cache=True)
+all_stats = l10n.get_cache_stats()  # Returns dict[locale, stats]
+for locale, stats in all_stats.items():
+    print(f"{locale}: {stats['hit_rate']:.1%} hit rate")
+```
+
+**Interpretation:**
+- **Hit rate < 50%**: Cache size may be too small or message/args too unique
+- **Hit rate > 80%**: Cache is effective, consider keeping current size
+- **Current size = max_size**: Cache is full, LRU eviction occurring
+- **Hits = 0**: Caching disabled or no repeated calls
+
+#### Best Practices
+
+1. **Start with defaults**: `enable_cache=True, cache_size=1000` works for most apps
+2. **Monitor in production**: Use `get_cache_stats()` to verify cache effectiveness
+3. **Tune based on hit rate**: If hit rate < 50%, investigate message/args patterns
+4. **Consider memory budget**: Mobile/embedded devices should use smaller cache_size
+5. **Use ISO 8601 for dates**: Ensures consistent cache keys (parsing falls back to ISO format)
+6. **Reuse bundles/localization**: Create once at startup, reuse across requests (framework integration patterns)
 
 ### Bidi Isolation Overhead
 

@@ -3,6 +3,19 @@
 # lint.sh — Deterministic Hybrid (AI/Human) Linter
 # ==============================================================================
 # COMPATIBILITY: Bash v5.0+
+#
+# ARCHITECTURAL INTENT (PLUGIN SYSTEM):
+# This script is designed as a closed, deterministic Host environment. However,
+# distinct projects possess unique constraints requiring bespoke validation.
+# To bridge this gap without destabilizing the Core, we employ a 'Marker-Based'
+# Discovery System.
+#
+# 1. DISCOVERY: The Host scans its own directory for files containing the
+#    marker: "# @lint-plugin: <Name>".
+# 2. ISOLATION: Plugins run in subprocesses. They inherit the Environment
+#    but cannot mutate the Host's internal state.
+# 3. CONTRACT: Plugins communicate success via Exit Code 0. Any other code
+#    signals failure. The Host aggregates these signals into the final JSON.
 # ==============================================================================
 
 if ((BASH_VERSINFO[0] < 5)); then
@@ -22,6 +35,7 @@ declare -A TIMING
 declare -A METRICS
 FAILED=false
 IS_GHA="${GITHUB_ACTIONS:-false}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -45,7 +59,7 @@ log_fail() { echo -e "${RED}[FAIL]${RESET} $1"; }
 log_pass() { echo -e "${GREEN}[PASS]${RESET} $1"; }
 log_err()  { echo -e "${RED}[ERROR]${RESET} $1" >&2; }
 
-# Safe Tool Resolver (No subshells, uses Nameref, handles errors internally)
+# Safe Tool Resolver
 resolve_tool() {
     local cmd="$1"
     local -n out_ref="$2"
@@ -82,8 +96,8 @@ resolve_tool() {
 # --- ASSUMPTIONS TESTER ---
 pre_flight_diagnostics() {
     log_group_start "Pre-Flight Diagnostics"
+    log_info "Host Script Location: ${SCRIPT_DIR}"
     log_info "Bash Version: ${BASH_VERSION}"
-    log_info "Shell Strictness: errexit, nounset, pipefail are all globally ON."
     
     if [[ -n "${VIRTUAL_ENV:-}" ]]; then
         log_info "VIRTUAL_ENV: Active at ${VIRTUAL_ENV}"
@@ -157,10 +171,10 @@ run_ruff() {
     done
     set -e
 
-    set +e # CRITICAL: Temporarily disable errexit
+    set +e
     "$RUFF_BIN" check --config "$PYPROJECT_CONFIG" "${TARGETS[@]}"
     local ruff_exit_code=$?
-    set -e # Restore errexit
+    set -e
 
     local end_time="${EPOCHREALTIME}"
     local duration=$(printf "%.3f" "$(echo "$end_time - $start_time" | bc)")
@@ -262,9 +276,97 @@ run_pylint() {
     log_group_end
 }
 
+# --- 4. PLUGIN SYSTEM ---
+run_plugins() {
+    # Marker format: # @lint-plugin: <PluginName>
+    local marker="# @lint-plugin:"
+    
+    # Discovery Phase
+    # We use find to avoid parsing ls output, looking only in SCRIPT_DIR
+    # We exclude lint.sh itself from the grep to avoid self-discovery
+    declare -A discovered_plugins
+    declare -a plugin_files=()
+
+    while IFS= read -r file; do
+        # Extract name using grep/sed
+        # Disable errexit temporarily: grep returns 1 when no match found
+        local name
+        set +e
+        name=$(grep -m 1 "$marker" "$file" 2>/dev/null | sed "s/.*$marker[[:space:]]*//")
+        set -e
+        if [[ -n "$name" ]]; then
+            plugin_files+=("$file")
+            discovered_plugins["$file"]="$name"
+        fi
+    done < <(find "$SCRIPT_DIR" -maxdepth 1 -type f ! -name "lint.sh" ! -name "for_testing_lint.sh")
+
+    if [[ ${#plugin_files[@]} -eq 0 ]]; then
+        return 0
+    fi
+
+    log_group_start "Plugin Discovery"
+    log_info "Scanning ${SCRIPT_DIR} for custom checks..."
+    for file in "${plugin_files[@]}"; do
+        log_info "Found Plugin: ${discovered_plugins[$file]} ($(basename "$file"))"
+    done
+    log_group_end
+
+    # Execution Phase
+    for file in "${plugin_files[@]}"; do
+        local name="${discovered_plugins[$file]}"
+        local basename=$(basename "$file")
+        
+        log_group_start "Plugin: $name"
+        log_info "Executing custom check: $basename"
+
+        local start_time="${EPOCHREALTIME}"
+        local exit_code=0
+        
+        # Interpreter Resolution
+        set +e
+        if [[ "$file" == *.py ]]; then
+            # Python: Use VENV python if available, else python3
+            local python_cmd="python3"
+            [[ -n "${VIRTUAL_ENV:-}" ]] && python_cmd="$VIRTUAL_ENV/bin/python"
+            log_info "Interpreter: Python ($python_cmd)"
+            "$python_cmd" "$file"
+            exit_code=$?
+        elif [[ "$file" == *.sh ]]; then
+            # Bash: Force bash execution
+            log_info "Interpreter: Bash"
+            bash "$file"
+            exit_code=$?
+        else
+            # Fallback: Direct execution (requires chmod +x)
+            log_info "Interpreter: Direct"
+            if [[ -x "$file" ]]; then
+                "$file"
+                exit_code=$?
+            else
+                log_err "Plugin is not executable and has no known extension."
+                exit_code=126
+            fi
+        fi
+        set -e
+
+        local end_time="${EPOCHREALTIME}"
+        local duration=$(printf "%.3f" "$(echo "$end_time - $start_time" | bc)")
+
+        if [[ $exit_code -eq 0 ]]; then
+            log_pass "Plugin '$name' passed."
+            record_result "plugin" "$name" "pass" "$duration" "1"
+        else
+            log_fail "Plugin '$name' failed (Exit Code: $exit_code)."
+            record_result "plugin" "$name" "fail" "$duration" "1"
+        fi
+        log_group_end
+    done
+}
+
 run_ruff
 run_mypy
 run_pylint
+run_plugins
 
 # --- REPORT ---
 log_group_start "Final Report"
@@ -284,7 +386,9 @@ printf "}\n"
 echo "[SUMMARY-JSON-END]"
 
 if [[ "$FAILED" == "true" ]]; then
+    log_err "Build FAILED. See logs above for details."
     exit 1
 else
+    log_pass "All checks passed."
     exit 0
 fi

@@ -24,9 +24,13 @@ def parse_date(
 ) -> date | None:
     """Parse locale-aware date string to date object.
 
+    v0.7.0 BREAKING CHANGE: Removed ambiguous fallback patterns.
+    Only ISO 8601 and locale-specific CLDR patterns are supported.
+    Ambiguous formats like "1/2/25" will ONLY match if locale CLDR pattern matches.
+
     Args:
-        value: Date string (e.g., "28.01.25" for lv_LV short format)
-        locale_code: BCP 47 locale identifier (used for locale-specific patterns)
+        value: Date string (e.g., "28.01.25" for lv_LV, "2025-01-28" for ISO 8601)
+        locale_code: BCP 47 locale identifier (e.g., "en_US", "lv_LV", "de_DE")
         strict: Raise exception on parse failure (default: True)
 
     Returns:
@@ -36,18 +40,20 @@ def parse_date(
         ValueError: If parsing fails and strict=True
 
     Examples:
-        >>> parse_date("1/28/25", "en_US")
+        >>> parse_date("2025-01-28", "en_US")  # ISO 8601 - always works
         datetime.date(2025, 1, 28)
-        >>> parse_date("28.01.25", "lv_LV")
+        >>> parse_date("1/28/25", "en_US")  # US locale format
         datetime.date(2025, 1, 28)
-        >>> parse_date("28.01.2025", "de_DE")
+        >>> parse_date("28.01.25", "lv_LV")  # Latvian locale format
+        datetime.date(2025, 1, 28)
+        >>> parse_date("28.01.2025", "de_DE")  # German locale format
         datetime.date(2025, 1, 28)
         >>> parse_date("invalid", "en_US", strict=False)
         None
 
     Note:
-        Uses Babel CLDR date patterns with Python 3.13 strptime.
-        Tries locale-specific patterns first, then common fallbacks.
+        v0.7.0: No ambiguous fallback patterns. Use ISO 8601 (YYYY-MM-DD) for
+        unambiguous, locale-independent dates.
 
     Thread Safety:
         Thread-safe. Uses Babel + stdlib (no global state).
@@ -89,9 +95,12 @@ def parse_datetime(
 ) -> datetime | None:
     """Parse locale-aware datetime string to datetime object.
 
+    v0.7.0 BREAKING CHANGE: Removed ambiguous fallback patterns.
+    Only ISO 8601 and locale-specific CLDR patterns are supported.
+
     Args:
-        value: DateTime string
-        locale_code: BCP 47 locale identifier (used for locale-specific patterns)
+        value: DateTime string (e.g., "2025-01-28 14:30" for ISO 8601)
+        locale_code: BCP 47 locale identifier (e.g., "en_US", "lv_LV", "de_DE")
         strict: Raise exception on parse failure (default: True)
         tzinfo: Timezone to assign if not in string (default: None - naive datetime)
 
@@ -102,12 +111,18 @@ def parse_datetime(
         ValueError: If parsing fails and strict=True
 
     Examples:
-        >>> parse_datetime("1/28/25 14:30", "en_US")
+        >>> parse_datetime("2025-01-28 14:30", "en_US")  # ISO 8601 - always works
         datetime.datetime(2025, 1, 28, 14, 30)
-        >>> parse_datetime("28.01.25 14:30", "lv_LV")
+        >>> parse_datetime("1/28/25 2:30 PM", "en_US")  # US locale format
+        datetime.datetime(2025, 1, 28, 14, 30)
+        >>> parse_datetime("28.01.25 14:30", "lv_LV")  # Latvian locale format
         datetime.datetime(2025, 1, 28, 14, 30)
         >>> parse_datetime("invalid", "en_US", strict=False)
         None
+
+    Note:
+        v0.7.0: No ambiguous fallback patterns. Use ISO 8601 (YYYY-MM-DD HH:MM:SS)
+        for unambiguous, locale-independent datetimes.
 
     Thread Safety:
         Thread-safe. Uses Babel + stdlib (no global state).
@@ -149,13 +164,19 @@ def parse_datetime(
 def _get_date_patterns(locale_code: str) -> list[str]:
     """Get strptime date patterns for locale.
 
-    Uses Babel CLDR date format patterns and converts them to strptime format.
+    Uses ONLY Babel CLDR date format patterns specific to the locale.
+    No fallback patterns to avoid ambiguous date interpretation.
+
+    v0.7.0 BREAKING CHANGE: Removed ambiguous fallback patterns.
+    Only ISO 8601 and locale-specific CLDR patterns are supported.
+    Use ISO 8601 (YYYY-MM-DD) for unambiguous, locale-independent dates.
 
     Args:
         locale_code: BCP 47 locale identifier
 
     Returns:
         List of strptime patterns to try, in order of preference
+        Empty list if locale parsing fails
     """
     try:
         # Parse locale (convert BCP-47 to POSIX: en-US -> en_US)
@@ -174,39 +195,28 @@ def _get_date_patterns(locale_code: str) -> list[str]:
             except (AttributeError, KeyError):
                 pass
 
+        return patterns
+
     except Exception:  # pylint: disable=broad-exception-caught
-        # Fallback to common patterns if locale parsing fails
-        patterns = []
-
-    # Add common fallback patterns
-    patterns.extend([
-        "%m/%d/%Y",      # US: 1/28/2025
-        "%m/%d/%y",      # US short: 1/28/25
-        "%d.%m.%Y",      # EU: 28.01.2025
-        "%d.%m.%y",      # EU short: 28.01.25
-        "%d/%m/%Y",      # EU slash: 28/01/2025
-        "%d/%m/%y",      # EU slash short: 28/01/25
-        "%Y-%m-%d",      # ISO: 2025-01-28
-        "%d-%m-%Y",      # ISO-like: 28-01-2025
-        "%b %d, %Y",     # Jan 28, 2025
-        "%d %b %Y",      # 28 Jan 2025
-        "%B %d, %Y",     # January 28, 2025
-        "%d %B %Y",      # 28 January 2025
-    ])
-
-    return patterns
+        # v0.7.0: If locale parsing fails, return empty list (no fallback patterns)
+        return []
 
 
 def _get_datetime_patterns(locale_code: str) -> list[str]:
     """Get strptime datetime patterns for locale.
 
-    Uses Babel CLDR datetime format patterns and converts them to strptime format.
+    Uses ONLY Babel CLDR datetime format patterns specific to the locale.
+    No fallback patterns to avoid ambiguous datetime interpretation.
+
+    v0.7.0 BREAKING CHANGE: Removed ambiguous fallback patterns.
+    Only ISO 8601 and locale-specific CLDR patterns are supported.
 
     Args:
         locale_code: BCP 47 locale identifier
 
     Returns:
         List of strptime patterns to try, in order of preference
+        Empty list if locale parsing fails
     """
     try:
         # Parse locale (convert BCP-47 to POSIX: en-US -> en_US)
@@ -225,33 +235,23 @@ def _get_datetime_patterns(locale_code: str) -> list[str]:
             except (AttributeError, KeyError):
                 pass
 
+        # Get date patterns and add time components for locale
+        date_patterns = _get_date_patterns(locale_code)
+
+        # Add datetime combinations using locale-specific date patterns
+        for date_pat in date_patterns:
+            patterns.extend([
+                f"{date_pat} %H:%M:%S",      # 24-hour with seconds
+                f"{date_pat} %H:%M",         # 24-hour without seconds
+                f"{date_pat} %I:%M:%S %p",   # 12-hour with seconds + AM/PM
+                f"{date_pat} %I:%M %p",      # 12-hour without seconds + AM/PM
+            ])
+
+        return patterns
+
     except Exception:  # pylint: disable=broad-exception-caught
-        # Fallback to common patterns if locale parsing fails
-        patterns = []
-
-    # Get date patterns and add time components
-    date_patterns = _get_date_patterns(locale_code)
-
-    # Add datetime combinations
-    for date_pat in date_patterns[:5]:  # Use first 5 date patterns
-        patterns.extend([
-            f"{date_pat} %H:%M:%S",  # 28.01.2025 14:30:45
-            f"{date_pat} %H:%M",     # 28.01.2025 14:30
-            f"{date_pat} %I:%M:%S %p",  # 1/28/2025 02:30:45 PM
-            f"{date_pat} %I:%M %p",     # 1/28/2025 02:30 PM
-        ])
-
-    # Add common fallback patterns
-    patterns.extend([
-        "%Y-%m-%d %H:%M:%S",    # ISO: 2025-01-28 14:30:45
-        "%Y-%m-%d %H:%M",       # ISO: 2025-01-28 14:30
-        "%m/%d/%Y %H:%M:%S",    # US: 1/28/2025 14:30:45
-        "%m/%d/%Y %H:%M",       # US: 1/28/2025 14:30
-        "%d.%m.%Y %H:%M:%S",    # EU: 28.01.2025 14:30:45
-        "%d.%m.%Y %H:%M",       # EU: 28.01.2025 14:30
-    ])
-
-    return patterns
+        # v0.7.0: If locale parsing fails, return empty list (no fallback patterns)
+        return []
 
 
 def _babel_to_strptime(babel_pattern: str) -> str:

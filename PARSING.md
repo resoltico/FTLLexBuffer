@@ -122,13 +122,17 @@ parse_date("2025-01-28", "en_US")  # → date(2025, 1, 28)
 - **Babel CLDR patterns** - Converts Babel date patterns to strptime format directives
   - Example conversions: `"M/d/yy"` → `"%m/%d/%y"`, `"dd.MM.yyyy"` → `"%d.%m.%Y"`
 - **Fast path optimization** - ISO 8601 dates (`"2025-01-28"`) use native `fromisoformat()` for maximum speed
-- **Pattern fallback chain**:
-  1. ISO 8601 format (fastest, unambiguous)
-  2. Locale-specific CLDR patterns from Babel
-  3. Common formats (US: MM/DD/YYYY, EU: DD.MM.YYYY)
-- **Locale determines interpretation** - Day-first (EU) vs month-first (US) for ambiguous dates
+- **Safe pattern matching** - No ambiguous fallback patterns:
+  1. ISO 8601 format (fastest, unambiguous, always works)
+  2. Locale-specific CLDR patterns from Babel ONLY
+  3. ❌ No generic fallback patterns (prevents misinterpretation)
+- **Locale determines interpretation** - Day-first (EU) vs month-first (US) based on CLDR patterns
 - **Thread-safe** - No global state, immutable pattern lists
 - **Zero external dependencies** - Uses only Python 3.13 stdlib + Babel (already a dependency)
+
+**Important**: Ambiguous dates like "1/2/25" will FAIL unless:
+- Input matches locale's CLDR pattern (e.g., "1/2/25" only works for en_US, not lv_LV)
+- Input uses ISO 8601 format "2025-01-02" (works everywhere, recommended)
 
 ### parse_datetime()
 
@@ -161,18 +165,36 @@ Parse locale-formatted currency string to `(Decimal, currency_code)` tuple.
 ```python
 from ftllexbuffer.parsing import parse_currency
 
-# Parse EUR with symbol
+# Unambiguous symbols - work without default_currency
 amount, currency = parse_currency("€100.50", "en_US")
 # → (Decimal('100.50'), 'EUR')
 
-# Parse with ISO code
+amount, currency = parse_currency("1 234,56 €", "lv_LV")
+# → (Decimal('1234.56'), 'EUR')
+
+# ISO codes - always unambiguous
 amount, currency = parse_currency("USD 1,234.56", "en_US")
 # → (Decimal('1234.56'), 'USD')
 
-# Latvian format
-amount, currency = parse_currency("1 234,56 €", "lv_LV")
-# → (Decimal('1234.56'), 'EUR')
+# Ambiguous symbols require explicit currency
+amount, currency = parse_currency("$100", "en_US", default_currency="USD")
+# → (Decimal('100'), 'USD')
+
+amount, currency = parse_currency("$100", "en_CA", default_currency="CAD")
+# → (Decimal('100'), 'CAD')
+
+# Or infer from locale
+amount, currency = parse_currency("$100", "en_CA", infer_from_locale=True)
+# → (Decimal('100'), 'CAD')  # Inferred from Canadian locale
+
+# Ambiguous symbols without default_currency raise ValueError
+parse_currency("$100", "en_US")  # ← Raises ValueError
 ```
+
+**Currency Symbol Handling**:
+- **Ambiguous**: $ (USD/CAD/AUD/SGD/HKD/NZD/MXN), ¢, ₨, ₱, kr
+- **Unambiguous**: € (EUR), £ (GBP), ¥ (JPY), ₹ (INR), ₽ (RUB), etc.
+- **Always safe**: ISO codes (USD, CAD, EUR, etc.)
 
 **Supported currencies**: All ISO 4217 codes plus major currency symbols (€, $, £, ¥, etc.)
 
@@ -552,9 +574,8 @@ parse_date("2025-01-02", locale)  # Always Jan 2
 
 - [API.md](API.md) - Complete API reference
 - [README.md](README.md) - Getting started
-- [PLAN.md](PLAN.md) - v0.5.0 implementation plan
 - [Babel Documentation](https://babel.pocoo.org/) - Number and date formatting patterns
 
 ---
 
-**FTLLexBuffer v0.5.0** - Production-ready bi-directional localization
+**FTLLexBuffer v0.7.0** - Production-ready bi-directional localization

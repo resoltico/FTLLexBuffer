@@ -34,7 +34,11 @@ class TestParseCurrencyHypothesis:
         # Format: symbol + amount (no locale formatting for simplicity)
         currency_str = f"{currency_symbol}{amount}"
 
-        result = parse_currency(currency_str, "en_US")
+        # v0.7.0: Ambiguous symbols require default_currency
+        ambiguous_symbols = {"$": "USD", "¢": "USD", "₨": "INR", "₱": "PHP"}
+        default_currency = ambiguous_symbols.get(currency_symbol)
+
+        result = parse_currency(currency_str, "en_US", default_currency=default_currency)
         assert result is not None
 
         parsed_amount, currency_code = result
@@ -48,11 +52,7 @@ class TestParseCurrencyHypothesis:
         assert currency_code.isupper()
 
     @given(
-        currency_code=st.text(
-            alphabet=st.characters(min_codepoint=65, max_codepoint=90),  # A-Z
-            min_size=3,
-            max_size=3,
-        ),
+        currency_code=st.from_regex(r"[A-Z]{3}", fullmatch=True),  # ISO 4217 format
     )
     @settings(max_examples=100)
     def test_parse_currency_iso_code_format(self, currency_code: str) -> None:
@@ -104,7 +104,7 @@ class TestParseCurrencyHypothesis:
         """Unknown currency symbols should return None in non-strict mode."""
         currency_str = f"{unknown_symbol}100.50"
 
-        result = parse_currency(currency_str, "en_US", strict=False)
+        result = parse_currency(currency_str, "en_US", strict=False, default_currency="USD")
         assert result is None
 
     def test_parse_currency_symbol_in_regex_but_not_in_map_strict(
@@ -127,16 +127,17 @@ class TestParseCurrencyHypothesis:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Test defensive code: symbol in regex but not in mapping (non-strict)."""
-        # Lines 108-111 coverage - symbol matches regex but not in _CURRENCY_SYMBOL_MAP
-        # Create a modified map that's missing the $ symbol
+        # Lines 192-197 coverage - symbol matches regex but not in _CURRENCY_SYMBOL_MAP
+        # v0.7.0: Use € (unambiguous symbol) instead of $ (ambiguous)
+        # Create a modified map that's missing the € symbol
         modified_map = _CURRENCY_SYMBOL_MAP.copy()
-        del modified_map["$"]
+        del modified_map["€"]
 
         # Monkeypatch the map in the currency module
         monkeypatch.setattr("ftllexbuffer.parsing.currency._CURRENCY_SYMBOL_MAP", modified_map)
 
-        # Now $ is in the regex but not in the map - should return None
-        result = parse_currency("$100.50", "en_US", strict=False)
+        # Now € is in the regex but not in the map - should return None
+        result = parse_currency("€100.50", "en_US", strict=False)
         assert result is None
 
     @given(
@@ -155,12 +156,13 @@ class TestParseCurrencyHypothesis:
     @settings(max_examples=50)
     def test_parse_currency_invalid_number_strict_mode(self, invalid_number: str) -> None:
         """Invalid numbers should raise ValueError in strict mode (NumberFormatError)."""
-        # Lines 122-126 coverage
+        # Lines 208-211 coverage
         # Note: Babel accepts NaN/Infinity/Inf (any case) as valid Decimal values
+        # v0.7.0: Use $ with default_currency
         currency_str = f"${invalid_number}"
 
         with pytest.raises(ValueError, match="Failed to parse amount"):
-            parse_currency(currency_str, "en_US", strict=True)
+            parse_currency(currency_str, "en_US", strict=True, default_currency="USD")
 
     @given(
         invalid_number=st.one_of(
@@ -181,7 +183,7 @@ class TestParseCurrencyHypothesis:
         # Note: Babel accepts NaN/Infinity/Inf (any case) as valid Decimal values
         currency_str = f"${invalid_number}"
 
-        result = parse_currency(currency_str, "en_US", strict=False)
+        result = parse_currency(currency_str, "en_US", strict=False, default_currency="USD")
         assert result is None
 
     @given(
@@ -224,7 +226,7 @@ class TestParseCurrencyHypothesis:
         """Negative amounts should parse correctly (debt, refunds)."""
         currency_str = f"${amount}"
 
-        result = parse_currency(currency_str, "en_US")
+        result = parse_currency(currency_str, "en_US", default_currency="USD")
         assert result is not None
 
         parsed_amount, _ = result
@@ -245,7 +247,7 @@ class TestParseCurrencyHypothesis:
         """Sub-dollar amounts should preserve precision (critical for financial)."""
         currency_str = f"${amount}"
 
-        result = parse_currency(currency_str, "en_US")
+        result = parse_currency(currency_str, "en_US", default_currency="USD")
         assert result is not None
 
         parsed_amount, _ = result
@@ -277,7 +279,6 @@ class TestParseCurrencyHypothesis:
         value=st.text(
             alphabet=st.characters(min_codepoint=32, max_codepoint=126),  # ASCII printable
             min_size=1,
-            max_size=20,
         ).filter(
             lambda x: not any(
                 symbol in x for symbol in "€$£¥₹₽¢₡₦₧₨₩₪₫₱₴₵₸₺₼₾"
@@ -297,7 +298,6 @@ class TestParseCurrencyHypothesis:
         value=st.text(
             alphabet=st.characters(min_codepoint=32, max_codepoint=126),
             min_size=1,
-            max_size=20,
         ).filter(
             lambda x: not any(
                 symbol in x for symbol in "€$£¥₹₽¢₡₦₧₨₩₪₫₱₴₵₸₺₼₾"
@@ -332,8 +332,9 @@ class TestCurrencyMetamorphicProperties:
         formatted1 = currency_format(float(amount1), "en_US", currency=currency)
         formatted2 = currency_format(float(amount2), "en_US", currency=currency)
 
-        result1 = parse_currency(formatted1, "en_US")
-        result2 = parse_currency(formatted2, "en_US")
+        # v0.7.0: $ and £ are ambiguous - specify default_currency
+        result1 = parse_currency(formatted1, "en_US", default_currency=currency)
+        result2 = parse_currency(formatted2, "en_US", default_currency=currency)
 
         assert result1 is not None
         assert result2 is not None
@@ -389,8 +390,9 @@ class TestCurrencyMetamorphicProperties:
         formatted1 = currency_format(float(amount), "en_US", currency="USD")
         formatted2 = currency_format(float(amount * 2), "en_US", currency="USD")
 
-        result1 = parse_currency(formatted1, "en_US")
-        result2 = parse_currency(formatted2, "en_US")
+        # v0.7.0: $ is ambiguous - specify default_currency
+        result1 = parse_currency(formatted1, "en_US", default_currency="USD")
+        result2 = parse_currency(formatted2, "en_US", default_currency="USD")
 
         assert result1 is not None
         assert result2 is not None
@@ -417,7 +419,8 @@ class TestCurrencyMetamorphicProperties:
         from ftllexbuffer.runtime.functions import currency_format
 
         formatted = currency_format(float(amount), "en_US", currency=currency)
-        result = parse_currency(formatted, "en_US")
+        # v0.7.0: $ and £ are ambiguous - specify default_currency
+        result = parse_currency(formatted, "en_US", default_currency=currency)
 
         assert result is not None
         parsed_amount, parsed_currency = result
@@ -435,11 +438,19 @@ class TestCurrencyMetamorphicProperties:
         # Test both prefix and suffix positions
         amount = Decimal("123.45")
 
+        # v0.7.0: Ambiguous symbols require default_currency
+        ambiguous_symbols = {"$": "USD", "¢": "USD", "₨": "INR", "₱": "PHP"}
+        default_currency = ambiguous_symbols.get(symbol)
+
         # Symbol before amount
-        result1 = parse_currency(f"{symbol}{amount}", "en_US", strict=False)
+        result1 = parse_currency(
+            f"{symbol}{amount}", "en_US", strict=False, default_currency=default_currency
+        )
 
         # Symbol after amount (common in some locales)
-        result2 = parse_currency(f"{amount} {symbol}", "en_US", strict=False)
+        result2 = parse_currency(
+            f"{amount} {symbol}", "en_US", strict=False, default_currency=default_currency
+        )
 
         # Both should parse to same amount (if they parse at all)
         if result1 is not None and result2 is not None:
@@ -457,7 +468,7 @@ class TestCurrencyMetamorphicProperties:
         """Zero amounts should parse correctly."""
         currency_str = "$0.00"
 
-        result = parse_currency(currency_str, "en_US")
+        result = parse_currency(currency_str, "en_US", default_currency="USD")
         assert result is not None
 
         parsed_amount, currency_code = result
@@ -478,8 +489,101 @@ class TestCurrencyMetamorphicProperties:
         # Add whitespace around currency and amount
         currency_str = f"{whitespace}€{whitespace}100.50{whitespace}"
 
-        result = parse_currency(currency_str, "en_US", strict=False)
+        result = parse_currency(currency_str, "en_US", strict=False, default_currency="USD")
         if result is not None:
             parsed_amount, currency_code = result
             assert parsed_amount == Decimal("100.50")
             assert currency_code == "EUR"
+
+
+# ============================================================================
+# COVERAGE TESTS - infer_from_locale PARAMETER
+# ============================================================================
+
+
+class TestCurrencyInferFromLocale:
+    """Test infer_from_locale parameter for ambiguous symbols (lines 167-189)."""
+
+    @given(
+        amount=st.decimals(
+            min_value=Decimal("0.01"),
+            max_value=Decimal("999999.99"),
+            places=2,
+            allow_nan=False,
+            allow_infinity=False,
+        )
+    )
+    @settings(max_examples=100)
+    def test_infer_from_locale_with_us_dollar(self, amount: Decimal) -> None:
+        """COVERAGE: infer_from_locale=True infers USD from en_US (line 167-178)."""
+        currency_str = f"${amount}"
+
+        # Line 167: infer_from_locale=True path
+        # Line 168: inferred_currency from _LOCALE_TO_CURRENCY
+        # Line 178: currency_code = inferred_currency
+        result = parse_currency(currency_str, "en_US", infer_from_locale=True)
+        assert result is not None
+
+        parsed_amount, currency_code = result
+        assert currency_code == "USD"
+        assert parsed_amount == amount
+
+    @given(
+        amount=st.decimals(
+            min_value=Decimal("0.01"),
+            max_value=Decimal("999999.99"),
+            places=2,
+            allow_nan=False,
+            allow_infinity=False,
+        )
+    )
+    @settings(max_examples=100)
+    def test_infer_from_locale_with_canadian_dollar(self, amount: Decimal) -> None:
+        """COVERAGE: infer_from_locale=True infers CAD from en_CA (line 167-178)."""
+        currency_str = f"${amount}"
+
+        # Line 167: infer_from_locale=True path
+        # Line 168: inferred_currency = CAD
+        result = parse_currency(currency_str, "en_CA", infer_from_locale=True)
+        assert result is not None
+
+        _parsed_amount, currency_code = result
+        assert currency_code == "CAD"
+
+    def test_infer_from_locale_unmapped_locale_strict_raises(self) -> None:
+        """COVERAGE: infer_from_locale with unmapped locale strict raises (line 170-176)."""
+        currency_str = "$100.00"
+
+        # Line 169: inferred_currency is None for unmapped locale (sv_SE not in mapping)
+        # Line 170-176: strict=True raises ValueError
+        with pytest.raises(
+            ValueError, match=r"Ambiguous currency symbol.*no currency mapping"
+        ):
+            parse_currency(currency_str, "sv_SE", infer_from_locale=True, strict=True)
+
+    def test_infer_from_locale_unmapped_locale_non_strict_returns_none(self) -> None:
+        """COVERAGE: infer_from_locale with unmapped locale returns None (line 177)."""
+        currency_str = "$100.00"
+
+        # Line 169: inferred_currency is None (sv_SE not in mapping)
+        # Line 177: return None for non-strict mode
+        result = parse_currency(currency_str, "sv_SE", infer_from_locale=True, strict=False)
+        assert result is None
+
+    def test_ambiguous_symbol_no_default_strict_raises(self) -> None:
+        """COVERAGE: Ambiguous symbol without default raises in strict (line 181-188)."""
+        currency_str = "$100.00"
+
+        # Line 181-188: No default_currency, no infer_from_locale, strict=True raises
+        with pytest.raises(
+            ValueError, match=r"Ambiguous currency symbol.*multiple currencies"
+        ):
+            parse_currency(currency_str, "en_US", strict=True)
+
+    def test_ambiguous_symbol_no_default_non_strict_returns_none(self) -> None:
+        """COVERAGE: Ambiguous symbol without default returns None (line 189)."""
+        currency_str = "$100.00"
+
+        # Line 189: return None for non-strict mode without default
+        result = parse_currency(currency_str, "en_US", strict=False)
+        assert result is None
