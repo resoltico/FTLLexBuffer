@@ -1,5 +1,9 @@
 """Hypothesis property-based tests for parsing type guards.
 
+v0.8.0: Updated for new tuple return type API.
+- Type guards now work with the new tuple return types
+- Tests validate type narrowing with (result, errors) tuple unpacking
+
 Tests type guard correctness, type narrowing properties, and edge cases.
 Ensures 100% coverage of parsing/guards.py.
 """
@@ -13,6 +17,7 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from ftllexbuffer.parsing.guards import (
+    has_parse_errors,
     is_valid_currency,
     is_valid_date,
     is_valid_datetime,
@@ -39,12 +44,44 @@ currency_tuples = st.tuples(
 
 
 # ============================================================================
+# PROPERTY TESTS - has_parse_errors
+# ============================================================================
+
+
+class TestHasParseErrorsGuard:
+    """Test has_parse_errors() helper function."""
+
+    def test_empty_list_returns_false(self) -> None:
+        """Empty error list returns False."""
+        from ftllexbuffer.diagnostics import FluentParseError  # noqa: PLC0415
+
+        errors: list[FluentParseError] = []
+        assert has_parse_errors(errors) is False
+
+    def test_non_empty_list_returns_true(self) -> None:
+        """Non-empty error list returns True."""
+        from ftllexbuffer.diagnostics import FluentParseError  # noqa: PLC0415
+
+        error = FluentParseError(
+            "Test error",
+            input_value="test",
+            locale_code="en_US",
+            parse_type="number",
+        )
+        assert has_parse_errors([error]) is True
+
+
+# ============================================================================
 # PROPERTY TESTS - is_valid_decimal
 # ============================================================================
 
 
 class TestValidDecimalGuard:
-    """Test is_valid_decimal() type guard properties."""
+    """Test is_valid_decimal() type guard properties.
+
+    Note: is_valid_decimal() doesn't accept None because parse_decimal()
+    returns Decimal("0") on error, never None. Only NaN/Infinity checks needed.
+    """
 
     @given(value=st.decimals(allow_nan=False, allow_infinity=False))
     @settings(max_examples=200)
@@ -52,30 +89,24 @@ class TestValidDecimalGuard:
         """PROPERTY: Finite Decimal values return True."""
         assert is_valid_decimal(value) is True
 
-    @given(value=st.none())
-    @settings(max_examples=50)
-    def test_none_returns_false(self, value: None) -> None:
-        """PROPERTY: None returns False."""
-        assert is_valid_decimal(value) is False
-
     @given(value=st.just(Decimal("NaN")))
     @settings(max_examples=50)
     def test_nan_returns_false(self, value: Decimal) -> None:
-        """PROPERTY: NaN Decimal returns False (line 52)."""
+        """PROPERTY: NaN Decimal returns False."""
         assert value.is_nan()
         assert is_valid_decimal(value) is False
 
     @given(value=st.just(Decimal("Infinity")))
     @settings(max_examples=50)
     def test_positive_infinity_returns_false(self, value: Decimal) -> None:
-        """PROPERTY: Positive infinity Decimal returns False (line 52)."""
+        """PROPERTY: Positive infinity Decimal returns False."""
         assert value.is_infinite()
         assert is_valid_decimal(value) is False
 
     @given(value=st.just(Decimal("-Infinity")))
     @settings(max_examples=50)
     def test_negative_infinity_returns_false(self, value: Decimal) -> None:
-        """PROPERTY: Negative infinity Decimal returns False (line 52)."""
+        """PROPERTY: Negative infinity Decimal returns False."""
         assert value.is_infinite()
         assert is_valid_decimal(value) is False
 
@@ -86,7 +117,11 @@ class TestValidDecimalGuard:
 
 
 class TestValidNumberGuard:
-    """Test is_valid_number() type guard properties."""
+    """Test is_valid_number() type guard properties.
+
+    Note: is_valid_number() doesn't accept None because parse_number()
+    returns 0.0 on error, never None. Only NaN/Infinity checks needed.
+    """
 
     @given(value=st.floats(allow_nan=False, allow_infinity=False))
     @settings(max_examples=200)
@@ -94,28 +129,22 @@ class TestValidNumberGuard:
         """PROPERTY: Finite float values return True."""
         assert is_valid_number(value) is True
 
-    @given(value=st.none())
-    @settings(max_examples=50)
-    def test_none_returns_false(self, value: None) -> None:
-        """PROPERTY: None returns False."""
-        assert is_valid_number(value) is False
-
     @given(value=st.just(float("nan")))
     @settings(max_examples=50)
     def test_nan_returns_false(self, value: float) -> None:
-        """PROPERTY: NaN float returns False (line 74)."""
+        """PROPERTY: NaN float returns False."""
         assert is_valid_number(value) is False
 
     @given(value=st.just(float("inf")))
     @settings(max_examples=50)
     def test_positive_infinity_returns_false(self, value: float) -> None:
-        """PROPERTY: Positive infinity float returns False (line 74)."""
+        """PROPERTY: Positive infinity float returns False."""
         assert is_valid_number(value) is False
 
     @given(value=st.just(float("-inf")))
     @settings(max_examples=50)
     def test_negative_infinity_returns_false(self, value: float) -> None:
-        """PROPERTY: Negative infinity float returns False (line 74)."""
+        """PROPERTY: Negative infinity float returns False."""
         assert is_valid_number(value) is False
 
 
@@ -135,7 +164,7 @@ class TestValidCurrencyGuard:
     def test_valid_currency_tuple_returns_true(
         self, amount: Decimal, currency: str
     ) -> None:
-        """PROPERTY: Valid (Decimal, str) tuple returns True (line 99)."""
+        """PROPERTY: Valid (Decimal, str) tuple returns True."""
         value = (amount, currency)
         assert is_valid_currency(value) is True
 
@@ -148,14 +177,14 @@ class TestValidCurrencyGuard:
     @given(currency=st.from_regex(r"[A-Z]{3}", fullmatch=True))
     @settings(max_examples=50)
     def test_nan_amount_returns_false(self, currency: str) -> None:
-        """PROPERTY: NaN amount returns False (line 99)."""
+        """PROPERTY: NaN amount returns False."""
         value = (Decimal("NaN"), currency)
         assert is_valid_currency(value) is False
 
     @given(currency=st.from_regex(r"[A-Z]{3}", fullmatch=True))
     @settings(max_examples=50)
     def test_infinite_amount_returns_false(self, currency: str) -> None:
-        """PROPERTY: Infinite amount returns False (line 99)."""
+        """PROPERTY: Infinite amount returns False."""
         value = (Decimal("Infinity"), currency)
         assert is_valid_currency(value) is False
 
@@ -175,14 +204,14 @@ class TestValidDateGuard:
     )
     @settings(max_examples=200)
     def test_valid_date_returns_true(self, year: int, month: int, day: int) -> None:
-        """PROPERTY: Valid date objects return True (line 120)."""
+        """PROPERTY: Valid date objects return True."""
         value = date(year, month, day)
         assert is_valid_date(value) is True
 
     @given(value=st.none())
     @settings(max_examples=50)
     def test_none_returns_false(self, value: None) -> None:
-        """PROPERTY: None returns False (line 120)."""
+        """PROPERTY: None returns False."""
         assert is_valid_date(value) is False
 
 
@@ -205,14 +234,14 @@ class TestValidDatetimeGuard:
     def test_valid_datetime_returns_true(
         self, year: int, month: int, day: int, hour: int, minute: int
     ) -> None:
-        """PROPERTY: Valid datetime objects return True (line 141)."""
+        """PROPERTY: Valid datetime objects return True."""
         value = datetime(year, month, day, hour, minute, tzinfo=UTC)
         assert is_valid_datetime(value) is True
 
     @given(value=st.none())
     @settings(max_examples=50)
     def test_none_returns_false(self, value: None) -> None:
-        """PROPERTY: None returns False (line 141)."""
+        """PROPERTY: None returns False."""
         assert is_valid_datetime(value) is False
 
 
@@ -222,7 +251,10 @@ class TestValidDatetimeGuard:
 
 
 class TestTypeNarrowingIntegration:
-    """Test type guard integration with actual parsing functions."""
+    """Test type guard integration with actual parsing functions.
+
+    v0.8.0: Tests updated for new tuple return type API.
+    """
 
     @given(
         amount=st.decimals(
@@ -236,11 +268,11 @@ class TestTypeNarrowingIntegration:
         from ftllexbuffer.parsing import parse_currency  # noqa: PLC0415
 
         currency_str = f"{currency} {amount}"
-        parsed = parse_currency(currency_str, "en_US")
+        result, errors = parse_currency(currency_str, "en_US")
 
-        if is_valid_currency(parsed):
-            # After type narrowing, mypy knows parsed is tuple[Decimal, str]
-            parsed_amount, parsed_currency = parsed
+        if not has_parse_errors(errors) and is_valid_currency(result):
+            # After type narrowing, mypy knows result is tuple[Decimal, str]
+            parsed_amount, parsed_currency = result
             assert isinstance(parsed_amount, Decimal)
             assert isinstance(parsed_currency, str)
             assert parsed_amount.is_finite()
@@ -256,12 +288,12 @@ class TestTypeNarrowingIntegration:
         from ftllexbuffer.parsing import parse_date  # noqa: PLC0415
 
         date_str = f"{year:04d}-{month:02d}-{day:02d}"
-        parsed = parse_date(date_str, "en_US")
+        result, errors = parse_date(date_str, "en_US")
 
-        if is_valid_date(parsed):
-            # After type narrowing, mypy knows parsed is date
-            assert isinstance(parsed, date)
-            assert parsed.year == year
+        if not has_parse_errors(errors) and is_valid_date(result):
+            # After type narrowing, mypy knows result is date
+            assert isinstance(result, date)
+            assert result.year == year
 
     @given(
         year=st.integers(min_value=2000, max_value=2068),
@@ -278,9 +310,51 @@ class TestTypeNarrowingIntegration:
         from ftllexbuffer.parsing import parse_datetime  # noqa: PLC0415
 
         datetime_str = f"{year:04d}-{month:02d}-{day:02d}T{hour:02d}:{minute:02d}:00"
-        parsed = parse_datetime(datetime_str, "en_US")
+        result, errors = parse_datetime(datetime_str, "en_US")
 
-        if is_valid_datetime(parsed):
-            # After type narrowing, mypy knows parsed is datetime
-            assert isinstance(parsed, datetime)
-            assert parsed.year == year
+        if not has_parse_errors(errors) and is_valid_datetime(result):
+            # After type narrowing, mypy knows result is datetime
+            assert isinstance(result, datetime)
+            assert result.year == year
+
+    @given(
+        value=st.floats(
+            min_value=-999999.99,
+            max_value=999999.99,
+            allow_nan=False,
+            allow_infinity=False,
+        ),
+    )
+    @settings(max_examples=100)
+    def test_number_type_narrowing(self, value: float) -> None:
+        """PROPERTY: Type guard correctly narrows number result type."""
+        from ftllexbuffer.parsing import parse_number  # noqa: PLC0415
+        from ftllexbuffer.runtime.functions import number_format  # noqa: PLC0415
+
+        formatted = number_format(value, "en_US")
+        result, errors = parse_number(formatted, "en_US")
+
+        if not has_parse_errors(errors) and is_valid_number(result):
+            # After type narrowing, mypy knows result is float
+            assert isinstance(result, float)
+
+    @given(
+        value=st.decimals(
+            min_value=Decimal("0.01"),
+            max_value=Decimal("999999.99"),
+            places=2,
+        ),
+    )
+    @settings(max_examples=100)
+    def test_decimal_type_narrowing(self, value: Decimal) -> None:
+        """PROPERTY: Type guard correctly narrows decimal result type."""
+        from ftllexbuffer.parsing import parse_decimal  # noqa: PLC0415
+        from ftllexbuffer.runtime.functions import number_format  # noqa: PLC0415
+
+        formatted = number_format(float(value), "en_US", minimum_fraction_digits=2)
+        result, errors = parse_decimal(formatted, "en_US")
+
+        if not has_parse_errors(errors) and is_valid_decimal(result):
+            # After type narrowing, mypy knows result is Decimal
+            assert isinstance(result, Decimal)
+            assert result.is_finite()

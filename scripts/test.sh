@@ -195,7 +195,7 @@ set +e
 TESTS_PASSED=$(grep -o '[0-9]* passed' "$LOG_FILE" | tail -1 | grep -o '[0-9]*' || echo "0")
 TESTS_FAILED=$(grep -o '[0-9]* failed' "$LOG_FILE" | tail -1 | grep -o '[0-9]*' || echo "0")
 TESTS_SKIPPED=$(grep -o '[0-9]* skipped' "$LOG_FILE" | tail -1 | grep -o '[0-9]*' || echo "0")
-COVERAGE_PCT=$(grep 'TOTAL' "$LOG_FILE" | tail -1 | grep -o '[0-9]*%' | grep -o '[0-9]*' || echo "0")
+COVERAGE_PCT=$(grep 'TOTAL' "$LOG_FILE" | tail -1 | awk '{print $NF}' | tr -d '%')
 [[ -z "$TESTS_PASSED" ]] && TESTS_PASSED=0
 [[ -z "$TESTS_FAILED" ]] && TESTS_FAILED=0
 [[ -z "$TESTS_SKIPPED" ]] && TESTS_SKIPPED=0

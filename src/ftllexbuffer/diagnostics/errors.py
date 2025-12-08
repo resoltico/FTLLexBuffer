@@ -74,3 +74,46 @@ class FluentCyclicReferenceError(FluentReferenceError):
 
     Fallback: return message ID.
     """
+
+
+class FluentParseError(FluentError):
+    """Error during bi-directional localization parsing.
+
+    Raised when parsing locale-formatted strings (numbers, dates, currency)
+    fails. Part of the unified error handling model aligned with format_*() API.
+
+    v0.8.0: Parsing API now returns tuple[result, list[FluentParseError]]
+    instead of raising exceptions, consistent with formatting API.
+
+    Attributes:
+        input_value: The string that failed to parse
+        locale_code: The locale used for parsing
+        parse_type: Type of parsing attempted ('number', 'decimal', 'date', 'datetime', 'currency')
+
+    Example:
+        >>> result, errors = parse_number("invalid", "en_US")
+        >>> if errors:
+        ...     for error in errors:
+        ...         print(f"Parse failed: {error.input_value} ({error.parse_type})")
+    """
+
+    def __init__(
+        self,
+        message: str | Diagnostic,
+        *,
+        input_value: str = "",
+        locale_code: str = "",
+        parse_type: str = "",
+    ) -> None:
+        """Initialize FluentParseError.
+
+        Args:
+            message: Error message string OR Diagnostic object
+            input_value: The string that failed to parse
+            locale_code: The locale used for parsing
+            parse_type: Type of parsing ('number', 'decimal', 'date', 'datetime', 'currency')
+        """
+        super().__init__(message)
+        self.input_value = input_value
+        self.locale_code = locale_code
+        self.parse_type = parse_type

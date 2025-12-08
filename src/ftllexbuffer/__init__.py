@@ -65,6 +65,7 @@ from __future__ import annotations
 from .diagnostics import (
     FluentCyclicReferenceError,
     FluentError,
+    FluentParseError,
     FluentReferenceError,
     FluentResolutionError,
     FluentSyntaxError,
@@ -87,8 +88,9 @@ from .localization import (
     ResourceLoader,
 )
 
-# Parsing API - Bi-directional localization
+# Parsing API - Bi-directional localization (v0.8.0 - tuple return types)
 from .parsing import (
+    has_parse_errors,
     parse_currency,
     parse_date,
     parse_datetime,
@@ -187,6 +189,7 @@ __all__ = [
     "serialize_ftl",
     # Exception hierarchy
     "FluentError",
+    "FluentParseError",
     "FluentSyntaxError",
     "FluentReferenceError",
     "FluentResolutionError",
@@ -205,7 +208,8 @@ __all__ = [
     "number_format",
     "datetime_format",
     "currency_format",
-    # Parsing API - Bi-directional
+    # Parsing API - Bi-directional (v0.8.0 - tuple return types)
+    "has_parse_errors",
     "parse_number",
     "parse_decimal",
     "parse_date",

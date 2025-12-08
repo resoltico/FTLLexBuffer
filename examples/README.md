@@ -167,7 +167,9 @@ Demonstrates:
 
 ### [bidirectional_formatting.py](bidirectional_formatting.py)
 
-**Bi-directional localization (v0.5.0+)** - Parse locale-formatted strings back to Python types.
+**Bi-directional localization (v0.5.0+, Breaking change in v0.8.0)** - Parse locale-formatted strings back to Python types.
+
+**v0.8.0 BREAKING CHANGE**: All parse functions now return `tuple[result, list[FluentParseError]]`.
 
 Demonstrates:
 1. Invoice processing with bi-directional localization (Latvian)
@@ -185,7 +187,8 @@ Demonstrates:
 - Financial precision with Decimal type
 - Form validation patterns
 - Import/export workflows
-- **Note**: Babel's `parse_decimal()` accepts `NaN`, `Infinity`, and `Inf` (case-insensitive) as valid Decimal values - add validation if your application needs to reject these
+- **v0.8.0 API**: Use `has_parse_errors()` and type guards from `ftllexbuffer.parsing.guards`
+- **Note**: Babel's `parse_decimal()` accepts `NaN`, `Infinity`, and `Inf` (case-insensitive) as valid Decimal values - use `is_valid_decimal()` to reject these for financial data
 
 ---
 

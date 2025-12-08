@@ -380,3 +380,216 @@ class ErrorTemplate:
             span=None,
             hint="Check for unclosed braces or incomplete syntax",
         )
+
+    # =========================================================================
+    # PARSING ERRORS (4000-4999) - Bi-directional localization
+    # =========================================================================
+
+    @staticmethod
+    def parse_number_failed(
+        value: str,
+        locale_code: str,
+        reason: str,
+    ) -> Diagnostic:
+        """Number parsing failed.
+
+        Args:
+            value: The input string that failed to parse
+            locale_code: The locale used for parsing
+            reason: The reason parsing failed
+
+        Returns:
+            Diagnostic for PARSE_NUMBER_FAILED
+        """
+        msg = f"Failed to parse number '{value}' for locale '{locale_code}': {reason}"
+        return Diagnostic(
+            code=DiagnosticCode.PARSE_NUMBER_FAILED,
+            message=msg,
+            span=None,
+            hint="Check that the number format matches the locale's conventions",
+        )
+
+    @staticmethod
+    def parse_decimal_failed(
+        value: str,
+        locale_code: str,
+        reason: str,
+    ) -> Diagnostic:
+        """Decimal parsing failed.
+
+        Args:
+            value: The input string that failed to parse
+            locale_code: The locale used for parsing
+            reason: The reason parsing failed
+
+        Returns:
+            Diagnostic for PARSE_DECIMAL_FAILED
+        """
+        msg = f"Failed to parse decimal '{value}' for locale '{locale_code}': {reason}"
+        return Diagnostic(
+            code=DiagnosticCode.PARSE_DECIMAL_FAILED,
+            message=msg,
+            span=None,
+            hint="Check that the decimal format matches the locale's conventions",
+        )
+
+    @staticmethod
+    def parse_date_failed(
+        value: str,
+        locale_code: str,
+        reason: str,
+    ) -> Diagnostic:
+        """Date parsing failed.
+
+        Args:
+            value: The input string that failed to parse
+            locale_code: The locale used for parsing
+            reason: The reason parsing failed
+
+        Returns:
+            Diagnostic for PARSE_DATE_FAILED
+        """
+        msg = f"Failed to parse date '{value}' for locale '{locale_code}': {reason}"
+        return Diagnostic(
+            code=DiagnosticCode.PARSE_DATE_FAILED,
+            message=msg,
+            span=None,
+            hint="Use ISO 8601 (YYYY-MM-DD) for unambiguous, locale-independent dates",
+        )
+
+    @staticmethod
+    def parse_datetime_failed(
+        value: str,
+        locale_code: str,
+        reason: str,
+    ) -> Diagnostic:
+        """Datetime parsing failed.
+
+        Args:
+            value: The input string that failed to parse
+            locale_code: The locale used for parsing
+            reason: The reason parsing failed
+
+        Returns:
+            Diagnostic for PARSE_DATETIME_FAILED
+        """
+        msg = f"Failed to parse datetime '{value}' for locale '{locale_code}': {reason}"
+        return Diagnostic(
+            code=DiagnosticCode.PARSE_DATETIME_FAILED,
+            message=msg,
+            span=None,
+            hint="Use ISO 8601 (YYYY-MM-DD HH:MM:SS) for unambiguous, locale-independent datetimes",
+        )
+
+    @staticmethod
+    def parse_currency_failed(
+        value: str,
+        locale_code: str,
+        reason: str,
+    ) -> Diagnostic:
+        """Currency parsing failed.
+
+        Args:
+            value: The input string that failed to parse
+            locale_code: The locale used for parsing
+            reason: The reason parsing failed
+
+        Returns:
+            Diagnostic for PARSE_CURRENCY_FAILED
+        """
+        msg = f"Failed to parse currency '{value}' for locale '{locale_code}': {reason}"
+        return Diagnostic(
+            code=DiagnosticCode.PARSE_CURRENCY_FAILED,
+            message=msg,
+            span=None,
+            hint="Use ISO currency codes (USD, EUR, GBP) for unambiguous parsing",
+        )
+
+    @staticmethod
+    def parse_locale_unknown(locale_code: str) -> Diagnostic:
+        """Unknown locale for parsing.
+
+        Args:
+            locale_code: The unknown locale code
+
+        Returns:
+            Diagnostic for PARSE_LOCALE_UNKNOWN
+        """
+        msg = f"Unknown locale '{locale_code}'"
+        return Diagnostic(
+            code=DiagnosticCode.PARSE_LOCALE_UNKNOWN,
+            message=msg,
+            span=None,
+            hint="Use BCP 47 locale codes (e.g., 'en_US', 'de_DE', 'lv_LV')",
+        )
+
+    @staticmethod
+    def parse_currency_ambiguous(
+        symbol: str,
+        value: str,
+    ) -> Diagnostic:
+        """Ambiguous currency symbol.
+
+        Args:
+            symbol: The ambiguous currency symbol
+            value: The full currency string
+
+        Returns:
+            Diagnostic for PARSE_CURRENCY_AMBIGUOUS
+        """
+        msg = (
+            f"Ambiguous currency symbol '{symbol}' in '{value}'. "
+            f"Symbol '{symbol}' is used by multiple currencies."
+        )
+        return Diagnostic(
+            code=DiagnosticCode.PARSE_CURRENCY_AMBIGUOUS,
+            message=msg,
+            span=None,
+            hint="Use default_currency parameter, infer_from_locale=True, or ISO code (USD, EUR)",
+        )
+
+    @staticmethod
+    def parse_currency_symbol_unknown(
+        symbol: str,
+        value: str,
+    ) -> Diagnostic:
+        """Unknown currency symbol.
+
+        Args:
+            symbol: The unknown currency symbol
+            value: The full currency string
+
+        Returns:
+            Diagnostic for PARSE_CURRENCY_SYMBOL_UNKNOWN
+        """
+        msg = f"Unknown currency symbol '{symbol}' in '{value}'"
+        return Diagnostic(
+            code=DiagnosticCode.PARSE_CURRENCY_SYMBOL_UNKNOWN,
+            message=msg,
+            span=None,
+            hint="Use ISO currency codes (USD, EUR, GBP) or supported symbols",
+        )
+
+    @staticmethod
+    def parse_amount_invalid(
+        amount_str: str,
+        value: str,
+        reason: str,
+    ) -> Diagnostic:
+        """Invalid amount in currency string.
+
+        Args:
+            amount_str: The amount portion that failed to parse
+            value: The full currency string
+            reason: The reason parsing failed
+
+        Returns:
+            Diagnostic for PARSE_AMOUNT_INVALID
+        """
+        msg = f"Failed to parse amount '{amount_str}' from '{value}': {reason}"
+        return Diagnostic(
+            code=DiagnosticCode.PARSE_AMOUNT_INVALID,
+            message=msg,
+            span=None,
+            hint="Check that the amount format matches the locale's conventions",
+        )

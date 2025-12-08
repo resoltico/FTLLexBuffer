@@ -1,11 +1,14 @@
 """Tests for number parsing functions.
 
+v0.8.0: Updated for new tuple return type API.
+- parse_number() returns tuple[float, list[FluentParseError]]
+- parse_decimal() returns tuple[Decimal, list[FluentParseError]]
+- Removed strict parameter - functions never raise, errors in list
+
 Validates parse_number() and parse_decimal() across multiple locales.
 """
 
 from decimal import Decimal
-
-import pytest
 
 from ftllexbuffer.parsing import parse_decimal, parse_number
 
@@ -15,31 +18,59 @@ class TestParseNumber:
 
     def test_parse_number_en_us(self) -> None:
         """Parse US English number format."""
-        assert parse_number("1,234.5", "en_US") == 1234.5
-        assert parse_number("1234.5", "en_US") == 1234.5
-        assert parse_number("0.5", "en_US") == 0.5
+        result, errors = parse_number("1,234.5", "en_US")
+        assert not errors
+        assert result == 1234.5
+
+        result, errors = parse_number("1234.5", "en_US")
+        assert not errors
+        assert result == 1234.5
+
+        result, errors = parse_number("0.5", "en_US")
+        assert not errors
+        assert result == 0.5
 
     def test_parse_number_lv_lv(self) -> None:
         """Parse Latvian number format."""
-        assert parse_number("1 234,5", "lv_LV") == 1234.5
-        assert parse_number("1234,5", "lv_LV") == 1234.5
-        assert parse_number("0,5", "lv_LV") == 0.5
+        result, errors = parse_number("1 234,5", "lv_LV")
+        assert not errors
+        assert result == 1234.5
+
+        result, errors = parse_number("1234,5", "lv_LV")
+        assert not errors
+        assert result == 1234.5
+
+        result, errors = parse_number("0,5", "lv_LV")
+        assert not errors
+        assert result == 0.5
 
     def test_parse_number_de_de(self) -> None:
         """Parse German number format."""
-        assert parse_number("1.234,5", "de_DE") == 1234.5
-        assert parse_number("1234,5", "de_DE") == 1234.5
-        assert parse_number("0,5", "de_DE") == 0.5
+        result, errors = parse_number("1.234,5", "de_DE")
+        assert not errors
+        assert result == 1234.5
 
-    def test_parse_number_strict_mode(self) -> None:
-        """Strict mode raises ValueError on invalid input."""
-        with pytest.raises(ValueError, match="Failed to parse number"):
-            parse_number("invalid", "en_US", strict=True)
+        result, errors = parse_number("1234,5", "de_DE")
+        assert not errors
+        assert result == 1234.5
 
-    def test_parse_number_non_strict_mode(self) -> None:
-        """Non-strict mode returns None on invalid input."""
-        assert parse_number("invalid", "en_US", strict=False) is None
-        assert parse_number("", "en_US", strict=False) is None
+        result, errors = parse_number("0,5", "de_DE")
+        assert not errors
+        assert result == 0.5
+
+    def test_parse_number_invalid_returns_error(self) -> None:
+        """Invalid input returns error in list (v0.8.0 - no exceptions)."""
+        result, errors = parse_number("invalid", "en_US")
+        assert len(errors) > 0
+        assert result == 0.0  # Default fallback value
+        assert errors[0].parse_type == "number"
+        assert errors[0].input_value == "invalid"
+
+    def test_parse_number_empty_returns_error(self) -> None:
+        """Empty input returns error in list."""
+        result, errors = parse_number("", "en_US")
+        assert len(errors) > 0
+        assert result == 0.0
 
 
 class TestParseDecimal:
@@ -47,38 +78,51 @@ class TestParseDecimal:
 
     def test_parse_decimal_en_us(self) -> None:
         """Parse US English decimal format."""
-        assert parse_decimal("1,234.56", "en_US") == Decimal("1234.56")
-        assert parse_decimal("0.01", "en_US") == Decimal("0.01")
+        result, errors = parse_decimal("1,234.56", "en_US")
+        assert not errors
+        assert result == Decimal("1234.56")
+
+        result, errors = parse_decimal("0.01", "en_US")
+        assert not errors
+        assert result == Decimal("0.01")
 
     def test_parse_decimal_lv_lv(self) -> None:
         """Parse Latvian decimal format."""
-        assert parse_decimal("1 234,56", "lv_LV") == Decimal("1234.56")
-        assert parse_decimal("0,01", "lv_LV") == Decimal("0.01")
+        result, errors = parse_decimal("1 234,56", "lv_LV")
+        assert not errors
+        assert result == Decimal("1234.56")
+
+        result, errors = parse_decimal("0,01", "lv_LV")
+        assert not errors
+        assert result == Decimal("0.01")
 
     def test_parse_decimal_de_de(self) -> None:
         """Parse German decimal format."""
-        assert parse_decimal("1.234,56", "de_DE") == Decimal("1234.56")
-        assert parse_decimal("0,01", "de_DE") == Decimal("0.01")
+        result, errors = parse_decimal("1.234,56", "de_DE")
+        assert not errors
+        assert result == Decimal("1234.56")
+
+        result, errors = parse_decimal("0,01", "de_DE")
+        assert not errors
+        assert result == Decimal("0.01")
 
     def test_parse_decimal_financial_precision(self) -> None:
         """Decimal preserves financial precision."""
-        amount = parse_decimal("100,50", "lv_LV")
-        assert amount is not None
+        amount, errors = parse_decimal("100,50", "lv_LV")
+        assert not errors
         vat = amount * Decimal("0.21")
         assert vat == Decimal("21.105")  # Exact, no float precision loss
 
-    def test_parse_decimal_strict_mode(self) -> None:
-        """Strict mode raises ValueError on invalid input."""
-        with pytest.raises(ValueError, match="Failed to parse decimal"):
-            parse_decimal("invalid", "en_US", strict=True)
-
-    def test_parse_decimal_non_strict_mode(self) -> None:
-        """Non-strict mode returns None on invalid input."""
-        assert parse_decimal("invalid", "en_US", strict=False) is None
+    def test_parse_decimal_invalid_returns_error(self) -> None:
+        """Invalid input returns error in list (v0.8.0 - no exceptions)."""
+        result, errors = parse_decimal("invalid", "en_US")
+        assert len(errors) > 0
+        assert result == Decimal("0")  # Default fallback value
+        assert errors[0].parse_type == "decimal"
 
 
 class TestRoundtrip:
-    """Test format → parse → format roundtrip preservation."""
+    """Test format -> parse -> format roundtrip preservation."""
 
     def test_roundtrip_number_en_us(self) -> None:
         """Number roundtrip for US English."""
@@ -86,7 +130,8 @@ class TestRoundtrip:
 
         original = 1234.5
         formatted = number_format(original, "en-US", use_grouping=True)
-        parsed = parse_number(formatted, "en_US")
+        parsed, errors = parse_number(formatted, "en_US")
+        assert not errors
         assert parsed == original
 
     def test_roundtrip_number_lv_lv(self) -> None:
@@ -95,7 +140,8 @@ class TestRoundtrip:
 
         original = 1234.5
         formatted = number_format(original, "lv-LV", use_grouping=True)
-        parsed = parse_number(formatted, "lv_LV")
+        parsed, errors = parse_number(formatted, "lv_LV")
+        assert not errors
         assert parsed == original
 
     def test_roundtrip_decimal_precision(self) -> None:
@@ -106,5 +152,6 @@ class TestRoundtrip:
         formatted = number_format(
             float(original), "lv-LV", minimum_fraction_digits=2, use_grouping=True
         )
-        parsed = parse_decimal(formatted, "lv_LV")
+        parsed, errors = parse_decimal(formatted, "lv_LV")
+        assert not errors
         assert parsed == original

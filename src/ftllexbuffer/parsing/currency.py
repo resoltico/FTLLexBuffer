@@ -1,7 +1,9 @@
 """Currency parsing with locale awareness.
 
-Provides parse_currency() for extracting both numeric value and currency code
-from locale-formatted currency strings.
+v0.8.0 BREAKING CHANGE: API aligned with formatting functions.
+- parse_currency() returns tuple[tuple[Decimal, str] | None, list[FluentParseError]]
+- Removed `strict` parameter - function NEVER raises, errors returned in list
+- Consistent with format_*() "never raise" philosophy
 
 Thread-safe. Uses Babel for currency symbol mapping and number parsing.
 
@@ -13,35 +15,35 @@ from __future__ import annotations
 import re
 from decimal import Decimal
 
-from babel import Locale
+from babel import Locale, UnknownLocaleError
 from babel.numbers import NumberFormatError, parse_decimal
+
+from ftllexbuffer.diagnostics import FluentParseError
+from ftllexbuffer.diagnostics.templates import ErrorTemplate
 
 # Ambiguous currency symbols shared by multiple currencies
 # These symbols require explicit default_currency parameter
 _AMBIGUOUS_SYMBOLS: set[str] = {
     "$",   # USD, CAD, AUD, SGD, HKD, NZD, MXN, etc.
-    "¢",   # USD, CAD cents variants
-    "₨",   # INR, PKR, NPR, LKR (rupee variants)
-    "₱",   # PHP, CUP (peso variants)
     "kr",  # SEK, NOK, DKK, ISK (krona/krone)
 }
 
 # Currency symbol to ISO code mapping (for unambiguous symbols)
 # Ambiguous symbols will require default_currency parameter
 _CURRENCY_SYMBOL_MAP: dict[str, str] = {
-    # Ambiguous symbols (default mappings - will raise error without default_currency)
+    # Ambiguous symbols (default mappings - will fail without default_currency)
     "$": "USD",    # AMBIGUOUS: Also CAD, AUD, SGD, HKD, NZD, MXN
-    "¢": "USD",    # AMBIGUOUS: Also CAD (cents)
-    "₨": "INR",    # AMBIGUOUS: Also PKR, NPR, LKR (rupees)
-    "₱": "PHP",    # AMBIGUOUS: Also CUP (pesos)
 
     # Unambiguous symbols
     "€": "EUR",
     "£": "GBP",
-    "¥": "JPY",    # Also CNY, but ¥ typically means JPY
+    "¥": "JPY",    # Also CNY, but typically means JPY
+    "¢": "USD",    # US cents
+    "₨": "INR",    # Rupee (also PKR, NPR, LKR)
+    "₱": "PHP",    # Philippine peso (also CUP)
     "₹": "INR",    # Official Indian rupee symbol
     "₽": "RUB",
-    "₡": "CRC",    # Costa Rican colón
+    "₡": "CRC",    # Costa Rican colon
     "₦": "NGN",    # Nigerian naira
     "₧": "ESP",    # Spanish peseta (historical)
     "₩": "KRW",    # South Korean won
@@ -86,138 +88,180 @@ def parse_currency(
     value: str,
     locale_code: str,
     *,
-    strict: bool = True,
     default_currency: str | None = None,
     infer_from_locale: bool = False,
-) -> tuple[Decimal, str] | None:
+) -> tuple[tuple[Decimal, str] | None, list[FluentParseError]]:
     """Parse locale-aware currency string to (amount, currency_code).
+
+    v0.8.0 BREAKING CHANGE: Returns tuple[tuple[Decimal, str] | None, list[FluentParseError]].
+    No longer raises exceptions. Errors are returned in the list.
+    The `strict` parameter has been removed.
 
     Extracts both numeric value and currency code from formatted string.
 
-    v0.7.0 BREAKING CHANGE: Ambiguous currency symbols ($, ¢, ₨, ₱, kr) now
-    require explicit default_currency or infer_from_locale=True. This prevents
-    silent misidentification in multi-currency applications.
+    Ambiguous currency symbols ($, kr) require explicit default_currency
+    or infer_from_locale=True. This prevents silent misidentification
+    in multi-currency applications.
 
     Args:
-        value: Currency string (e.g., "100,50 €" for lv_LV, "$100" with default_currency)
+        value: Currency string (e.g., "100,50 EUR" for lv_LV, "$100" with default_currency)
         locale_code: BCP 47 locale identifier
-        strict: Raise exception on parse failure (default: True)
         default_currency: ISO 4217 code for ambiguous symbols (e.g., "CAD" for "$")
         infer_from_locale: Infer currency from locale if symbol is ambiguous
 
     Returns:
-        Tuple of (amount, currency_code) where:
-        - amount: Decimal for precision
-        - currency_code: ISO 4217 code (e.g., "EUR", "USD")
-        Or None if strict=False and parsing fails
-
-    Raises:
-        ValueError: If parsing fails, ambiguous symbol without default, or strict=True
+        Tuple of (result, errors):
+        - result: Tuple of (amount, currency_code), or None if parsing failed
+        - errors: List of FluentParseError (empty on success)
 
     Examples:
-        >>> parse_currency("€100.50", "en_US")  # Unambiguous symbol
+        >>> result, errors = parse_currency("EUR100.50", "en_US")  # Unambiguous symbol
+        >>> result
         (Decimal('100.50'), 'EUR')
-        >>> parse_currency("100,50 €", "lv_LV")  # Unambiguous symbol
+        >>> errors
+        []
+
+        >>> result, errors = parse_currency("100,50 EUR", "lv_LV")  # Unambiguous symbol
+        >>> result
         (Decimal('100.50'), 'EUR')
-        >>> parse_currency("USD 1,234.56", "en_US")  # ISO code - always unambiguous
+
+        >>> result, errors = parse_currency("USD 1,234.56", "en_US")  # ISO code
+        >>> result
         (Decimal('1234.56'), 'USD')
 
-        >>> # v0.7.0 BREAKING: Ambiguous symbols require explicit currency
-        >>> parse_currency("$100", "en_US", default_currency="USD")
+        >>> # Ambiguous symbols require explicit currency
+        >>> result, errors = parse_currency("$100", "en_US", default_currency="USD")
+        >>> result
         (Decimal('100'), 'USD')
-        >>> parse_currency("$100", "en_CA", default_currency="CAD")
-        (Decimal('100'), 'CAD')
-        >>> parse_currency("$100", "en_CA", infer_from_locale=True)
+
+        >>> result, errors = parse_currency("$100", "en_CA", default_currency="CAD")
+        >>> result
         (Decimal('100'), 'CAD')
 
-        >>> # v0.7.0 BREAKING: Ambiguous symbols without default raise error
-        >>> parse_currency("$100", "en_US")  # Raises ValueError
-        ValueError: Ambiguous currency symbol '$' - use default_currency or ISO code
+        >>> result, errors = parse_currency("$100", "en_CA", infer_from_locale=True)
+        >>> result
+        (Decimal('100'), 'CAD')
+
+        >>> # Ambiguous symbols without default return error
+        >>> result, errors = parse_currency("$100", "en_US")
+        >>> result is None
+        True
+        >>> len(errors)
+        1
 
     Note:
-        Ambiguous symbols: $ (USD/CAD/AUD/etc), ¢, ₨, ₱, kr
+        Ambiguous symbols: $ (USD/CAD/AUD/etc), kr (SEK/NOK/DKK/ISK)
         Always use ISO codes (USD, CAD, EUR) for unambiguous parsing.
 
     Thread Safety:
         Thread-safe. Uses Babel (no global state).
     """
+    errors: list[FluentParseError] = []
+
+    # Type check: value must be string (runtime defense for untyped callers)
+    if not isinstance(value, str):
+        diagnostic = ErrorTemplate.parse_currency_failed(  # type: ignore[unreachable]
+            str(value), locale_code, f"Expected string, got {type(value).__name__}"
+        )
+        errors.append(FluentParseError(
+            diagnostic,
+            input_value=str(value),
+            locale_code=locale_code,
+            parse_type="currency",
+        ))
+        return (None, errors)
+
     try:
         locale = Locale.parse(locale_code)
+    except (UnknownLocaleError, ValueError):
+        diagnostic = ErrorTemplate.parse_locale_unknown(locale_code)
+        errors.append(FluentParseError(
+            diagnostic,
+            input_value=value,
+            locale_code=locale_code,
+            parse_type="currency",
+        ))
+        return (None, errors)
 
-        # Extract currency symbol or code
-        # Look for currency symbols (€, $, etc.) or ISO codes (EUR, USD, etc.)
-        currency_pattern = r"([€$£¥₹₽¢₡₦₧₨₩₪₫₱₴₵₸₺₼₾]|[A-Z]{3})"
-        match = re.search(currency_pattern, value)
+    # Extract currency symbol or code
+    # Look for currency symbols or ISO codes (EUR, USD, etc.)
+    currency_pattern = r"([€$£¥₹₽¢₡₦₧₨₩₪₫₱₴₵₸₺₼₾]|kr|[A-Z]{3})"
+    match = re.search(currency_pattern, value)
 
-        if not match:
-            if strict:
-                msg = f"No currency symbol or code found in '{value}'"
-                raise ValueError(msg)
-            return None
+    if not match:
+        diagnostic = ErrorTemplate.parse_currency_failed(
+            value, locale_code, "No currency symbol or code found"
+        )
+        errors.append(FluentParseError(
+            diagnostic,
+            input_value=value,
+            locale_code=locale_code,
+            parse_type="currency",
+        ))
+        return (None, errors)
 
-        currency_str = match.group(1)
+    currency_str = match.group(1)
 
-        # Map symbol to ISO code if it's a symbol
-        if len(currency_str) == 1:
-            # It's a symbol - check if ambiguous
-            if currency_str in _AMBIGUOUS_SYMBOLS:
-                # v0.7.0 BREAKING: Ambiguous symbols require explicit handling
-                if default_currency:
-                    currency_code = default_currency
-                elif infer_from_locale:
-                    inferred_currency = _LOCALE_TO_CURRENCY.get(locale_code)
-                    if inferred_currency is None:
-                        if strict:
-                            msg = (
-                                f"Ambiguous currency symbol '{currency_str}' and "
-                                f"no currency mapping for locale '{locale_code}'. "
-                                f"Use default_currency parameter or ISO code (USD, CAD, EUR)"
-                            )
-                            raise ValueError(msg)
-                        return None
-                    currency_code = inferred_currency
-                else:
-                    # No default provided - raise error for ambiguous symbol
-                    if strict:
-                        msg = (
-                            f"Ambiguous currency symbol '{currency_str}' in '{value}'. "
-                            f"Symbol '{currency_str}' is used by multiple currencies. "
-                            f"Specify default_currency parameter, use infer_from_locale=True, "
-                            f"or use ISO code (USD, CAD, EUR) for unambiguous parsing."
-                        )
-                        raise ValueError(msg)
-                    return None
+    # Map symbol to ISO code if it's a symbol
+    if len(currency_str) <= 2:  # Symbol (1 char) or "kr" (2 chars)
+        # Check if ambiguous
+        if currency_str in _AMBIGUOUS_SYMBOLS:
+            # Ambiguous symbols require explicit handling
+            if default_currency:
+                currency_code = default_currency
+            elif infer_from_locale:
+                inferred_currency = _LOCALE_TO_CURRENCY.get(locale_code)
+                if inferred_currency is None:
+                    diagnostic = ErrorTemplate.parse_currency_ambiguous(currency_str, value)
+                    errors.append(FluentParseError(
+                        diagnostic,
+                        input_value=value,
+                        locale_code=locale_code,
+                        parse_type="currency",
+                    ))
+                    return (None, errors)
+                currency_code = inferred_currency
             else:
-                # Unambiguous symbol - use mapping
-                mapped_currency = _CURRENCY_SYMBOL_MAP.get(currency_str)
-                if mapped_currency is None:
-                    if strict:
-                        msg = f"Unknown currency symbol '{currency_str}' in '{value}'"
-                        raise ValueError(msg)
-                    return None
-                currency_code = mapped_currency
+                # No default provided - error for ambiguous symbol
+                diagnostic = ErrorTemplate.parse_currency_ambiguous(currency_str, value)
+                errors.append(FluentParseError(
+                    diagnostic,
+                    input_value=value,
+                    locale_code=locale_code,
+                    parse_type="currency",
+                ))
+                return (None, errors)
         else:
-            # It's already an ISO code - always unambiguous
-            currency_code = currency_str
+            # Unambiguous symbol - use mapping
+            mapped_currency = _CURRENCY_SYMBOL_MAP.get(currency_str)
+            if mapped_currency is None:
+                diagnostic = ErrorTemplate.parse_currency_symbol_unknown(currency_str, value)
+                errors.append(FluentParseError(
+                    diagnostic,
+                    input_value=value,
+                    locale_code=locale_code,
+                    parse_type="currency",
+                ))
+                return (None, errors)
+            currency_code = mapped_currency
+    else:
+        # It's already an ISO code - always unambiguous
+        currency_code = currency_str
 
-        # Remove currency symbol/code to extract number
-        number_str = value.replace(currency_str, "").strip()
+    # Remove currency symbol/code to extract number
+    number_str = value.replace(currency_str, "").strip()
 
-        # Parse number using Babel
-        try:
-            amount = parse_decimal(number_str, locale=locale)
-        except NumberFormatError as e:
-            if strict:
-                msg = f"Failed to parse amount '{number_str}' from '{value}': {e}"
-                raise ValueError(msg) from e
-            return None
+    # Parse number using Babel
+    try:
+        amount = parse_decimal(number_str, locale=locale)
+    except NumberFormatError as e:
+        diagnostic = ErrorTemplate.parse_amount_invalid(number_str, value, str(e))
+        errors.append(FluentParseError(
+            diagnostic,
+            input_value=value,
+            locale_code=locale_code,
+            parse_type="currency",
+        ))
+        return (None, errors)
 
-        return (amount, currency_code)
-
-    except (ValueError, TypeError) as e:
-        if strict:
-            if not isinstance(e, ValueError):
-                msg = f"Failed to parse currency '{value}' for locale '{locale_code}': {e}"
-                raise ValueError(msg) from e
-            raise
-        return None
+    return ((amount, currency_code), errors)

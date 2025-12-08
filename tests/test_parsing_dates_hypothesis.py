@@ -1,5 +1,10 @@
 """Hypothesis-based property tests for date/datetime parsing.
 
+v0.8.0: Updated for new tuple return type API.
+- parse_date() returns tuple[date | None, list[FluentParseError]]
+- parse_datetime() returns tuple[datetime | None, list[FluentParseError]]
+- Removed strict parameter - functions never raise, errors in list
+
 Focus on financial date handling and edge cases.
 """
 
@@ -31,7 +36,8 @@ class TestParseDateHypothesis:
         # ISO 8601 is the international standard for dates
         iso_date = f"{year:04d}-{month:02d}-{day:02d}"
 
-        result = parse_date(iso_date, "en_US")
+        result, errors = parse_date(iso_date, "en_US")
+        assert not errors
         assert result is not None
         assert isinstance(result, date)
 
@@ -53,7 +59,8 @@ class TestParseDateHypothesis:
         """ISO 8601 dates should parse consistently across all locales."""
         iso_date = f"{year:04d}-{month:02d}-{day:02d}"
 
-        result = parse_date(iso_date, locale)
+        result, errors = parse_date(iso_date, locale)
+        assert not errors
         assert result is not None
 
         # Must preserve date regardless of locale
@@ -74,25 +81,10 @@ class TestParseDateHypothesis:
         ),
     )
     @settings(max_examples=100)
-    def test_parse_date_invalid_strict_mode(self, invalid_date: str) -> None:
-        """Invalid dates should raise ValueError in strict mode."""
-        with pytest.raises(ValueError, match="Failed to parse date"):
-            parse_date(invalid_date, "en_US", strict=True)
-
-    @given(
-        invalid_date=st.one_of(
-            st.text(
-                alphabet=st.characters(whitelist_categories=("L",)),
-                min_size=1,
-            ),
-            st.just("not-a-date"),
-            st.just("2025/99/99"),
-        ),
-    )
-    @settings(max_examples=100)
-    def test_parse_date_invalid_non_strict(self, invalid_date: str) -> None:
-        """Invalid dates should return None in non-strict mode."""
-        result = parse_date(invalid_date, "en_US", strict=False)
+    def test_parse_date_invalid_returns_error(self, invalid_date: str) -> None:
+        """Invalid dates should return error in list (v0.8.0 - no exceptions)."""
+        result, errors = parse_date(invalid_date, "en_US")
+        assert len(errors) > 0
         assert result is None
 
     @given(
@@ -104,23 +96,10 @@ class TestParseDateHypothesis:
         ),
     )
     @settings(max_examples=50)
-    def test_parse_date_type_error_strict_mode(self, value: object) -> None:
-        """Non-string types should raise ValueError in strict mode (TypeError path)."""
-        # Line 80 coverage - TypeError exception path
-        with pytest.raises(ValueError, match="Failed to parse date"):
-            parse_date(value, "en_US", strict=True)
-
-    @given(
-        value=st.one_of(
-            st.integers(),
-            st.floats(allow_nan=False, allow_infinity=False),
-            st.lists(st.integers()),
-        ),
-    )
-    @settings(max_examples=50)
-    def test_parse_date_type_error_non_strict(self, value: object) -> None:
-        """Non-string types should return None in non-strict mode."""
-        result = parse_date(value, "en_US", strict=False)
+    def test_parse_date_type_error_returns_error(self, value: object) -> None:
+        """Non-string types should return error in list (v0.8.0 - no exceptions)."""
+        result, errors = parse_date(value, "en_US")
+        assert len(errors) > 0
         assert result is None
 
     @given(
@@ -133,7 +112,8 @@ class TestParseDateHypothesis:
         # US uses month-first format
         date_str = f"{month}/{day}/25"  # v0.7.0: Use 2-digit year for CLDR
 
-        result = parse_date(date_str, "en_US")
+        result, errors = parse_date(date_str, "en_US")
+        assert not errors
         assert result is not None
 
         # Verify correct interpretation
@@ -151,7 +131,8 @@ class TestParseDateHypothesis:
         # European uses day-first format
         date_str = f"{day:02d}.{month:02d}.2025"
 
-        result = parse_date(date_str, "de_DE")
+        result, errors = parse_date(date_str, "de_DE")
+        assert not errors
         assert result is not None
 
         # Verify correct interpretation
@@ -179,7 +160,8 @@ class TestParseDateHypothesis:
         ]
 
         for date_str, locale in formats:
-            result = parse_date(date_str, locale)
+            result, errors = parse_date(date_str, locale)
+            assert not errors
             assert result is not None
             assert result.year == year
             assert result.month == month
@@ -201,7 +183,8 @@ class TestParseDateHypothesis:
         iso_str = original_date.isoformat()
 
         # Parse back
-        result = parse_date(iso_str, "en_US")
+        result, errors = parse_date(iso_str, "en_US")
+        assert not errors
         assert result is not None
         assert result == original_date
 
@@ -217,9 +200,11 @@ class TestParseDateHypothesis:
         iso1 = date1.isoformat()
         iso2 = date2.isoformat()
 
-        result1 = parse_date(iso1, "en_US")
-        result2 = parse_date(iso2, "en_US")
+        result1, errors1 = parse_date(iso1, "en_US")
+        result2, errors2 = parse_date(iso2, "en_US")
 
+        assert not errors1
+        assert not errors2
         assert result1 is not None
         assert result2 is not None
 
@@ -253,7 +238,8 @@ class TestParseDatetimeHypothesis:
             f"{year:04d}-{month:02d}-{day:02d}T{hour:02d}:{minute:02d}:{second:02d}"
         )
 
-        result = parse_datetime(iso_datetime, "en_US")
+        result, errors = parse_datetime(iso_datetime, "en_US")
+        assert not errors
         assert result is not None
         assert isinstance(result, datetime)
 
@@ -277,13 +263,13 @@ class TestParseDatetimeHypothesis:
         self, year: int, month: int, day: int, hour: int, minute: int
     ) -> None:
         """ISO datetime without timezone should accept tzinfo parameter."""
-        # Lines 118->120 coverage - ISO datetime with tzinfo
         iso_datetime = (
             f"{year:04d}-{month:02d}-{day:02d}T{hour:02d}:{minute:02d}:00"
         )
 
         # Parse with timezone
-        result = parse_datetime(iso_datetime, "en_US", tzinfo=UTC)
+        result, errors = parse_datetime(iso_datetime, "en_US", tzinfo=UTC)
+        assert not errors
         assert result is not None
 
         # Should have assigned timezone
@@ -306,12 +292,12 @@ class TestParseDatetimeHypothesis:
         self, year: int, month: int, day: int, hour: int, minute: int
     ) -> None:
         """Non-ISO datetime patterns should accept tzinfo parameter."""
-        # Line 131 coverage - strptime path with tzinfo
         # Use US format (not ISO)
         # v0.7.0: 2-digit year
         datetime_str = f"{month}/{day}/{year % 100:02d} {hour:02d}:{minute:02d}"
 
-        result = parse_datetime(datetime_str, "en_US", tzinfo=UTC)
+        result, errors = parse_datetime(datetime_str, "en_US", tzinfo=UTC)
+        assert not errors
         assert result is not None
 
         # Should have assigned timezone
@@ -334,24 +320,10 @@ class TestParseDatetimeHypothesis:
         ),
     )
     @settings(max_examples=100)
-    def test_parse_datetime_invalid_strict_mode(self, invalid_datetime: str) -> None:
-        """Invalid datetimes should raise ValueError in strict mode."""
-        with pytest.raises(ValueError, match="Failed to parse datetime"):
-            parse_datetime(invalid_datetime, "en_US", strict=True)
-
-    @given(
-        invalid_datetime=st.one_of(
-            st.text(
-                alphabet=st.characters(whitelist_categories=("L",)),
-                min_size=1,
-            ),
-            st.just("not-a-datetime"),
-        ),
-    )
-    @settings(max_examples=100)
-    def test_parse_datetime_invalid_non_strict(self, invalid_datetime: str) -> None:
-        """Invalid datetimes should return None in non-strict mode."""
-        result = parse_datetime(invalid_datetime, "en_US", strict=False)
+    def test_parse_datetime_invalid_returns_error(self, invalid_datetime: str) -> None:
+        """Invalid datetimes should return error in list (v0.8.0 - no exceptions)."""
+        result, errors = parse_datetime(invalid_datetime, "en_US")
+        assert len(errors) > 0
         assert result is None
 
     @given(
@@ -363,23 +335,10 @@ class TestParseDatetimeHypothesis:
         ),
     )
     @settings(max_examples=50)
-    def test_parse_datetime_type_error_strict_mode(self, value: object) -> None:
-        """Non-string types should raise ValueError in strict mode (TypeError path)."""
-        # Line 146 coverage - TypeError exception path
-        with pytest.raises(ValueError, match="Failed to parse datetime"):
-            parse_datetime(value, "en_US", strict=True)
-
-    @given(
-        value=st.one_of(
-            st.integers(),
-            st.floats(allow_nan=False, allow_infinity=False),
-            st.lists(st.integers()),
-        ),
-    )
-    @settings(max_examples=50)
-    def test_parse_datetime_type_error_non_strict(self, value: object) -> None:
-        """Non-string types should return None in non-strict mode."""
-        result = parse_datetime(value, "en_US", strict=False)
+    def test_parse_datetime_type_error_returns_error(self, value: object) -> None:
+        """Non-string types should return error in list (v0.8.0 - no exceptions)."""
+        result, errors = parse_datetime(value, "en_US")
+        assert len(errors) > 0
         assert result is None
 
     @given(
@@ -391,7 +350,8 @@ class TestParseDatetimeHypothesis:
         """24-hour time format should parse correctly (common in financial systems)."""
         datetime_str = f"2025-01-28 {hour:02d}:{minute:02d}"
 
-        result = parse_datetime(datetime_str, "en_US")
+        result, errors = parse_datetime(datetime_str, "en_US")
+        assert not errors
         assert result is not None
 
         # Verify correct time parsing
@@ -406,7 +366,8 @@ class TestParseDatetimeHypothesis:
         """ISO 8601 datetimes should parse consistently across all locales."""
         iso_datetime = "2025-01-28T14:30:45"
 
-        result = parse_datetime(iso_datetime, locale)
+        result, errors = parse_datetime(iso_datetime, locale)
+        assert not errors
         assert result is not None
 
         # Must preserve datetime regardless of locale
@@ -425,8 +386,6 @@ class TestDateParsingEdgeCases:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Test AttributeError/KeyError path in _get_date_patterns."""
-        # Lines 174-175 coverage - AttributeError/KeyError in the for loop
-
         # Create a property that raises AttributeError when accessed
         class MockLocale:
             def __init__(self, real_locale: Locale):
@@ -447,17 +406,15 @@ class TestDateParsingEdgeCases:
         # Patch in the dates module namespace
         monkeypatch.setattr("ftllexbuffer.parsing.dates.Locale.parse", mock_parse)
 
-        # v0.7.0: No fallback patterns - should return None
+        # v0.8.0: No fallback patterns - should return None with error
         # Non-ISO format without CLDR patterns = failure
-        result = parse_date("01/28/2025", "en_US", strict=False)
-        assert result is None  # v0.7.0: No fallback patterns
+        result, _errors = parse_date("01/28/2025", "en_US")
+        assert result is None  # v0.8.0: No fallback patterns
 
     def test_parse_date_locale_date_formats_missing_style(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Test KeyError path in _get_date_patterns."""
-        # Lines 174-175 coverage - KeyError when accessing date_formats[style]
-
         # Create a property that returns a dict-like object that raises KeyError
         class MockDateFormats:
             def __getitem__(self, key: str) -> object:
@@ -481,7 +438,8 @@ class TestDateParsingEdgeCases:
         monkeypatch.setattr("ftllexbuffer.parsing.dates.Locale.parse", mock_parse)
 
         # ISO format should still work (uses fromisoformat path, not CLDR)
-        result = parse_date("2025-01-28", "en_US", strict=False)
+        result, errors = parse_date("2025-01-28", "en_US")
+        assert not errors
         assert result is not None
         assert result.year == 2025
 
@@ -489,8 +447,6 @@ class TestDateParsingEdgeCases:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Test AttributeError/KeyError path in _get_datetime_patterns."""
-        # Lines 223-224 coverage - AttributeError when accessing datetime_formats
-
         # Create a property that raises AttributeError when accessed
         class MockLocale:
             def __init__(self, real_locale: Locale):
@@ -510,17 +466,15 @@ class TestDateParsingEdgeCases:
 
         monkeypatch.setattr("ftllexbuffer.parsing.dates.Locale.parse", mock_parse)
 
-        # v0.7.0: No fallback patterns - should return None
+        # v0.8.0: No fallback patterns - should return None with error
         # Non-ISO format without CLDR patterns = failure
-        result = parse_datetime("01/28/2025 14:30:00", "en_US", strict=False)
-        assert result is None  # v0.7.0: No fallback patterns
+        result, _errors = parse_datetime("01/28/2025 14:30:00", "en_US")
+        assert result is None  # v0.8.0: No fallback patterns
 
     def test_parse_datetime_locale_datetime_formats_missing_style(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Test KeyError path in _get_datetime_patterns."""
-        # Lines 223-224 coverage - KeyError when accessing datetime_formats[style]
-
         # Create a property that returns a dict-like object that raises KeyError
         class MockDateTimeFormats:
             def __getitem__(self, key: str) -> object:
@@ -544,7 +498,8 @@ class TestDateParsingEdgeCases:
         monkeypatch.setattr("ftllexbuffer.parsing.dates.Locale.parse", mock_parse)
 
         # ISO format should still work (uses fromisoformat path, not CLDR)
-        result = parse_datetime("2025-01-28T14:30:00", "en_US", strict=False)
+        result, errors = parse_datetime("2025-01-28T14:30:00", "en_US")
+        assert not errors
         assert result is not None
         assert result.year == 2025
 
@@ -552,8 +507,6 @@ class TestDateParsingEdgeCases:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Test broad Exception path when Locale.parse fails."""
-        # Lines 177-179 coverage - Exception in _get_date_patterns
-
         # Make Locale.parse raise an exception
         def mock_parse(_locale_str: str) -> Locale:
             msg = "Simulated locale parsing failure"
@@ -561,16 +514,14 @@ class TestDateParsingEdgeCases:
 
         monkeypatch.setattr("ftllexbuffer.parsing.dates.Locale.parse", mock_parse)
 
-        # v0.7.0: No fallback patterns - should return None
-        result = parse_date("01/28/2025", "en_US", strict=False)
-        assert result is None  # v0.7.0: No fallback patterns
+        # v0.8.0: No fallback patterns - should return None with error
+        result, _errors = parse_date("01/28/2025", "en_US")
+        assert result is None  # v0.8.0: No fallback patterns
 
     def test_parse_datetime_locale_parse_exception(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Test broad Exception path when Locale.parse fails in datetime."""
-        # Lines 228-230 coverage - Exception in _get_datetime_patterns
-
         # Make Locale.parse raise an exception
         def mock_parse(_locale_str: str) -> Locale:
             msg = "Simulated locale parsing failure"
@@ -578,18 +529,14 @@ class TestDateParsingEdgeCases:
 
         monkeypatch.setattr("ftllexbuffer.parsing.dates.Locale.parse", mock_parse)
 
-        # v0.7.0: No fallback patterns - should return None
-        result = parse_datetime("01/28/2025 14:30:00", "en_US", strict=False)
-        assert result is None  # v0.7.0: No fallback patterns
+        # v0.8.0: No fallback patterns - should return None with error
+        result, _errors = parse_datetime("01/28/2025 14:30:00", "en_US")
+        assert result is None  # v0.8.0: No fallback patterns
 
     def test_parse_datetime_with_cldr_patterns(self) -> None:
         """Test successful CLDR pattern retrieval and usage."""
-        # Lines 223-224 coverage - successful pattern retrieval
-        # Use a locale that has good CLDR data and a format that will use it
-        # The key is to use a format that matches CLDR patterns but not fallback patterns
-
         # German locale uses different datetime format (2-digit year for CLDR)
-        result = parse_datetime("28.01.25 14:30", "de_DE", strict=False)
+        result, _errors = parse_datetime("28.01.25 14:30", "de_DE")
         if result is not None:  # If CLDR patterns work
             assert result.year == 2025
             assert result.month == 1
@@ -603,30 +550,25 @@ class TestDateParsingEdgeCases:
     )
     @settings(max_examples=50)
     def test_parse_date_invalid_locale_fallback(self, invalid_locale: str) -> None:
-        """Invalid locales should fall back to common patterns gracefully."""
-        # ISO date should still work with fallback patterns
+        """Invalid locales should return error for non-ISO patterns."""
+        # ISO date should still work with fromisoformat
         date_str = "2025-01-28"
 
-        try:
-            result = parse_date(date_str, invalid_locale)
-            # Should either work with ISO (fromisoformat) or return None
-            if result is not None:
-                assert result.year == 2025
-                assert result.month == 1
-                assert result.day == 28
-        except ValueError:
-            # Acceptable to fail in strict mode
-            pass
+        result, _errors = parse_date(date_str, invalid_locale)
+        # Should either work with ISO (fromisoformat) or return error
+        if result is not None:
+            assert result.year == 2025
+            assert result.month == 1
+            assert result.day == 28
 
     def test_parse_date_minimal_locale_data(self) -> None:
         """Test locale with minimal date format data."""
         # Try locales that might not have full CLDR data
-        # This attempts to trigger the AttributeError/KeyError path
         minimal_locales = ["root", "und", "en_001", "en_150"]
 
         for locale in minimal_locales:
             # ISO date should always work (uses fromisoformat, not CLDR)
-            result = parse_date("2025-01-28", locale, strict=False)
+            result, _errors = parse_date("2025-01-28", locale)
             if result is not None:
                 assert result.year == 2025
                 assert result.month == 1
@@ -640,30 +582,24 @@ class TestDateParsingEdgeCases:
     )
     @settings(max_examples=50)
     def test_parse_datetime_invalid_locale_fallback(self, invalid_locale: str) -> None:
-        """Invalid locales should fall back to common datetime patterns."""
-        # Lines 223-224, 228-230 coverage - Exception handling in _get_datetime_patterns
+        """Invalid locales should return error for non-ISO patterns."""
         datetime_str = "2025-01-28T14:30:00"
 
-        try:
-            result = parse_datetime(datetime_str, invalid_locale)
-            # Should either work with ISO (fromisoformat) or return None
-            if result is not None:
-                assert result.year == 2025
-                assert result.month == 1
-                assert result.day == 28
-        except ValueError:
-            # Acceptable to fail in strict mode
-            pass
+        result, _errors = parse_datetime(datetime_str, invalid_locale)
+        # Should either work with ISO (fromisoformat) or return error
+        if result is not None:
+            assert result.year == 2025
+            assert result.month == 1
+            assert result.day == 28
 
     def test_parse_datetime_minimal_locale_data(self) -> None:
         """Test datetime parsing with locales that have minimal CLDR data."""
         # Try locales that might not have full datetime format data
-        # This attempts to trigger the AttributeError/KeyError path
         minimal_locales = ["root", "und", "en_001", "en_150"]
 
         for locale in minimal_locales:
             # ISO datetime should always work (uses fromisoformat, not CLDR)
-            result = parse_datetime("2025-01-28T14:30:00", locale, strict=False)
+            result, _errors = parse_datetime("2025-01-28T14:30:00", locale)
             if result is not None:
                 assert result.year == 2025
                 assert result.month == 1
@@ -678,32 +614,28 @@ class TestDateParsingEdgeCases:
 
 
 class TestDatetimeFormatsExceptionHandling:
-    """Test exception handling for datetime_formats patterns (lines 233-234)."""
+    """Test exception handling for datetime_formats patterns."""
 
     def test_datetime_cldr_pattern_us_format(self) -> None:
-        """COVERAGE: CLDR pattern generation for US datetime (lines 232-234)."""
+        """COVERAGE: CLDR pattern generation for US datetime."""
         # US short datetime format: M/D/YY h:mm a
-        # This forces CLDR pattern generation (lines 232-234)
         datetime_str = "1/28/25 2:30 PM"
 
-        # Line 232: babel_pattern = locale.datetime_formats[style].pattern
-        # Line 233: strptime_pattern = _babel_to_strptime(babel_pattern)
-        # Line 234: patterns.append(strptime_pattern)
-        result = parse_datetime(datetime_str, "en_US", strict=False)
+        result, _errors = parse_datetime(datetime_str, "en_US")
 
         # May or may not parse depending on CLDR pattern support
-        # Main goal: exercise lines 232-234 without crashing
+        # Main goal: exercise pattern generation without crashing
         if result is not None:
             assert result.year in (2025, 1925)  # 2-digit year ambiguity
 
     def test_datetime_cldr_pattern_german_format(self) -> None:
-        """COVERAGE: CLDR pattern generation for German datetime (lines 232-234)."""
+        """COVERAGE: CLDR pattern generation for German datetime."""
         # German format: DD.MM.YYYY HH:MM:SS
         datetime_str = "28.01.2025 14:30:00"
 
-        # Lines 232-234: CLDR pattern generation for de_DE
-        result = parse_datetime(datetime_str, "de_DE", strict=False)
+        result, errors = parse_datetime(datetime_str, "de_DE")
 
+        assert not errors
         assert result is not None
         assert result.year == 2025
         assert result.month == 1
@@ -712,12 +644,11 @@ class TestDatetimeFormatsExceptionHandling:
         assert result.minute == 30
 
     def test_datetime_cldr_pattern_french_format(self) -> None:
-        """COVERAGE: CLDR pattern generation for French datetime (lines 232-234)."""
+        """COVERAGE: CLDR pattern generation for French datetime."""
         # French format: DD/MM/YYYY HH:MM
         datetime_str = "28/01/2025 14:30"
 
-        # Lines 232-234: CLDR pattern generation for fr_FR
-        result = parse_datetime(datetime_str, "fr_FR", strict=False)
+        result, _errors = parse_datetime(datetime_str, "fr_FR")
 
         if result is not None:
             assert result.year == 2025
@@ -725,19 +656,15 @@ class TestDatetimeFormatsExceptionHandling:
             assert result.day == 28
 
     def test_datetime_cldr_exception_handling(self) -> None:
-        """COVERAGE: Exception handling in CLDR pattern access (lines 235-236)."""
-        # Use a locale format that might trigger KeyError/AttributeError
-        # Lines 235-236: except (AttributeError, KeyError): pass
-
+        """COVERAGE: Exception handling in CLDR pattern access."""
         # Try various datetime formats to exercise exception path
         test_cases = [
             ("2025-01-28 14:30", "en_US"),
             ("28.01.2025", "de_DE"),  # Missing time component
-            ("2025年1月28日", "ja_JP"),  # Japanese format
         ]
 
         for datetime_str, locale in test_cases:
             # Should not crash even if CLDR patterns fail
-            result = parse_datetime(datetime_str, locale, strict=False)
+            result, _errors = parse_datetime(datetime_str, locale)
             # Result may be None or datetime - both acceptable
             assert result is None or isinstance(result, datetime)

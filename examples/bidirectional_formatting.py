@@ -1,10 +1,15 @@
 """Bi-Directional Localization Examples.
 
-FTLLexBuffer v0.5.0+ provides full bi-directional localization:
-- Format: data → display (FluentBundle + CURRENCY/NUMBER functions)
-- Parse: display → data (parsing module)
+FTLLexBuffer v0.8.0+ provides full bi-directional localization:
+- Format: data -> display (FluentBundle + CURRENCY/NUMBER functions)
+- Parse: display -> data (parsing module)
 
 This enables locale-aware forms, invoices, and financial applications.
+
+v0.8.0 API CHANGES:
+- All parse functions return tuple[result, list[FluentParseError]]
+- Functions never raise exceptions - errors in list
+- Removed strict parameter
 
 Implementation:
 - Number/currency parsing: Babel's parse_decimal() (CLDR-compliant)
@@ -30,7 +35,7 @@ def example_invoice_processing() -> None:
         """
 subtotal = Summa: { CURRENCY($amount, currency: "EUR") }
 vat = PVN (21%): { CURRENCY($vat, currency: "EUR") }
-total = Kopā: { CURRENCY($total, currency: "EUR") }
+total = Kopa: { CURRENCY($total, currency: "EUR") }
 """
     )
 
@@ -38,8 +43,11 @@ total = Kopā: { CURRENCY($total, currency: "EUR") }
     user_input = "1 234,56"
     print(f"User input (subtotal): {user_input}")
 
-    subtotal = parse_decimal(user_input, "lv_LV")
-    assert subtotal is not None, "Failed to parse subtotal"
+    # v0.8.0: Now returns tuple[Decimal, list[FluentParseError]]
+    subtotal, errors = parse_decimal(user_input, "lv_LV")
+    if errors:
+        print(f"Failed to parse subtotal: {errors[0]}")
+        return
     print(f"Parsed to Decimal: {subtotal}")
 
     # Calculate VAT (financial precision with Decimal)
@@ -63,10 +71,11 @@ total = Kopā: { CURRENCY($total, currency: "EUR") }
 
     # Roundtrip validation
     print("\nRoundtrip validation:")
-    parsed_back = parse_decimal("1 234,56", "lv_LV")
-    print(f"  Original: {subtotal}")
-    print(f"  Parsed back: {parsed_back}")
-    print(f"  Match: {subtotal == parsed_back}")
+    parsed_back, errors = parse_decimal("1 234,56", "lv_LV")
+    if not errors:
+        print(f"  Original: {subtotal}")
+        print(f"  Parsed back: {parsed_back}")
+        print(f"  Match: {subtotal == parsed_back}")
 
 
 def example_form_validation() -> None:
@@ -93,27 +102,27 @@ def example_form_validation() -> None:
             print("  Error: Amount is required")
             continue
 
-        try:
-            amount = parse_decimal(user_input, "de_DE", strict=True)
-            assert amount is not None, "Parse returned None"
-            print(f"  Parsed: {amount}")
+        # v0.8.0: Now returns tuple - no strict parameter
+        amount, errors = parse_decimal(user_input, "de_DE")
+        if errors:
+            print(f"  Error: {errors[0]}")
+            continue
 
-            # Range validation
-            if amount <= 0:
-                print("  Error: Amount must be positive")
-                continue
+        print(f"  Parsed: {amount}")
 
-            if amount > Decimal("1000000"):
-                print("  Error: Amount exceeds maximum")
-                continue
+        # Range validation
+        if amount <= 0:
+            print("  Error: Amount must be positive")
+            continue
 
-            # Format for display
-            formatted, _ = bundle.format_pattern("price", {"amount": float(amount)})
-            print(f"  Display: {formatted}")
-            print("  Status: Valid")
+        if amount > Decimal("1000000"):
+            print("  Error: Amount exceeds maximum")
+            continue
 
-        except ValueError as e:
-            print(f"  Error: {e}")
+        # Format for display
+        formatted, _ = bundle.format_pattern("price", {"amount": float(amount)})
+        print(f"  Display: {formatted}")
+        print("  Status: Valid")
 
 
 def example_currency_parsing() -> None:
@@ -122,18 +131,23 @@ def example_currency_parsing() -> None:
     print("-" * 60)
 
     test_cases = [
-        ("€123.45", "en_US"),
-        ("1 234,56 €", "lv_LV"),
-        ("1.234,56 €", "de_DE"),
+        ("EUR 123.45", "en_US"),
+        ("1 234,56 EUR", "lv_LV"),
+        ("1.234,56 EUR", "de_DE"),
         ("USD 1,234.56", "en_US"),
-        ("£99.99", "en_GB"),
-        ("¥12,345", "ja_JP"),
+        ("GBP 99.99", "en_GB"),
+        ("JPY 12,345", "ja_JP"),
     ]
 
     for user_input, locale in test_cases:
         print(f"\nInput: {user_input:15} | Locale: {locale}")
 
-        result = parse_currency(user_input, locale)
+        # v0.8.0: Now returns tuple
+        result, errors = parse_currency(user_input, locale)
+        if errors:
+            print(f"  Error: {errors[0]}")
+            continue
+
         if result is not None:
             amount, currency = result
             print(f"  Amount: {amount:12} | Currency: {currency}")
@@ -170,23 +184,33 @@ def example_date_parsing() -> None:
     date_string = "01/02/2025"
 
     # US format (month-first)
-    us_date = parse_date(date_string, "en_US")
+    # v0.8.0: Now returns tuple
+    us_date, errors = parse_date(date_string, "en_US")
     print(f"Input: {date_string}")
-    print(f"  US format (MM/DD/YYYY): {us_date}  # January 2, 2025")
+    if not errors:
+        print(f"  US format (MM/DD/YYYY): {us_date}  # January 2, 2025")
+    else:
+        print(f"  US format error: {errors[0]}")
 
     # European format (day-first)
-    eu_date = parse_date(date_string, "lv_LV")
-    print(f"  EU format (DD/MM/YYYY): {eu_date}  # February 1, 2025")
+    eu_date, errors = parse_date(date_string, "lv_LV")
+    if not errors:
+        print(f"  EU format (DD/MM/YYYY): {eu_date}  # February 1, 2025")
+    else:
+        print(f"  EU format error: {errors[0]}")
 
     # ISO 8601 (unambiguous)
     iso_string = "2025-01-02"
-    iso_date = parse_date(iso_string, "en_US")
+    iso_date, errors = parse_date(iso_string, "en_US")
     print(f"\nISO 8601: {iso_string}")
-    print(f"  Always unambiguous: {iso_date}  # January 2, 2025")
+    if not errors:
+        print(f"  Always unambiguous: {iso_date}  # January 2, 2025")
+    else:
+        print(f"  ISO format error: {errors[0]}")
 
 
 def example_roundtrip_validation() -> None:
-    """Roundtrip validation: format → parse → format."""
+    """Roundtrip validation: format -> parse -> format."""
     print("\n[Example 5] Roundtrip Validation")
     print("-" * 60)
 
@@ -199,11 +223,17 @@ def example_roundtrip_validation() -> None:
         bundle = FluentBundle(locale, use_isolating=False)
         bundle.add_resource('price = { CURRENCY($amount, currency: "EUR") }')
 
-        # Format → Parse → Format
+        # Format -> Parse -> Format
         formatted1, _ = bundle.format_pattern("price", {"amount": float(original_value)})
-        parsed = parse_currency(formatted1, locale)
-        if parsed is not None:
-            parsed_amount, parsed_currency = parsed
+
+        # v0.8.0: Now returns tuple
+        result, errors = parse_currency(formatted1, locale)
+        if errors:
+            print(f"Locale: {locale} - Parse failed: {errors[0]}")
+            continue
+
+        if result is not None:
+            parsed_amount, parsed_currency = result
             formatted2, _ = bundle.format_pattern("price", {"amount": float(parsed_amount)})
 
             print(f"Locale: {locale}")
@@ -229,7 +259,7 @@ def example_csv_import() -> None:
 
     locale = "lv_LV"
     transactions = []
-    errors = []
+    import_errors = []
 
     print(f"Importing transactions (locale: {locale}):\n")
 
@@ -237,33 +267,39 @@ def example_csv_import() -> None:
         print(f"Row {row_num}: {date_str} | {description} | {amount_str}")
 
         # Parse date (ISO format - unambiguous)
-        date = parse_date(date_str, locale, strict=False)
-        if date is None:
+        # v0.8.0: Now returns tuple - no strict parameter
+        date_result, errors = parse_date(date_str, locale)
+        if errors:
             error_msg = f"Row {row_num}: Invalid date '{date_str}'"
-            errors.append(error_msg)
+            import_errors.append(error_msg)
             print(f"  Error: {error_msg}")
             continue
 
         # Parse amount (Latvian format)
-        amount = parse_decimal(amount_str, locale, strict=False)
-        if amount is None:
+        # v0.8.0: Now returns tuple - no strict parameter
+        amount, errors = parse_decimal(amount_str, locale)
+        if errors:
             error_msg = f"Row {row_num}: Invalid amount '{amount_str}'"
-            errors.append(error_msg)
+            import_errors.append(error_msg)
             print(f"  Error: {error_msg}")
             continue
 
-        transactions.append({"date": date, "description": description, "amount": amount})
-        print(f"  Imported: {date} | {description} | {amount}")
+        transactions.append({
+            "date": date_result,
+            "description": description,
+            "amount": amount,
+        })
+        print(f"  Imported: {date_result} | {description} | {amount}")
 
     print("\nImport summary:")
     print(f"  Successful: {len(transactions)}")
-    print(f"  Errors: {len(errors)}")
+    print(f"  Errors: {len(import_errors)}")
 
 
 if __name__ == "__main__":
     print("=" * 60)
     print("Bi-Directional Localization Examples")
-    print("FTLLexBuffer v0.5.0+")
+    print("FTLLexBuffer v0.8.0+")
     print("=" * 60)
 
     example_invoice_processing()

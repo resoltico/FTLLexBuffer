@@ -1,5 +1,10 @@
 """Hypothesis-based property tests for number parsing.
 
+v0.8.0: Updated for new tuple return type API.
+- parse_number() returns tuple[float, list[FluentParseError]]
+- parse_decimal() returns tuple[Decimal, list[FluentParseError]]
+- Removed strict parameter - functions never raise, errors in list
+
 Focus on precision, locale independence, and roundtrip properties.
 """
 
@@ -7,7 +12,6 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
@@ -28,13 +32,12 @@ class TestParseNumberHypothesis:
     @settings(max_examples=200)
     def test_parse_number_always_returns_float(self, value: float) -> None:
         """parse_number always returns float type."""
-        # Format then parse
         from ftllexbuffer.runtime.functions import number_format
 
         formatted = number_format(value, "en_US")
-        result = parse_number(formatted, "en_US")
+        result, errors = parse_number(formatted, "en_US")
 
-        assert result is not None
+        assert not errors
         assert isinstance(result, float)
 
     @given(
@@ -50,14 +53,13 @@ class TestParseNumberHypothesis:
     def test_parse_number_roundtrip_preserves_value(
         self, value: float, locale: str
     ) -> None:
-        """Roundtrip (format → parse → format) preserves numeric value within float precision."""
+        """Roundtrip (format -> parse -> format) preserves numeric value within float precision."""
         from ftllexbuffer.runtime.functions import number_format
 
-        # Format → parse → compare
         formatted = number_format(value, locale)
-        parsed = parse_number(formatted, locale)
+        parsed, errors = parse_number(formatted, locale)
 
-        assert parsed is not None
+        assert not errors
         # Float precision: allow small rounding error
         assert abs(parsed - value) < 0.01
 
@@ -75,25 +77,11 @@ class TestParseNumberHypothesis:
         ),
     )
     @settings(max_examples=100)
-    def test_parse_number_invalid_strict_mode(self, invalid_input: str) -> None:
-        """Invalid numbers raise ValueError in strict mode."""
-        # Note: Babel accepts NaN/Infinity/Inf
-        with pytest.raises(ValueError, match="Failed to parse number"):
-            parse_number(invalid_input, "en_US", strict=True)
-
-    @given(
-        invalid_input=st.one_of(
-            st.text(alphabet=st.characters(whitelist_categories=("L",)), min_size=1).filter(
-                lambda x: x.upper() not in ("NAN", "INFINITY", "INF")
-            ),
-            st.just("invalid"),
-        ),
-    )
-    @settings(max_examples=100)
-    def test_parse_number_invalid_non_strict(self, invalid_input: str) -> None:
-        """Invalid numbers return None in non-strict mode."""
-        result = parse_number(invalid_input, "en_US", strict=False)
-        assert result is None
+    def test_parse_number_invalid_returns_error(self, invalid_input: str) -> None:
+        """Invalid numbers return error in list (v0.8.0 - no exceptions)."""
+        result, errors = parse_number(invalid_input, "en_US")
+        assert len(errors) > 0
+        assert result == 0.0  # Default fallback value
 
     @given(
         value=st.one_of(
@@ -103,22 +91,11 @@ class TestParseNumberHypothesis:
         ),
     )
     @settings(max_examples=50)
-    def test_parse_number_type_error_strict(self, value: object) -> None:
-        """Non-string types raise ValueError in strict mode."""
-        with pytest.raises(ValueError, match="Failed to parse number"):
-            parse_number(value, "en_US", strict=True)
-
-    @given(
-        value=st.one_of(
-            st.integers(),
-            st.lists(st.integers()),
-        ),
-    )
-    @settings(max_examples=50)
-    def test_parse_number_type_error_non_strict(self, value: object) -> None:
-        """Non-string types return None in non-strict mode."""
-        result = parse_number(value, "en_US", strict=False)
-        assert result is None
+    def test_parse_number_type_error_returns_error(self, value: object) -> None:
+        """Non-string types return error in list (v0.8.0 - no exceptions)."""
+        result, errors = parse_number(value, "en_US")
+        assert len(errors) > 0
+        assert result == 0.0
 
 
 class TestParseDecimalHypothesis:
@@ -137,9 +114,9 @@ class TestParseDecimalHypothesis:
         from ftllexbuffer.runtime.functions import number_format
 
         formatted = number_format(float(value), "en_US")
-        result = parse_decimal(formatted, "en_US")
+        result, errors = parse_decimal(formatted, "en_US")
 
-        assert result is not None
+        assert not errors
         assert isinstance(result, Decimal)
 
     @given(
@@ -157,11 +134,10 @@ class TestParseDecimalHypothesis:
         """Roundtrip preserves exact Decimal precision (critical for financial)."""
         from ftllexbuffer.runtime.functions import number_format
 
-        # Format → parse → compare
         formatted = number_format(float(value), locale, minimum_fraction_digits=2)
-        parsed = parse_decimal(formatted, locale)
+        parsed, errors = parse_decimal(formatted, locale)
 
-        assert parsed is not None
+        assert not errors
         # Decimal must preserve exact value
         assert parsed == value
 
@@ -178,9 +154,9 @@ class TestParseDecimalHypothesis:
         from ftllexbuffer.runtime.functions import number_format
 
         formatted = number_format(float(value), "en_US", minimum_fraction_digits=2)
-        parsed = parse_decimal(formatted, "en_US")
+        parsed, errors = parse_decimal(formatted, "en_US")
 
-        assert parsed is not None
+        assert not errors
         assert parsed == value
         assert parsed < 0
 
@@ -197,9 +173,9 @@ class TestParseDecimalHypothesis:
         from ftllexbuffer.runtime.functions import number_format
 
         formatted = number_format(float(value), "en_US", minimum_fraction_digits=3)
-        parsed = parse_decimal(formatted, "en_US")
+        parsed, errors = parse_decimal(formatted, "en_US")
 
-        assert parsed is not None
+        assert not errors
         assert parsed == value
         assert parsed < Decimal("1.00")
 
@@ -216,24 +192,11 @@ class TestParseDecimalHypothesis:
         ),
     )
     @settings(max_examples=100)
-    def test_parse_decimal_invalid_strict_mode(self, invalid_input: str) -> None:
-        """Invalid decimals raise ValueError in strict mode."""
-        with pytest.raises(ValueError, match="Failed to parse decimal"):
-            parse_decimal(invalid_input, "en_US", strict=True)
-
-    @given(
-        invalid_input=st.one_of(
-            st.text(alphabet=st.characters(whitelist_categories=("L",)), min_size=1).filter(
-                lambda x: x.upper() not in ("NAN", "INFINITY", "INF")
-            ),
-            st.just("invalid"),
-        ),
-    )
-    @settings(max_examples=100)
-    def test_parse_decimal_invalid_non_strict(self, invalid_input: str) -> None:
-        """Invalid decimals return None in non-strict mode."""
-        result = parse_decimal(invalid_input, "en_US", strict=False)
-        assert result is None
+    def test_parse_decimal_invalid_returns_error(self, invalid_input: str) -> None:
+        """Invalid decimals return error in list (v0.8.0 - no exceptions)."""
+        result, errors = parse_decimal(invalid_input, "en_US")
+        assert len(errors) > 0
+        assert result == Decimal("0")  # Default fallback value
 
     @given(
         locale=st.sampled_from(["en_US", "de_DE", "fr_FR", "lv_LV", "pl_PL", "ja_JP"]),
@@ -253,9 +216,9 @@ class TestParseDecimalHypothesis:
         formatted = number_format(
             float(value), locale, use_grouping=True, minimum_fraction_digits=2
         )
-        parsed = parse_decimal(formatted, locale)
+        parsed, errors = parse_decimal(formatted, locale)
 
-        assert parsed is not None
+        assert not errors
         # Should handle grouping separators correctly
         assert parsed == value
 
@@ -275,16 +238,18 @@ class TestParsingMetamorphicProperties:
         """Parsing result independent of intermediate formatting steps."""
         from ftllexbuffer.runtime.functions import number_format
 
-        # Path 1: Direct format → parse
+        # Path 1: Direct format -> parse
         formatted1 = number_format(float(value), "en_US", minimum_fraction_digits=2)
-        parsed1 = parse_decimal(formatted1, "en_US")
+        parsed1, errors1 = parse_decimal(formatted1, "en_US")
 
-        # Path 2: Format with grouping → parse
+        # Path 2: Format with grouping -> parse
         formatted2 = number_format(
             float(value), "en_US", use_grouping=True, minimum_fraction_digits=2
         )
-        parsed2 = parse_decimal(formatted2, "en_US")
+        parsed2, errors2 = parse_decimal(formatted2, "en_US")
 
+        assert not errors1
+        assert not errors2
         # Both paths should yield same numeric value
         assert parsed1 == parsed2 == value
 
@@ -303,10 +268,13 @@ class TestParsingMetamorphicProperties:
         formatted = number_format(float(value), "en_US", minimum_fraction_digits=2)
 
         # Parse multiple times
-        parsed1 = parse_decimal(formatted, "en_US")
-        parsed2 = parse_decimal(formatted, "en_US")
-        parsed3 = parse_decimal(formatted, "en_US")
+        parsed1, errors1 = parse_decimal(formatted, "en_US")
+        parsed2, errors2 = parse_decimal(formatted, "en_US")
+        parsed3, errors3 = parse_decimal(formatted, "en_US")
 
+        assert not errors1
+        assert not errors2
+        assert not errors3
         # All results identical
         assert parsed1 == parsed2 == parsed3 == value
 
@@ -324,13 +292,15 @@ class TestParsingMetamorphicProperties:
 
         # First cycle
         formatted1 = number_format(float(value), "en_US", minimum_fraction_digits=2)
-        parsed1 = parse_decimal(formatted1, "en_US")
+        parsed1, errors1 = parse_decimal(formatted1, "en_US")
+
+        assert not errors1
 
         # Second cycle
-        assert parsed1 is not None
         formatted2 = number_format(float(parsed1), "en_US", minimum_fraction_digits=2)
-        parsed2 = parse_decimal(formatted2, "en_US")
+        parsed2, errors2 = parse_decimal(formatted2, "en_US")
 
+        assert not errors2
         # Should stabilize
         assert parsed1 == parsed2
 
@@ -343,8 +313,8 @@ class TestParsingMetamorphicProperties:
     @settings(max_examples=10)
     def test_parse_zero_handling(self, value: Decimal) -> None:  # noqa: ARG002
         """Zero values parse correctly."""
-        result = parse_decimal("0.00", "en_US")
-        assert result is not None
+        result, errors = parse_decimal("0.00", "en_US")
+        assert not errors
         assert result == Decimal("0.00")
 
     @given(
@@ -360,9 +330,9 @@ class TestParsingMetamorphicProperties:
         from ftllexbuffer.runtime.functions import number_format
 
         formatted = number_format(float(value), "en_US", minimum_fraction_digits=2)
-        parsed = parse_decimal(formatted, "en_US")
+        parsed, errors = parse_decimal(formatted, "en_US")
 
-        assert parsed is not None
+        assert not errors
         # Large numbers must not lose precision
         assert abs(parsed - value) < Decimal("0.01")
 
@@ -397,7 +367,7 @@ class TestParsingMetamorphicProperties:
             formatted = number_format(
                 float(value), locale, use_grouping=True, minimum_fraction_digits=2
             )
-            parsed = parse_decimal(formatted, locale)
+            parsed, errors = parse_decimal(formatted, locale)
 
-            assert parsed is not None
+            assert not errors
             assert parsed == value

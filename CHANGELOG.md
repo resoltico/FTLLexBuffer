@@ -5,6 +5,169 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2025-12-08
+
+### Breaking Changes
+
+- **All parsing functions now return tuple instead of raising exceptions**
+  - `parse_number()` returns `tuple[float, list[FluentParseError]]`
+  - `parse_decimal()` returns `tuple[Decimal, list[FluentParseError]]`
+  - `parse_date()` returns `tuple[date | None, list[FluentParseError]]`
+  - `parse_datetime()` returns `tuple[datetime | None, list[FluentParseError]]`
+  - `parse_currency()` returns `tuple[tuple[Decimal, str] | None, list[FluentParseError]]`
+  - **Rationale**: Consistent with "never raise" philosophy - errors are data, not control flow
+  - **Impact**: All code using parse_* functions must be updated to handle tuple returns
+
+- **Removed `strict` parameter from all parsing functions**
+  - Functions NEVER raise exceptions - errors are always returned in the list
+  - No more strict/non-strict distinction
+  - **Migration**: Remove `strict=True/False` arguments, check error list instead
+
+- **Type guards updated for new API**
+  - `is_valid_decimal(value: Decimal)` - validates finite Decimal (not NaN/Infinity)
+  - `is_valid_number(value: float)` - validates finite float (not NaN/Infinity)
+  - `is_valid_currency(value: tuple[Decimal, str] | None)` - validates non-None with finite amount
+  - `is_valid_date(value: date | None)` - validates non-None date
+  - `is_valid_datetime(value: datetime | None)` - validates non-None datetime
+  - Note: `is_valid_decimal` and `is_valid_number` no longer accept None (parse functions return default values on error, not None)
+
+### Added
+
+- **`has_parse_errors()` helper function**
+  - Check if parsing returned any errors: `has_parse_errors(errors) -> bool`
+  - Returns True if error list is non-empty
+  - **Use case**: Clean pattern for checking parse success before using result
+  - **Example**:
+    ```python
+    from ftllexbuffer.parsing import parse_decimal
+    from ftllexbuffer.parsing.guards import has_parse_errors, is_valid_decimal
+
+    result, errors = parse_decimal("1,234.56", "en_US")
+    if not has_parse_errors(errors) and is_valid_decimal(result):
+        # Safe to use result
+        total = result * Decimal("1.21")
+    ```
+
+- **Runtime type checking for non-string inputs**
+  - Parse functions now gracefully handle non-string inputs (return error instead of TypeError)
+  - **Example**: `parse_date(123, "en_US")` returns `(None, [FluentParseError(...)])`
+
+- **Parsing diagnostic codes (4000-4999)**
+  - `PARSE_NUMBER_FAILED` (4001)
+  - `PARSE_DECIMAL_FAILED` (4002)
+  - `PARSE_DATE_FAILED` (4003)
+  - `PARSE_DATETIME_FAILED` (4004)
+  - `PARSE_CURRENCY_FAILED` (4005)
+  - `PARSE_LOCALE_UNKNOWN` (4006)
+  - `PARSE_CURRENCY_AMBIGUOUS` (4007)
+  - `PARSE_CURRENCY_SYMBOL_UNKNOWN` (4008)
+  - `PARSE_AMOUNT_INVALID` (4009)
+
+- **Cache unhashable argument handling**
+  - `FormatCache` now gracefully handles unhashable args (lists, dicts)
+  - Returns cache miss instead of crashing with `TypeError`
+  - New `unhashable_skips` property for monitoring
+
+### Fixed
+
+- **Date parsing regex boundary issue**
+  - Token-based Babel-to-strptime converter replaces fragile regex approach
+  - Correctly handles patterns like `d.MM.yyyy` where `d` is adjacent to punctuation
+  - `_tokenize_babel_pattern()` properly extracts pattern tokens
+
+### Changed
+
+- **Error handling philosophy**: Parse functions now follow the same "never raise" pattern as format functions
+- **Default return values on error**:
+  - `parse_number()` returns `0.0` on error
+  - `parse_decimal()` returns `Decimal("0")` on error
+  - `parse_date()` returns `None` on error
+  - `parse_datetime()` returns `None` on error
+  - `parse_currency()` returns `None` on error
+
+### Migration Notes
+
+#### For Users
+
+**BREAKING CHANGES SUMMARY**:
+
+1. **Tuple return type**: All parse functions return `(result, errors)` tuple
+2. **No more exceptions**: Check `errors` list instead of catching `ValueError`
+3. **No `strict` parameter**: Remove `strict=True/False` arguments
+
+**Migration Steps**:
+
+```python
+# OLD (v0.7.0): Exception-based error handling
+try:
+    amount = parse_decimal(user_input, locale)
+except ValueError as e:
+    show_error(f"Invalid: {e}")
+    return
+
+# NEW (v0.8.0): Tuple-based error handling
+result, errors = parse_decimal(user_input, locale)
+if errors:
+    show_error(f"Invalid: {errors[0]}")
+    return
+amount = result
+
+# OLD (v0.7.0): Non-strict mode
+amount = parse_decimal(user_input, locale, strict=False)
+if amount is None:
+    amount = Decimal("0")
+
+# NEW (v0.8.0): Check errors list
+result, errors = parse_decimal(user_input, locale)
+if errors:
+    result = Decimal("0")
+amount = result
+
+# NEW (v0.8.0): Using type guards
+from ftllexbuffer.parsing.guards import has_parse_errors, is_valid_decimal
+
+result, errors = parse_decimal(user_input, locale)
+if not has_parse_errors(errors) and is_valid_decimal(result):
+    # mypy knows result is finite Decimal
+    process_payment(result)
+```
+
+#### For Library Developers
+
+**Updated Public API**:
+```python
+from ftllexbuffer.parsing import (
+    parse_number,    # -> tuple[float, list[FluentParseError]]
+    parse_decimal,   # -> tuple[Decimal, list[FluentParseError]]
+    parse_date,      # -> tuple[date | None, list[FluentParseError]]
+    parse_datetime,  # -> tuple[datetime | None, list[FluentParseError]]
+    parse_currency,  # -> tuple[tuple[Decimal, str] | None, list[FluentParseError]]
+)
+
+from ftllexbuffer.parsing.guards import (
+    has_parse_errors,    # NEW: Check if errors list is non-empty
+    is_valid_decimal,    # Updated: No longer accepts None
+    is_valid_number,     # Updated: No longer accepts None
+    is_valid_currency,   # Validates non-None tuple with finite amount
+    is_valid_date,       # Validates non-None date
+    is_valid_datetime,   # Validates non-None datetime
+)
+```
+
+**Error handling pattern**:
+```python
+result, errors = parse_decimal(value, locale)
+if has_parse_errors(errors):
+    # Handle errors - result is default value (Decimal("0"))
+    for error in errors:
+        log.warning(f"Parse error: {error}")
+elif is_valid_decimal(result):
+    # Safe to use result - mypy knows it's finite Decimal
+    process(result)
+```
+
+---
+
 ## [0.7.0] - 2025-12-07
 
 ### Breaking Changes
@@ -687,6 +850,7 @@ if "CURRENCY" in bundle._function_registry:
 
 Initial release.
 
+[0.8.0]: https://github.com/resoltico/ftllexbuffer/releases/tag/v0.8.0
 [0.7.0]: https://github.com/resoltico/ftllexbuffer/releases/tag/v0.7.0
 [0.6.0]: https://github.com/resoltico/ftllexbuffer/releases/tag/v0.6.0
 [0.5.1]: https://github.com/resoltico/ftllexbuffer/releases/tag/v0.5.1

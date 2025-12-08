@@ -12,6 +12,7 @@ from .codes import Diagnostic, DiagnosticCode, SourceSpan
 from .errors import (
     FluentCyclicReferenceError,
     FluentError,
+    FluentParseError,
     FluentReferenceError,
     FluentResolutionError,
     FluentSyntaxError,
@@ -24,6 +25,7 @@ __all__ = [
     "ErrorTemplate",
     "FluentCyclicReferenceError",
     "FluentError",
+    "FluentParseError",
     "FluentReferenceError",
     "FluentResolutionError",
     "FluentSyntaxError",

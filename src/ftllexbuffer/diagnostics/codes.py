@@ -44,6 +44,17 @@ class DiagnosticCode(Enum):
     INVALID_CHARACTER = 3002
     EXPECTED_TOKEN = 3003
 
+    # Parsing errors (4000-4999) - Bi-directional localization
+    PARSE_NUMBER_FAILED = 4001
+    PARSE_DECIMAL_FAILED = 4002
+    PARSE_DATE_FAILED = 4003
+    PARSE_DATETIME_FAILED = 4004
+    PARSE_CURRENCY_FAILED = 4005
+    PARSE_LOCALE_UNKNOWN = 4006
+    PARSE_CURRENCY_AMBIGUOUS = 4007
+    PARSE_CURRENCY_SYMBOL_UNKNOWN = 4008
+    PARSE_AMOUNT_INVALID = 4009
+
 
 @dataclass(frozen=True, slots=True)
 class SourceSpan:

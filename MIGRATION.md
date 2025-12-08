@@ -760,8 +760,8 @@ from ftllexbuffer import (
 
 ---
 
-**Migration Guide Last Updated**: December 7, 2025
-**FTLLexBuffer Version**: 0.7.0
+**Migration Guide Last Updated**: December 8, 2025
+**FTLLexBuffer Version**: 0.8.0
 **fluent.runtime Version Referenced**: 0.4.0
 
 **Feedback**: If you encounter migration issues not covered here, please open an issue!

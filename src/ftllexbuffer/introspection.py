@@ -175,6 +175,13 @@ class IntrospectionVisitor(ASTVisitor):
 
     Uses Python 3.13's pattern matching for elegant AST traversal and TypeIs
     for type-safe runtime narrowing.
+
+    Note on Traversal (v0.8.0):
+        This visitor intentionally overrides pattern traversal instead of calling
+        super().visit_Pattern(). The FTL specification's Pattern structure is stable
+        (elements only), and our introspection logic requires specific handling
+        of each element type. Calling super() would invoke generic_visit() which
+        is a no-op for this visitor pattern.
     """
 
     def __init__(self) -> None:
@@ -186,7 +193,12 @@ class IntrospectionVisitor(ASTVisitor):
         self._context: str = "pattern"
 
     def visit_Pattern(self, node: Pattern) -> None:
-        """Visit pattern and extract variables from all elements."""
+        """Visit pattern and extract variables from all elements.
+
+        Note: Intentionally does NOT call super().visit_Pattern(node) as this
+        visitor implements custom traversal logic. The Pattern node structure
+        is stable per FTL specification (only has 'elements' children).
+        """
         for element in node.elements:
             self._visit_pattern_element(element)
 

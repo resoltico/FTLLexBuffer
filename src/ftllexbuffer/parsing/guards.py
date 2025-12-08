@@ -1,5 +1,10 @@
 """Type guard functions for parsing result type narrowing.
 
+v0.8.0 BREAKING CHANGE: Type guards updated for new tuple return types.
+- All parse_* functions now return tuple[result, list[FluentParseError]]
+- Type guards now check the result component of the tuple
+- has_parse_errors() added to check error presence
+
 Provides TypeIs-based type guards for mypy to narrow parsing result types safely.
 Particularly useful with mypy --strict for financial applications.
 
@@ -7,11 +12,11 @@ Python 3.13+ with TypeIs support (PEP 742).
 
 Example:
     >>> from ftllexbuffer.parsing import parse_decimal
-    >>> from ftllexbuffer.parsing.guards import is_valid_decimal
-    >>> parsed = parse_decimal("1,234.56", "en_US")
-    >>> if is_valid_decimal(parsed):
-    ...     # mypy knows parsed is Decimal (not Decimal | None)
-    ...     amount = parsed.quantize(Decimal("0.01"))
+    >>> from ftllexbuffer.parsing.guards import is_valid_decimal, has_parse_errors
+    >>> result, errors = parse_decimal("1,234.56", "en_US")
+    >>> if not has_parse_errors(errors) and is_valid_decimal(result):
+    ...     # mypy knows result is Decimal (not Decimal)
+    ...     amount = result.quantize(Decimal("0.01"))
 """
 
 from __future__ import annotations
@@ -21,7 +26,10 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import TypeIs
 
+from ftllexbuffer.diagnostics import FluentParseError
+
 __all__ = [
+    "has_parse_errors",
     "is_valid_currency",
     "is_valid_date",
     "is_valid_datetime",
@@ -30,48 +38,71 @@ __all__ = [
 ]
 
 
-def is_valid_decimal(value: Decimal | None) -> TypeIs[Decimal]:
-    """Type guard: Check if parsed decimal is valid (not None, not NaN/Infinity).
+def has_parse_errors(errors: list[FluentParseError]) -> bool:
+    """Check if parsing returned any errors.
 
-    Validates that parse_decimal() result is safe for financial calculations.
-    Rejects None, NaN, and Infinity values.
+    v0.8.0: New function for checking parse result errors.
 
     Args:
-        value: Result from parse_decimal()
+        errors: Error list from parse_* function result tuple
+
+    Returns:
+        True if errors list is non-empty, False otherwise
+
+    Example:
+        >>> result, errors = parse_number("invalid", "en_US")
+        >>> if has_parse_errors(errors):
+        ...     print(f"Parse failed: {errors[0]}")
+    """
+    return len(errors) > 0
+
+
+def is_valid_decimal(value: Decimal) -> TypeIs[Decimal]:
+    """Type guard: Check if parsed decimal is valid (not NaN/Infinity).
+
+    v0.8.0: Updated for new API - validates Decimal from tuple result.
+    Check has_parse_errors() first to ensure parsing succeeded.
+
+    Validates that parse_decimal() result is safe for financial calculations.
+    Rejects NaN and Infinity values.
+
+    Args:
+        value: Decimal from parse_decimal() result tuple
 
     Returns:
         True if value is a finite Decimal, False otherwise
 
     Example:
-        >>> from ftllexbuffer.parsing import parse_decimal
-        >>> parsed = parse_decimal("1,234.56", "en_US")
-        >>> if is_valid_decimal(parsed):
-        ...     # Type-safe: mypy knows parsed is Decimal
-        ...     total = parsed * Decimal("1.21")  # Add VAT
+        >>> result, errors = parse_decimal("1,234.56", "en_US")
+        >>> if not has_parse_errors(errors) and is_valid_decimal(result):
+        ...     # Type-safe: mypy knows result is finite Decimal
+        ...     total = result * Decimal("1.21")  # Add VAT
     """
-    return value is not None and value.is_finite()
+    return value.is_finite()
 
 
-def is_valid_number(value: float | None) -> TypeIs[float]:
-    """Type guard: Check if parsed number is valid (not None, not NaN/Infinity).
+def is_valid_number(value: float) -> TypeIs[float]:
+    """Type guard: Check if parsed number is valid (not NaN/Infinity).
+
+    v0.8.0: Updated for new API - validates float from tuple result.
+    Check has_parse_errors() first to ensure parsing succeeded.
 
     Validates that parse_number() result is safe for calculations.
-    Rejects None, NaN, and Infinity values.
+    Rejects NaN and Infinity values.
 
     Args:
-        value: Result from parse_number()
+        value: Float from parse_number() result tuple
 
     Returns:
         True if value is a finite float, False otherwise
 
     Example:
-        >>> from ftllexbuffer.parsing import parse_number
-        >>> parsed = parse_number("1,234.56", "en_US")
-        >>> if is_valid_number(parsed):
-        ...     # Type-safe: mypy knows parsed is float
-        ...     total = parsed * 1.21
+        >>> result, errors = parse_number("1,234.56", "en_US")
+        >>> if not has_parse_errors(errors) and is_valid_number(result):
+        ...     # Type-safe: mypy knows result is finite float
+        ...     total = result * 1.21
     """
-    return value is not None and math.isfinite(value)
+    return math.isfinite(value)
 
 
 def is_valid_currency(
@@ -79,21 +110,23 @@ def is_valid_currency(
 ) -> TypeIs[tuple[Decimal, str]]:
     """Type guard: Check if parsed currency is valid (not None, finite amount).
 
+    v0.8.0: Updated for new API - validates currency tuple from result.
+    Check has_parse_errors() first to ensure parsing succeeded.
+
     Validates that parse_currency() result is safe for financial calculations.
     Rejects None and verifies amount is finite.
 
     Args:
-        value: Result from parse_currency()
+        value: Currency tuple from parse_currency() result
 
     Returns:
         True if value is (Decimal, str) with finite amount, False otherwise
 
     Example:
-        >>> from ftllexbuffer.parsing import parse_currency
-        >>> parsed = parse_currency("€1,234.56", "en_US")
-        >>> if is_valid_currency(parsed):
-        ...     # Type-safe: mypy knows parsed is tuple[Decimal, str]
-        ...     amount, currency = parsed
+        >>> result, errors = parse_currency("EUR1,234.56", "en_US")
+        >>> if not has_parse_errors(errors) and is_valid_currency(result):
+        ...     # Type-safe: mypy knows result is tuple[Decimal, str]
+        ...     amount, currency = result
         ...     total = amount * Decimal("1.21")
     """
     return value is not None and value[0].is_finite()
@@ -102,20 +135,20 @@ def is_valid_currency(
 def is_valid_date(value: date | None) -> TypeIs[date]:
     """Type guard: Check if parsed date is valid (not None).
 
-    Validates that parse_date() result is safe for use.
+    v0.8.0: Updated for new API - validates date from tuple result.
+    Check has_parse_errors() first to ensure parsing succeeded.
 
     Args:
-        value: Result from parse_date()
+        value: Date from parse_date() result tuple
 
     Returns:
         True if value is a date object, False otherwise
 
     Example:
-        >>> from ftllexbuffer.parsing import parse_date
-        >>> parsed = parse_date("2025-01-28", "en_US")
-        >>> if is_valid_date(parsed):
-        ...     # Type-safe: mypy knows parsed is date
-        ...     year = parsed.year
+        >>> result, errors = parse_date("2025-01-28", "en_US")
+        >>> if not has_parse_errors(errors) and is_valid_date(result):
+        ...     # Type-safe: mypy knows result is date
+        ...     year = result.year
     """
     return value is not None
 
@@ -123,19 +156,19 @@ def is_valid_date(value: date | None) -> TypeIs[date]:
 def is_valid_datetime(value: datetime | None) -> TypeIs[datetime]:
     """Type guard: Check if parsed datetime is valid (not None).
 
-    Validates that parse_datetime() result is safe for use.
+    v0.8.0: Updated for new API - validates datetime from tuple result.
+    Check has_parse_errors() first to ensure parsing succeeded.
 
     Args:
-        value: Result from parse_datetime()
+        value: Datetime from parse_datetime() result tuple
 
     Returns:
         True if value is a datetime object, False otherwise
 
     Example:
-        >>> from ftllexbuffer.parsing import parse_datetime
-        >>> parsed = parse_datetime("2025-01-28 14:30", "en_US")
-        >>> if is_valid_datetime(parsed):
-        ...     # Type-safe: mypy knows parsed is datetime
-        ...     timestamp = parsed.timestamp()
+        >>> result, errors = parse_datetime("2025-01-28 14:30", "en_US")
+        >>> if not has_parse_errors(errors) and is_valid_datetime(result):
+        ...     # Type-safe: mypy knows result is datetime
+        ...     timestamp = result.timestamp()
     """
     return value is not None

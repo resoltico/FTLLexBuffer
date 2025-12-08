@@ -273,13 +273,16 @@ result, errors = bundle.format_value("greeting", {"name": "Alice"})
 result, errors = bundle.format_pattern("button", attribute="tooltip")
 ```
 
-### Bi-Directional Localization (v0.5.0+)
+### Bi-Directional Localization (v0.5.0+, Breaking change in v0.8.0)
 
-FTLLexBuffer provides **full bi-directional localization** - both formatting (data → display) and parsing (display → data). This is critical for forms, invoices, and any user input that needs to be locale-aware:
+FTLLexBuffer provides **full bi-directional localization** - both formatting (data → display) and parsing (display → data). This is critical for forms, invoices, and any user input that needs to be locale-aware.
+
+**v0.8.0 BREAKING CHANGE**: All parse functions now return `tuple[result, list[FluentParseError]]`.
 
 ```python
 from ftllexbuffer import FluentBundle
 from ftllexbuffer.parsing import parse_decimal, parse_currency
+from ftllexbuffer.parsing.guards import has_parse_errors, is_valid_decimal, is_valid_currency
 
 # Create bundle for Latvian locale
 bundle = FluentBundle("lv_LV", use_isolating=False)
@@ -291,18 +294,21 @@ price = Cena: { CURRENCY($amount, currency: "EUR") }
 formatted, _ = bundle.format_pattern("price", {"amount": 1234.56})
 print(formatted)  # "Cena: 1 234,56 €"
 
-# Parse user input back to data (user → data)
+# Parse user input back to data (user → data) - v0.8.0 tuple return
 user_input = "1 234,56"
-amount = parse_decimal(user_input, "lv_LV")
-print(amount)  # Decimal('1234.56')
+result, errors = parse_decimal(user_input, "lv_LV")
+if not has_parse_errors(errors) and is_valid_decimal(result):
+    print(result)  # Decimal('1234.56')
 
-# Parse currency with automatic symbol detection
+# Parse currency with automatic symbol detection - v0.8.0 tuple return
 user_input_currency = "1 234,56 €"
-amount, currency = parse_currency(user_input_currency, "lv_LV")
-print(f"{amount} {currency}")  # Decimal('1234.56') EUR
+result, errors = parse_currency(user_input_currency, "lv_LV")
+if not has_parse_errors(errors) and is_valid_currency(result):
+    amount, currency = result
+    print(f"{amount} {currency}")  # Decimal('1234.56') EUR
 
-# Roundtrip validation: format → parse → format preserves value
-assert float(amount) == 1234.56
+    # Roundtrip validation: format → parse → format preserves value
+    assert float(amount) == 1234.56
 ```
 
 **See [PARSING.md](https://github.com/resoltico/ftllexbuffer/blob/main/PARSING.md) for complete parsing guide with best practices, common patterns, and troubleshooting.**
@@ -1326,7 +1332,7 @@ result, errors = bundle.format_pattern("a")
 
 Comprehensive comparison of localization libraries available in the Python ecosystem (versions verified as of November 2025):
 
-| Feature | **FTLLexBuffer** (0.7.0) | fluent.runtime (0.4.0) | fluent-compiler (1.1) | gettext (stdlib) | Babel (2.17.0) | PySide6 (6.x LGPL) | python-i18n (0.3.9) |
+| Feature | **FTLLexBuffer** (0.8.0) | fluent.runtime (0.4.0) | fluent-compiler (1.1) | gettext (stdlib) | Babel (2.17.0) | PySide6 (6.x LGPL) | python-i18n (0.3.9) |
 |---------|----------|----------------|-------------------|-----------------|----------------|---------------------|-------------------|
 | **Format** | .ftl (FTL v1.0) | .ftl (FTL v1.0) | .ftl (FTL v1.0) | .po/.mo (gettext) | .po/.mo (gettext) | .ts/.qm (Qt XML) | .yml/.json |
 | **File Type** | Human-readable text | Human-readable text | Human-readable text | Text (.po) + Compiled binary (.mo) | Text (.po) + Compiled binary (.mo) | XML (.ts) + Compiled binary (.qm) | Human-readable text |

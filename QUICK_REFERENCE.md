@@ -434,29 +434,38 @@ price-name = { CURRENCY($amount, currency: "EUR", currencyDisplay: "name") }
 
 ---
 
-## Parsing API (v0.5.0+)
+## Parsing API (v0.5.0+, Breaking change in v0.8.0)
 
 **Bi-directional localization**: Parse locale-formatted strings back to Python types.
 
+**v0.8.0 BREAKING CHANGE**: All parse functions now return `tuple[result, list[FluentParseError]]`.
+
 ```python
 from ftllexbuffer.parsing import parse_number, parse_decimal, parse_date, parse_datetime, parse_currency
+from ftllexbuffer.parsing.guards import has_parse_errors, is_valid_decimal
 
-# Parse numbers
-amount = parse_decimal("1 234,56", "lv_LV")  # → Decimal('1234.56')
+# Parse numbers (v0.8.0 tuple return)
+result, errors = parse_decimal("1 234,56", "lv_LV")
+if not has_parse_errors(errors) and is_valid_decimal(result):
+    amount = result  # Decimal('1234.56')
 
-# Parse dates
-date = parse_date("28.01.2025", "lv_LV")  # → date(2025, 1, 28)
+# Parse dates (v0.8.0 tuple return)
+result, errors = parse_date("28.01.2025", "lv_LV")
+if not has_parse_errors(errors):
+    date_value = result  # date(2025, 1, 28)
 
-# Parse currency
-amount, currency = parse_currency("1 234,56 €", "lv_LV")  # → (Decimal('1234.56'), 'EUR')
+# Parse currency (v0.8.0 tuple return)
+result, errors = parse_currency("1 234,56 €", "lv_LV")
+if not has_parse_errors(errors) and result is not None:
+    amount, currency = result  # (Decimal('1234.56'), 'EUR')
 ```
 
-**Key Functions**:
-- `parse_number(value, locale)` → `float`
-- `parse_decimal(value, locale)` → `Decimal` (financial precision)
-- `parse_date(value, locale)` → `date`
-- `parse_datetime(value, locale, tzinfo=None)` → `datetime`
-- `parse_currency(value, locale)` → `(Decimal, currency_code)`
+**Key Functions (v0.8.0 signatures)**:
+- `parse_number(value, locale)` → `tuple[float, list[FluentParseError]]`
+- `parse_decimal(value, locale)` → `tuple[Decimal, list[FluentParseError]]`
+- `parse_date(value, locale)` → `tuple[date | None, list[FluentParseError]]`
+- `parse_datetime(value, locale, tzinfo=None)` → `tuple[datetime | None, list[FluentParseError]]`
+- `parse_currency(value, locale)` → `tuple[tuple[Decimal, str] | None, list[FluentParseError]]`
 
 **Implementation**: Uses Babel for number parsing, Python 3.13 stdlib (`strptime`, `fromisoformat`) with Babel CLDR patterns for date parsing.
 
@@ -723,6 +732,6 @@ print(f"Fluent Specification {__fluent_spec_version__}")
 
 ---
 
-**Quick Reference Last Updated**: December 7, 2025
-**FTLLexBuffer Version**: 0.7.0
+**Quick Reference Last Updated**: December 8, 2025
+**FTLLexBuffer Version**: 0.8.0
 **Python Requirement**: 3.13+
