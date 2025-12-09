@@ -138,7 +138,7 @@ class TestFunctionReferenceTransformation:
                 named=(
                     NamedArgument(
                         name=Identifier(name="minimumFractionDigits"),
-                        value=NumberLiteral(value="2"),
+                        value=NumberLiteral(value=2, raw="2"),
                     ),
                 ),
             ),
@@ -251,7 +251,7 @@ class TestCallArgumentsTransformation:
         call_args = CallArguments(
             positional=(
                 VariableReference(id=Identifier(name="value")),
-                NumberLiteral(value="42"),
+                NumberLiteral(value=42, raw="42"),
             ),
             named=(
                 NamedArgument(
@@ -266,7 +266,7 @@ class TestCallArgumentsTransformation:
 
         assert isinstance(result, CallArguments)
         assert result.positional[0].id.name == "VALUE"  # type: ignore[union-attr]
-        assert result.positional[1].value == "42"  # type: ignore[union-attr]
+        assert result.positional[1].value == 42  # type: ignore[union-attr]
         assert result.named[0].name.name == "OPTION"
         assert result.named[0].value.id.name == "OPT"  # type: ignore[union-attr]
 
@@ -361,7 +361,9 @@ class TestTransformerPropertyBased:
         transformer = UppercaseIdentifierTransformer()
 
         result1 = transformer.visit(identifier)
+        assert isinstance(result1, Identifier), f"Expected Identifier, got {type(result1)}"
         result2 = transformer.visit(result1)
+        assert isinstance(result2, Identifier), f"Expected Identifier, got {type(result2)}"
 
         # Uppercasing twice should give same result
         assert result1.name == result2.name
@@ -389,7 +391,13 @@ class TestTransformerPropertyBased:
 
         transformer = UppercaseIdentifierTransformer()
         result = transformer.visit(pattern)
+        assert isinstance(result, Pattern), f"Expected Pattern, got {type(result)}"
 
         assert len(result.elements) == len(names)
         for i, name in enumerate(names):
-            assert result.elements[i].expression.id.name == name.upper()
+            elem = result.elements[i]
+            assert isinstance(elem, Placeable), f"Expected Placeable, got {type(elem)}"
+            assert isinstance(elem.expression, VariableReference), (
+                f"Expected VariableReference, got {type(elem.expression)}"
+            )
+            assert elem.expression.id.name == name.upper()

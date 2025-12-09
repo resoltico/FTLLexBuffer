@@ -25,7 +25,6 @@ from ftllexbuffer.syntax import (
     VariableReference,
 )
 from ftllexbuffer.syntax.parser import FluentParserV1
-from ftllexbuffer.syntax.type_guards import is_text_element
 
 
 @pytest.fixture
@@ -89,13 +88,13 @@ class TestFluentParserBasicAttributes:
 
         # Check attribute values
         attr0_elem = msg.attributes[0].value.elements[0]
-        assert is_text_element(attr0_elem)
+        assert TextElement.guard(attr0_elem)
         assert attr0_elem.value == "Click here to sign in"
         attr1_elem = msg.attributes[1].value.elements[0]
-        assert is_text_element(attr1_elem)
+        assert TextElement.guard(attr1_elem)
         assert attr1_elem.value == "Sign in button"
         attr2_elem = msg.attributes[2].value.elements[0]
-        assert is_text_element(attr2_elem)
+        assert TextElement.guard(attr2_elem)
         assert attr2_elem.value == "L"
 
     def test_parse_attribute_with_hyphen_in_name(self, parser: FluentParserV1) -> None:
@@ -256,10 +255,10 @@ class TestFluentParserAttributeEdgeCases:
         assert isinstance(msg, Message)
         assert len(msg.attributes) == 2
         emoji_elem = msg.attributes[0].value.elements[0]
-        assert is_text_element(emoji_elem)
+        assert TextElement.guard(emoji_elem)
         assert emoji_elem.value == "Click 👍 to like"
         chinese_elem = msg.attributes[1].value.elements[0]
-        assert is_text_element(chinese_elem)
+        assert TextElement.guard(chinese_elem)
         assert chinese_elem.value == "你好世界"
 
     def test_parse_multiple_messages_with_attributes(self, parser: FluentParserV1) -> None:

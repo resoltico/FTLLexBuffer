@@ -62,7 +62,7 @@ class TestParseNumber:
         """Invalid input returns error in list (v0.8.0 - no exceptions)."""
         result, errors = parse_number("invalid", "en_US")
         assert len(errors) > 0
-        assert result == 0.0  # Default fallback value
+        assert result is None  # v0.9.0: Returns None on failure
         assert errors[0].parse_type == "number"
         assert errors[0].input_value == "invalid"
 
@@ -70,7 +70,7 @@ class TestParseNumber:
         """Empty input returns error in list."""
         result, errors = parse_number("", "en_US")
         assert len(errors) > 0
-        assert result == 0.0
+        assert result is None  # v0.9.0: Returns None on failure
 
 
 class TestParseDecimal:
@@ -110,6 +110,7 @@ class TestParseDecimal:
         """Decimal preserves financial precision."""
         amount, errors = parse_decimal("100,50", "lv_LV")
         assert not errors
+        assert amount is not None
         vat = amount * Decimal("0.21")
         assert vat == Decimal("21.105")  # Exact, no float precision loss
 
@@ -117,7 +118,7 @@ class TestParseDecimal:
         """Invalid input returns error in list (v0.8.0 - no exceptions)."""
         result, errors = parse_decimal("invalid", "en_US")
         assert len(errors) > 0
-        assert result == Decimal("0")  # Default fallback value
+        assert result is None  # v0.9.0: Returns None on failure
         assert errors[0].parse_type == "decimal"
 
 

@@ -27,7 +27,7 @@ welcome = Hello, { missing-msg }!
 """)
         assert result.is_valid  # No syntax errors
         assert result.warning_count == 1
-        assert "undefined message 'missing-msg'" in result.warnings[0]
+        assert "undefined message 'missing-msg'" in result.warnings[0].message
 
     def test_undefined_term_reference(self) -> None:
         """Test detection of undefined term references."""
@@ -37,7 +37,7 @@ welcome = Welcome to { -brand-name }!
 """)
         assert result.is_valid
         assert result.warning_count == 1
-        assert "undefined term '-brand-name'" in result.warnings[0]
+        assert "undefined term '-brand-name'" in result.warnings[0].message
 
     def test_circular_message_reference_simple(self) -> None:
         """Test detection of simple circular message references."""
@@ -48,9 +48,9 @@ msg-b = { msg-a }
 """)
         assert result.is_valid
         assert result.warning_count == 1
-        assert "Circular message reference" in result.warnings[0]
-        assert "msg-a" in result.warnings[0]
-        assert "msg-b" in result.warnings[0]
+        assert "Circular message reference" in result.warnings[0].message
+        assert "msg-a" in result.warnings[0].message
+        assert "msg-b" in result.warnings[0].message
 
     def test_circular_message_reference_complex(self) -> None:
         """Test detection of complex circular message chain."""
@@ -62,7 +62,7 @@ msg3 = { msg1 }
 """)
         assert result.is_valid
         assert result.warning_count == 1
-        assert "Circular message reference" in result.warnings[0]
+        assert "Circular message reference" in result.warnings[0].message
 
     def test_circular_term_reference_simple(self) -> None:
         """Test detection of simple circular term references."""
@@ -73,9 +73,9 @@ msg3 = { msg1 }
 """)
         assert result.is_valid
         assert result.warning_count == 1
-        assert "Circular term reference" in result.warnings[0]
-        assert "-term1" in result.warnings[0]
-        assert "-term2" in result.warnings[0]
+        assert "Circular term reference" in result.warnings[0].message
+        assert "-term1" in result.warnings[0].message
+        assert "-term2" in result.warnings[0].message
 
     def test_circular_term_reference_complex(self) -> None:
         """Test detection of complex circular term chain."""
@@ -88,7 +88,7 @@ msg3 = { msg1 }
 """)
         assert result.is_valid
         assert result.warning_count == 1
-        assert "Circular term reference" in result.warnings[0]
+        assert "Circular term reference" in result.warnings[0].message
 
     def test_valid_resource_no_warnings(self) -> None:
         """Test that valid resource produces no warnings."""
@@ -118,7 +118,7 @@ msg6 =
         assert result.warning_count >= 3  # At least circular + 2 undefined
 
         # Check all issue types are detected
-        warnings_text = " ".join(result.warnings)
+        warnings_text = " ".join(w.message for w in result.warnings)
         assert "Circular" in warnings_text
         assert "undefined message" in warnings_text
         assert "undefined term" in warnings_text
@@ -132,7 +132,7 @@ msg = Second
 """)
         assert result.is_valid
         assert result.warning_count == 1
-        assert "Duplicate message ID 'msg'" in result.warnings[0]
+        assert "Duplicate message ID 'msg'" in result.warnings[0].message
 
     def test_message_without_value(self) -> None:
         """Test detection of messages without values or attributes."""
@@ -155,7 +155,8 @@ invalid =
 """)
         assert result.is_valid
         assert result.warning_count == 1
-        assert "Term '-brand' references undefined message 'company-name'" in result.warnings[0]
+        warning_msg = "Term '-brand' references undefined message 'company-name'"
+        assert warning_msg in result.warnings[0].message
 
     def test_complex_nested_references(self) -> None:
         """Test validation with complex nested reference chains."""
@@ -178,7 +179,7 @@ button = Click
 """)
         assert result.is_valid
         assert result.warning_count == 1
-        assert "undefined message 'undefined-msg'" in result.warnings[0]
+        assert "undefined message 'undefined-msg'" in result.warnings[0].message
 
 
 class TestValidationEdgeCases:
@@ -192,7 +193,7 @@ recursive = This is { recursive }
 """)
         assert result.is_valid
         assert result.warning_count == 1
-        assert "Circular" in result.warnings[0]
+        assert "Circular" in result.warnings[0].message
 
     def test_empty_resource_valid(self) -> None:
         """Test that empty resource is valid with no warnings."""

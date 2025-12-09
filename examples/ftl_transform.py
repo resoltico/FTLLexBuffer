@@ -26,6 +26,7 @@ from ftllexbuffer import (
     Identifier,
     Message,
     Placeable,
+    Resource,
     TextElement,
     VariableReference,
     parse_ftl,
@@ -131,10 +132,12 @@ goodbye = Goodbye!
 
     resource = parse_ftl(ftl_with_comments)
     transformer = RemoveCommentsTransformer()
-    cleaned_resource = transformer.transform(resource)
+    cleaned = transformer.transform(resource)
+    # v0.9.0: transform() returns ASTNode, assert it's a Resource
+    assert isinstance(cleaned, Resource), f"Expected Resource, got {type(cleaned)}"
 
     print("\nAFTER:")
-    print(serialize_ftl(cleaned_resource))
+    print(serialize_ftl(cleaned))
 
     # Example 2: Rename variables
     print("\n" + "=" * 60)
@@ -152,6 +155,7 @@ farewell = Goodbye, { $userName }!
     resource = parse_ftl(ftl_with_vars)
     rename_transformer = RenameVariablesTransformer({"userName": "user_name"})
     renamed_resource = rename_transformer.transform(resource)
+    assert isinstance(renamed_resource, Resource), f"Expected Resource, got {type(renamed_resource)}"
 
     print("\nAFTER:")
     print(serialize_ftl(renamed_resource))
@@ -172,6 +176,7 @@ about = This is World!
     resource = parse_ftl(ftl_hardcoded)
     extract_transformer = ExtractVariablesTransformer({"World": "app_name"})
     extracted_resource = extract_transformer.transform(resource)
+    assert isinstance(extracted_resource, Resource), f"Expected Resource, got {type(extracted_resource)}"
 
     print("\nAFTER (note: 'World' → { $app_name }):")
     print(serialize_ftl(extracted_resource))
@@ -193,6 +198,7 @@ another = Goodbye!
     resource = parse_ftl(ftl_with_empty)
     remove_empty_transformer = RemoveEmptyMessagesTransformer()
     filtered_resource = remove_empty_transformer.transform(resource)
+    assert isinstance(filtered_resource, Resource), f"Expected Resource, got {type(filtered_resource)}"
 
     print("\nAFTER (empty-message removed):")
     print(serialize_ftl(filtered_resource))
@@ -219,10 +225,14 @@ admin-greeting = Hello, { $userName }!
     resource = parse_ftl(complex_ftl)
 
     # Step 1: Remove comments
-    resource = RemoveCommentsTransformer().transform(resource)
+    result = RemoveCommentsTransformer().transform(resource)
+    assert isinstance(result, Resource), f"Expected Resource, got {type(result)}"
+    resource = result
 
     # Step 2: Rename variables
-    resource = RenameVariablesTransformer({"userName": "user_name"}).transform(resource)
+    result = RenameVariablesTransformer({"userName": "user_name"}).transform(resource)
+    assert isinstance(result, Resource), f"Expected Resource, got {type(result)}"
+    resource = result
 
     print("\nAFTER (comments removed + variables renamed):")
     print(serialize_ftl(resource))
@@ -257,10 +267,12 @@ accountBalance = Balance: { NUMBER($currentBalance) }
     })
 
     modernized_resource = modernizer.transform(resource)
+    assert isinstance(modernized_resource, Resource), f"Expected Resource, got {type(modernized_resource)}"
 
     # Remove comments for production
     comment_remover = RemoveCommentsTransformer()
     production_resource = comment_remover.transform(modernized_resource)
+    assert isinstance(production_resource, Resource), f"Expected Resource, got {type(production_resource)}"
 
     print("\nAFTER (modernized + production-ready):")
     print(serialize_ftl(production_resource))

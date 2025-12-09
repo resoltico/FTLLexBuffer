@@ -20,8 +20,7 @@ from __future__ import annotations
 from hypothesis import assume, given
 from hypothesis import strategies as st
 
-from ftllexbuffer.runtime.bundle import FluentBundle
-from ftllexbuffer.syntax.ast import Junk
+from ftllexbuffer.runtime.bundle import FluentBundle, ValidationError
 
 # ============================================================================
 # COVERAGE TARGET: Line 295->297 (Message without value in add_resource)
@@ -99,7 +98,7 @@ msg-b = { msg-a }
         result = bundle.validate_resource(ftl_source)
 
         # Should detect circular reference
-        assert any("Circular message reference" in w for w in result.warnings)
+        assert any("Circular message reference" in w.message for w in result.warnings)
 
     def test_circular_term_reference_duplicate_cycles(self) -> None:
         """COVERAGE: Line 349->344 - Duplicate circular term reference.
@@ -118,7 +117,7 @@ msg-b = { msg-a }
         result = bundle.validate_resource(ftl_source)
 
         # Should detect circular term reference
-        assert any("Circular term reference" in w for w in result.warnings)
+        assert any("Circular term reference" in w.message for w in result.warnings)
 
 
 # ============================================================================
@@ -142,7 +141,7 @@ class TestDuplicateTermIDWarning:
         result = bundle.validate_resource(ftl_source)
 
         # Should warn about duplicate term ID
-        assert any("Duplicate term ID" in w for w in result.warnings)
+        assert any("Duplicate term ID" in w.message for w in result.warnings)
 
     @given(term_name=st.from_regex(r"[a-z][a-z0-9-]{0,10}", fullmatch=True))
     def test_duplicate_term_property(self, term_name: str) -> None:
@@ -157,7 +156,7 @@ class TestDuplicateTermIDWarning:
         result = bundle.validate_resource(ftl_source)
 
         # Should warn about duplicate
-        assert any("Duplicate term ID" in w for w in result.warnings)
+        assert any("Duplicate term ID" in w.message for w in result.warnings)
 
 
 # ============================================================================
@@ -229,7 +228,7 @@ greeting = Hello
         result = bundle.validate_resource(ftl_source)
 
         # Should NOT warn (message is defined)
-        assert not any("undefined message" in w for w in result.warnings)
+        assert not any("undefined message" in w.message for w in result.warnings)
 
 
 # ============================================================================
@@ -252,7 +251,7 @@ class TestTermReferencingUndefinedTerm:
         result = bundle.validate_resource(ftl_source)
 
         # Should warn about undefined term reference
-        assert any("references undefined term '-term-b'" in w for w in result.warnings)
+        assert any("references undefined term '-term-b'" in w.message for w in result.warnings)
 
     @given(
         term_a=st.from_regex(r"[a-z][a-z0-9-]{0,10}", fullmatch=True),
@@ -271,7 +270,7 @@ class TestTermReferencingUndefinedTerm:
         result = bundle.validate_resource(ftl_source)
 
         # Should warn about undefined term
-        assert any(f"undefined term '-{term_b}'" in w for w in result.warnings)
+        assert any(f"undefined term '-{term_b}'" in w.message for w in result.warnings)
 
 
 # ============================================================================
@@ -296,17 +295,17 @@ class TestCriticalSyntaxErrorInValidateResource:
         assert len(result.errors) > 0
 
     def test_critical_error_returns_junk_entry(self) -> None:
-        """COVERAGE: Lines 554-556 - Junk entry creation for critical error."""
+        """COVERAGE: Lines 554-556 - ValidationError for critical error (v0.9.0)."""
         bundle = FluentBundle("en_US", use_isolating=False)
 
         invalid_ftl = "msg = {{ broken"
 
         result = bundle.validate_resource(invalid_ftl)
 
-        # Should have Junk entry representing the error
+        # Should have ValidationError representing the parse error
         assert len(result.errors) > 0
-        # Errors should be Junk entries
-        assert all(isinstance(e, Junk) for e in result.errors)
+        # v0.9.0: Errors are ValidationError instances, not Junk AST nodes
+        assert all(isinstance(e, ValidationError) for e in result.errors)
 
 
 # ============================================================================
@@ -357,7 +356,7 @@ msg-attrs =
         assert len(result.warnings) > 0
 
         # Check for specific warning types
-        warning_str = " ".join(result.warnings)
+        warning_str = " ".join(w.message for w in result.warnings)
         assert "Duplicate message ID" in warning_str
         assert "Duplicate term ID" in warning_str
         # NOTE: "neither value nor attributes" not tested - unreachable (parser creates Junk)

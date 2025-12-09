@@ -16,8 +16,9 @@ Python 3.13+.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, TypeIs
+from typing import TYPE_CHECKING
 
+from .enums import ReferenceKind, VariableContext
 from .syntax.ast import (
     FunctionReference,
     Message,
@@ -46,14 +47,16 @@ if TYPE_CHECKING:
 class VariableInfo:
     """Immutable metadata about a variable reference in a message.
 
+    v0.9.0: context changed from str to VariableContext enum for type safety.
+
     Uses Python 3.13's frozen dataclass with slots for zero-allocation storage.
     """
 
     name: str
     """Variable name (without $ prefix)."""
 
-    context: str
-    """Context where variable appears ('pattern', 'selector', 'variant')."""
+    context: VariableContext
+    """Context where variable appears."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,13 +75,16 @@ class FunctionCallInfo:
 
 @dataclass(frozen=True, slots=True)
 class ReferenceInfo:
-    """Immutable metadata about message/term references."""
+    """Immutable metadata about message/term references.
+
+    v0.9.0: kind changed from str to ReferenceKind enum for type safety.
+    """
 
     id: str
     """Referenced message or term ID."""
 
-    kind: str
-    """Reference type: 'message' or 'term'."""
+    kind: ReferenceKind
+    """Reference type."""
 
     attribute: str | None
     """Attribute name if accessing an attribute."""
@@ -136,36 +142,6 @@ class MessageIntrospection:
 
 
 # ==============================================================================
-# TYPE GUARDS (Using Python 3.13's TypeIs)
-# ==============================================================================
-
-
-def _is_variable_ref(expr: object) -> TypeIs[VariableReference]:
-    """Type-safe runtime check for VariableReference using Python 3.13 TypeIs."""
-    return isinstance(expr, VariableReference)
-
-
-def _is_function_ref(expr: object) -> TypeIs[FunctionReference]:
-    """Type-safe runtime check for FunctionReference using Python 3.13 TypeIs."""
-    return isinstance(expr, FunctionReference)
-
-
-def _is_message_ref(expr: object) -> TypeIs[MessageReference]:
-    """Type-safe runtime check for MessageReference using Python 3.13 TypeIs."""
-    return isinstance(expr, MessageReference)
-
-
-def _is_term_ref(expr: object) -> TypeIs[TermReference]:
-    """Type-safe runtime check for TermReference using Python 3.13 TypeIs."""
-    return isinstance(expr, TermReference)
-
-
-def _is_select_expr(expr: object) -> TypeIs[SelectExpression]:
-    """Type-safe runtime check for SelectExpression using Python 3.13 TypeIs."""
-    return isinstance(expr, SelectExpression)
-
-
-# ==============================================================================
 # AST VISITOR FOR VARIABLE EXTRACTION
 # ==============================================================================
 
@@ -190,7 +166,7 @@ class IntrospectionVisitor(ASTVisitor):
         self.functions: set[FunctionCallInfo] = set()
         self.references: set[ReferenceInfo] = set()
         self.has_selectors: bool = False
-        self._context: str = "pattern"
+        self._context: VariableContext = VariableContext.PATTERN
 
     def visit_Pattern(self, node: Pattern) -> None:
         """Visit pattern and extract variables from all elements.
@@ -212,26 +188,30 @@ class IntrospectionVisitor(ASTVisitor):
 
     def _visit_expression(self, expr: Expression | InlineExpression) -> None:
         """Visit an expression and extract metadata using pattern matching."""
-        # Use Python 3.13 TypeIs for type-safe narrowing
-        if _is_variable_ref(expr):
+        # Use Python 3.13 TypeIs for type-safe narrowing via static .guard() methods
+        if VariableReference.guard(expr):
             self.variables.add(VariableInfo(name=expr.id.name, context=self._context))
 
-        elif _is_function_ref(expr):
+        elif FunctionReference.guard(expr):
             self._extract_function_call(expr)
 
-        elif _is_message_ref(expr):
+        elif MessageReference.guard(expr):
             attr_name = expr.attribute.name if expr.attribute else None
-            self.references.add(ReferenceInfo(id=expr.id.name, kind="message", attribute=attr_name))
+            self.references.add(
+                ReferenceInfo(id=expr.id.name, kind=ReferenceKind.MESSAGE, attribute=attr_name)
+            )
 
-        elif _is_term_ref(expr):
+        elif TermReference.guard(expr):
             attr_name = expr.attribute.name if expr.attribute else None
-            self.references.add(ReferenceInfo(id=expr.id.name, kind="term", attribute=attr_name))
+            self.references.add(
+                ReferenceInfo(id=expr.id.name, kind=ReferenceKind.TERM, attribute=attr_name)
+            )
 
-        elif _is_select_expr(expr):
+        elif SelectExpression.guard(expr):
             self.has_selectors = True
             # Visit selector
             old_context = self._context
-            self._context = "selector"
+            self._context = VariableContext.SELECTOR
             self._visit_expression(expr.selector)
             self._context = old_context
 
@@ -247,17 +227,21 @@ class IntrospectionVisitor(ASTVisitor):
         if func.arguments:
             # Extract positional arguments (must be VariableReferences)
             for pos_arg in func.arguments.positional:
-                if _is_variable_ref(pos_arg):
+                if VariableReference.guard(pos_arg):
                     positional.append(pos_arg.id.name)
                     # Also track as variable usage
-                    self.variables.add(VariableInfo(name=pos_arg.id.name, context="function_arg"))
+                    self.variables.add(
+                        VariableInfo(name=pos_arg.id.name, context=VariableContext.FUNCTION_ARG)
+                    )
 
             # Extract named argument keys
             for named_arg in func.arguments.named:
                 named.add(named_arg.name.name)
                 # Extract variable from value if it's a VariableReference
-                if _is_variable_ref(named_arg.value):
-                    var_info = VariableInfo(name=named_arg.value.id.name, context="function_arg")
+                if VariableReference.guard(named_arg.value):
+                    var_info = VariableInfo(
+                        name=named_arg.value.id.name, context=VariableContext.FUNCTION_ARG
+                    )
                     self.variables.add(var_info)
 
         func_info = FunctionCallInfo(
@@ -268,7 +252,7 @@ class IntrospectionVisitor(ASTVisitor):
     def _visit_variant(self, variant: Variant) -> None:
         """Visit a select variant and extract variables from its pattern."""
         old_context = self._context
-        self._context = "variant"
+        self._context = VariableContext.VARIANT
         self.visit_Pattern(variant.value)
         self._context = old_context
 

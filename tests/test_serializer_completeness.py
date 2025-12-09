@@ -27,6 +27,7 @@ See SYSTEM 5 in the testing strategy document.
 
 import pytest
 
+from ftllexbuffer.enums import CommentType
 from ftllexbuffer.syntax.ast import (
     Attribute,
     CallArguments,
@@ -88,7 +89,7 @@ class TestMessageSerialization:
             id=Identifier(name="greeting"),
             value=Pattern(elements=(TextElement(value="Hello World"),)),
             attributes=(),
-            comment=Comment(content="A friendly greeting", type="comment"),
+            comment=Comment(content="A friendly greeting", type=CommentType.COMMENT),
         )
         resource = Resource(entries=(message,))
 
@@ -181,7 +182,7 @@ class TestMessageSerialization:
             id=Identifier(name="save-button"),
             value=Pattern(elements=(TextElement(value="Save"),)),
             attributes=(attribute,),
-            comment=Comment(content="Save button text", type="comment"),
+            comment=Comment(content="Save button text", type=CommentType.COMMENT),
         )
         resource = Resource(entries=(message,))
 
@@ -227,7 +228,7 @@ class TestTermSerialization:
             id=Identifier(name="brand-name"),
             value=Pattern(elements=(TextElement(value="Firefox Browser"),)),
             attributes=(),
-            comment=Comment(content="Official brand name", type="comment"),
+            comment=Comment(content="Official brand name", type=CommentType.COMMENT),
         )
         resource = Resource(entries=(term,))
 
@@ -294,7 +295,7 @@ class TestTermSerialization:
             id=Identifier(name="brand"),
             value=Pattern(elements=(TextElement(value="Firefox"),)),
             attributes=(attribute,),
-            comment=Comment(content="Brand with variations", type="comment"),
+            comment=Comment(content="Brand with variations", type=CommentType.COMMENT),
         )
         resource = Resource(entries=(term,))
 
@@ -405,7 +406,7 @@ class TestExpressionSerialization:
 
     def test_number_literal(self):
         """Line 149: NumberLiteral in expression."""
-        expr = NumberLiteral(value="42")
+        expr = NumberLiteral(value=42, raw="42")
         placeable = Placeable(expression=expr)
         pattern = Pattern(elements=(placeable,))
         message = Message(
@@ -422,7 +423,7 @@ class TestExpressionSerialization:
 
     def test_number_literal_decimal(self):
         """Line 149: NumberLiteral with decimal."""
-        expr = NumberLiteral(value="3.14159")
+        expr = NumberLiteral(value=3.14159, raw="3.14159")
         placeable = Placeable(expression=expr)
         pattern = Pattern(elements=(placeable,))
         message = Message(
@@ -568,7 +569,7 @@ class TestExpressionSerialization:
         """Lines 167-168: FunctionReference with arguments."""
         named_arg = NamedArgument(
             name=Identifier(name="minimumFractionDigits"),
-            value=NumberLiteral(value="2"),
+            value=NumberLiteral(value=2, raw="2"),
         )
         call_args = CallArguments(positional=(), named=(named_arg,))
         expr = FunctionReference(id=Identifier(name="NUMBER"), arguments=call_args)
@@ -596,7 +597,7 @@ class TestCallArgumentsSerialization:
 
     def test_call_arguments_positional_only(self):
         """Lines 178-181: CallArguments with only positional arguments."""
-        arg1 = NumberLiteral(value="42")
+        arg1 = NumberLiteral(value=42, raw="42")
         arg2 = StringLiteral(value="test")
         call_args = CallArguments(positional=(arg1, arg2), named=())
         expr = FunctionReference(id=Identifier(name="FUNC"), arguments=call_args)
@@ -616,7 +617,7 @@ class TestCallArgumentsSerialization:
 
     def test_call_arguments_named_only(self):
         """Lines 184-188: CallArguments with only named arguments."""
-        arg1 = NamedArgument(name=Identifier(name="key1"), value=NumberLiteral(value="1"))
+        arg1 = NamedArgument(name=Identifier(name="key1"), value=NumberLiteral(value=1, raw="1"))
         arg2 = NamedArgument(
             name=Identifier(name="key2"), value=StringLiteral(value="value")
         )
@@ -638,7 +639,7 @@ class TestCallArgumentsSerialization:
 
     def test_call_arguments_mixed(self):
         """Lines 178-188: CallArguments with both positional and named."""
-        pos_arg = NumberLiteral(value="100")
+        pos_arg = NumberLiteral(value=100, raw="100")
         named_arg = NamedArgument(
             name=Identifier(name="unit"), value=StringLiteral(value="USD")
         )

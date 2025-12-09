@@ -104,7 +104,7 @@ class RenameVariablesTransformer(ASTTransformer):
             return VariableReference(
                 id=Identifier(name=self.mapping[node.id.name])
             )
-        return self.generic_visit(node)
+        return node
 
 
 # ============================================================================
@@ -243,6 +243,7 @@ class TestTransformerIdentity:
 
         transformer = IdentityTransformer()
         transformed = transformer.transform(resource)
+        assert isinstance(transformed, Resource), f"Expected Resource, got {type(transformed)}"
 
         original_msg = resource.entries[0]
         transformed_msg = transformed.entries[0]
@@ -308,6 +309,7 @@ class TestTransformerRemoval:
 
         transformer = RemoveCommentsTransformer()
         transformed = transformer.transform(resource)
+        assert isinstance(transformed, Resource), f"Expected Resource, got {type(transformed)}"
 
         # Messages must be preserved
         original_messages = [e for e in resource.entries if isinstance(e, Message)]
@@ -344,6 +346,7 @@ class TestTransformerRenaming:
         mapping = {old_var: new_var}
         transformer = RenameVariablesTransformer(mapping)
         transformed = transformer.transform(resource)
+        assert isinstance(transformed, Resource), f"Expected Resource, got {type(transformed)}"
 
         # Check that variable was renamed
         msg = transformed.entries[0]
@@ -379,6 +382,7 @@ class TestTransformerRenaming:
         mapping = {var1: new_name}
         transformer = RenameVariablesTransformer(mapping)
         transformed = transformer.transform(resource)
+        assert isinstance(transformed, Resource), f"Expected Resource, got {type(transformed)}"
 
         msg = transformed.entries[0]
         assert isinstance(msg, Message)
@@ -456,6 +460,7 @@ class TestTransformerImmutability:
         mapping = {var_name: new_name}
         transformer = RenameVariablesTransformer(mapping)
         transformed = transformer.transform(resource)
+        assert isinstance(transformed, Resource), f"Expected Resource, got {type(transformed)}"
 
         # Original variable name must be unchanged
         assert original_var_name == var_name
@@ -559,6 +564,7 @@ class TestComplexTransformations:
         mapping = {var_name: new_var}
         transformer = RenameVariablesTransformer(mapping)
         transformed = transformer.transform(resource)
+        assert isinstance(transformed, Resource), f"Expected Resource, got {type(transformed)}"
 
         # Both term value and message should have renamed variable
         term = transformed.entries[0]
@@ -598,6 +604,7 @@ class TestComplexTransformations:
         mapping = {var_name: new_var}
         transformer = RenameVariablesTransformer(mapping)
         transformed = transformer.transform(resource)
+        assert isinstance(transformed, Resource), f"Expected Resource, got {type(transformed)}"
 
         msg = transformed.entries[0]
         assert isinstance(msg, Message)

@@ -177,13 +177,15 @@ result = bundle.validate_resource(ftl_source)
 if not result.is_valid:
     print(f"Found {result.error_count} syntax errors:")
     for error in result.errors:
-        print(f"  - {error.content[:80]}")
+        location = f"line {error.line}" if error.line else "unknown"
+        print(f"  - {location}: {error.message[:80]}")
     sys.exit(1)
 
 if result.warning_count > 0:
     print(f"Found {result.warning_count} warnings:")
     for warning in result.warnings:
-        print(f"  - {warning}")
+        location = f"line {warning.line}" if warning.line else "unknown"
+        print(f"  - {location}: {warning.message}")
 
 # Safe to add
 bundle.add_resource(ftl_source)
@@ -702,7 +704,7 @@ print(f"Found messages: {collector.messages}")
 
 ## Supported Locales
 
-**Built-in CLDR plural rules**: 30 languages including — see [README.md - Locale Support](README.md#locale-support).
+**v0.9.0 - CLDR plural rules via Babel**: 200+ locales with full Unicode CLDR compliance — see [README.md - Locale Support](README.md#locale-support) for details.
 
 ---
 
@@ -732,6 +734,6 @@ print(f"Fluent Specification {__fluent_spec_version__}")
 
 ---
 
-**Quick Reference Last Updated**: December 8, 2025
-**FTLLexBuffer Version**: 0.8.0
+**Quick Reference Last Updated**: December 9, 2025
+**FTLLexBuffer Version**: 0.9.0
 **Python Requirement**: 3.13+

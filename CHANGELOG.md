@@ -5,6 +5,293 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2025-12-09
+
+### Breaking Changes
+
+- **Enums replace magic strings**
+  - `Comment.type` changed from `str` to `CommentType` enum
+    - `CommentType.COMMENT`, `CommentType.GROUP`, `CommentType.RESOURCE`
+  - `VariableInfo.context` changed from `str` to `VariableContext` enum
+    - `VariableContext.PATTERN`, `VariableContext.SELECTOR`, `VariableContext.VARIANT`, `VariableContext.FUNCTION_ARG`
+  - `ReferenceInfo.kind` changed from `str` to `ReferenceKind` enum
+    - `ReferenceKind.MESSAGE`, `ReferenceKind.TERM`
+  - **Impact**: All string comparisons must be updated to use enum values
+  - **Migration**: Import enums from `ftllexbuffer` and use enum values instead of strings
+
+- **NumberLiteral structure changed**
+  - `NumberLiteral.value` changed from `str` to `int | float` (parsed value)
+  - Added `NumberLiteral.raw: str` for original source representation
+  - Removed `NumberLiteral.parsed_value` property
+  - **Impact**: Code accessing `.value` expecting string will break
+  - **Impact**: Code using `.parsed_value` must change to `.value`
+  - **Migration**: Use `.value` for numeric value, `.raw` for serialization
+
+- **Cursor.line_col property removed**
+  - Property was misleading (O(n) operation appearing as O(1))
+  - Use `cursor.compute_line_col()` method instead
+  - **Impact**: All `cursor.line_col` must change to `cursor.compute_line_col()`
+
+- **Parsing API standardized to return None on failure**
+  - `parse_number()` now returns `tuple[float | None, list[FluentParseError]]`
+  - `parse_decimal()` now returns `tuple[Decimal | None, list[FluentParseError]]`
+  - Previously returned sentinel values (0.0, Decimal("0")) on failure
+  - **Impact**: Code checking for sentinel values must change to check for None
+  - **Migration**: Use `if result is not None:` instead of `if result != 0.0:`
+
+- **Visitor pattern matches stdlib convention**
+  - `ASTVisitor.generic_visit()` now automatically traverses all child nodes
+  - Previously, each `visit_*()` method explicitly traversed children
+  - All `visit_*()` methods removed - override only when custom behavior needed
+  - **Impact**: All custom visitors must be updated
+  - **Migration**: Override `visit_*()` methods only for custom behavior, call `self.generic_visit(node)` for traversal
+
+- **Visitor type safety improved**
+  - All visitor methods now use `ASTNode` instead of `Any`
+  - Added `ASTNode` Protocol for structural typing
+  - **Impact**: Better type checking, catches more errors at type-check time
+  - **Migration**: Ensure custom visitors follow protocol
+
+- **ValidationResult uses structured errors**
+  - `ValidationResult.errors` changed from `list[Junk]` to `list[ValidationError]`
+  - `ValidationResult.warnings` changed from `list[str]` to `list[ValidationWarning]`
+  - `ValidationError` has fields: `code`, `message`, `content`, `line`, `column`
+  - `ValidationWarning` has fields: `code`, `message`, `context`
+  - **Impact**: Code accessing error/warning fields must be updated
+  - **Migration**: Access structured fields instead of Junk nodes or plain strings
+
+- **Span handling standardized**
+  - Only top-level entry nodes have spans: `Message`, `Term`, `Comment`, `Junk`
+  - Removed spans from: `Attribute`, `SelectExpression`, `Variant`
+  - **Impact**: Code accessing `.span` on these nodes will fail
+  - **Migration**: Track spans externally or use parent entry span
+
+- **Type guards consolidated to AST nodes**
+  - Removed `guards.py` and `syntax/type_guards.py` modules
+  - All type guards now live as static `.guard()` methods on AST node classes
+  - Removed `is_message`, `is_term`, `is_comment`, `is_junk`, `is_placeable`, `is_text_element`, `has_value` from package exports
+  - **Impact**: Code using standalone type guard functions will break
+  - **Migration**: Use static methods directly: `Message.guard(entry)` instead of `is_message(entry)`
+
+- **Import structure simplified**
+  - Eliminated all unnecessary runtime imports (PLC0415)
+  - All module imports now at top-level except one legitimate lazy import
+  - Cleaner module dependencies: `diagnostics → syntax → runtime`
+  - **Impact**: Import performance slightly improved
+  - **No user migration needed**: This is an internal refactoring
+
+- **Parser error messages simplified**
+  - Removed internal Result monad abstraction from parser implementation
+  - Parser methods now use stdlib `ParseResult[T] | None` pattern instead of custom `Success[T] | Failure[E]`
+  - Junk entry annotations now contain generic "Parse error" message instead of detailed error descriptions
+  - Parser robustness unchanged: still creates Junk entries for invalid syntax
+  - **Impact**: Error messages in Junk annotations are less specific
+  - **Migration**: If code depends on specific error message text in Junk annotations, use alternative error detection strategies
+
+### Added
+
+- **Type-safe enums** (`ftllexbuffer.enums`)
+  - `CommentType` - Comment type enumeration
+  - `VariableContext` - Variable context enumeration
+  - `ReferenceKind` - Reference kind enumeration
+  - All enums have `__str__()` returning value for serialization
+
+- **Structured validation errors** (`ftllexbuffer.runtime.bundle`)
+  - `ValidationError` - Structured syntax error with code, message, content, line, column
+  - `ValidationWarning` - Structured semantic warning with code, message, context
+  - Both exported from main package for easy import
+
+- **ASTNode Protocol** (`ftllexbuffer.syntax.ast`)
+  - Base protocol for all AST nodes
+  - Enables type-safe visitor patterns
+  - Uses structural typing (no inheritance required)
+
+- **__slots__ for memory efficiency**
+  - `FluentParserV1` - Empty slots (stateless)
+  - `FluentBundle` - 8 slots (sorted alphabetically)
+  - `FluentResolver` - 7 slots (sorted alphabetically)
+  - Reduces memory usage per instance
+
+- **__repr__() methods for debugging**
+  - `FluentBundle` - Shows locale and message/term counts
+  - `FluentLocalization` - Shows locale list and bundle count
+  - `FunctionRegistry` - Shows function count
+  - Better REPL and debugging experience
+
+### Changed
+
+- **Parser creates parsed numbers immediately**
+  - NumberLiteral constructed with parsed value and raw string
+  - No lazy parsing
+  - **Performance**: Single parse instead of multiple accesses
+
+- **Serializer uses NumberLiteral.raw**
+  - Preserves original number format in round-trip
+  - Uses `.raw` field instead of `.value`
+
+### Improved
+
+- **Plural rules now use Babel's CLDR data**
+  - Refactored from 352 lines of hardcoded rules to Babel's CLDR implementation
+  - **Locale support**: Expanded from 30 to 200+ locales with full CLDR compliance
+  - **Accuracy**: CLDR-compliant plural rules match official Unicode specifications
+  - **Maintainability**: Automatically updated with Babel releases, no manual rule maintenance
+  - **Impact**: More languages supported with correct plural rules, including complex cases (Latvian fractions, Arabic 6-category system)
+  - **Example**: Latvian decimal `10.1` now correctly returns `"one"` per CLDR fractional digit rules
+
+- **Locale format handling standardized**
+  - All parsing functions now accept both BCP 47 (`en-US`) and POSIX (`en_US`) locale formats
+  - Automatic normalization to underscore format for Babel compatibility
+  - **Functions updated**: `parse_number()`, `parse_decimal()`, `parse_currency()`
+  - **Impact**: More flexible API, accepts both common locale format conventions
+  - **No migration needed**: Both formats work seamlessly
+
+### Removed
+
+- **Dead code elimination**
+  - Removed try/except for TypeIs import (Python 3.13 baseline)
+  - Removed empty `TYPE_CHECKING` blocks
+  - Cleaned up unnecessary compatibility code
+
+### Internal
+
+- **Code quality improvements**
+  - All async operations properly tracked
+  - Consistent code organization
+  - Improved type safety throughout
+
+### Migration Guide
+
+#### Enum Migration
+
+```python
+# OLD (0.8.0):
+if comment.type == "comment":
+    ...
+if var_info.context == "pattern":
+    ...
+if ref.kind == "message":
+    ...
+
+# NEW (0.9.0):
+from ftllexbuffer import CommentType, VariableContext, ReferenceKind
+
+if comment.type == CommentType.COMMENT:
+    ...
+if var_info.context == VariableContext.PATTERN:
+    ...
+if ref.kind == ReferenceKind.MESSAGE:
+    ...
+```
+
+#### NumberLiteral Migration
+
+```python
+# OLD (0.8.0):
+number_str = num_literal.value  # Was string
+number_val = num_literal.parsed_value  # Property
+
+# NEW (0.9.0):
+number_val = num_literal.value  # Now int|float
+number_str = num_literal.raw  # Original string
+```
+
+#### Cursor Migration
+
+```python
+# OLD (0.8.0):
+line, col = cursor.line_col  # Property
+
+# NEW (0.9.0):
+line, col = cursor.compute_line_col()  # Method (makes O(n) cost explicit)
+```
+
+#### Parsing API Migration
+
+```python
+# OLD (0.8.0):
+from ftllexbuffer.parsing import parse_number
+result, errors = parse_number("invalid", "en_US")
+if result == 0.0:  # Sentinel value
+    print("Parse failed")
+
+# NEW (0.9.0):
+result, errors = parse_number("invalid", "en_US")
+if result is None:  # Explicit None
+    print("Parse failed")
+```
+
+#### Visitor Pattern Migration
+
+```python
+# OLD (0.8.0):
+class MyVisitor(ASTVisitor):
+    def visit_Message(self, node):
+        print(f"Message: {node.id.name}")
+        # Manually traverse children
+        self.visit(node.id)
+        if node.value:
+            self.visit(node.value)
+        return self.generic_visit(node)
+
+# NEW (0.9.0):
+class MyVisitor(ASTVisitor):
+    def visit_Message(self, node):
+        print(f"Message: {node.id.name}")
+        # generic_visit() automatically traverses children
+        return self.generic_visit(node)
+```
+
+#### ValidationResult Migration
+
+```python
+# OLD (0.8.0):
+result = bundle.validate_resource(ftl_source)
+for error in result.errors:
+    print(f"Error: {error.content}")  # Junk node
+for warning in result.warnings:
+    print(f"Warning: {warning}")  # Plain string
+
+# NEW (0.9.0):
+result = bundle.validate_resource(ftl_source)
+for error in result.errors:
+    print(f"Error [{error.code}]: {error.message}")  # Structured
+for warning in result.warnings:
+    print(f"Warning [{warning.code}]: {warning.message}")  # Structured
+```
+
+#### Span Handling Migration
+
+```python
+# OLD (0.8.0):
+select_expr = ...  # SelectExpression
+if select_expr.span:
+    print(f"Located at: {select_expr.span}")
+
+# NEW (0.9.0):
+# SelectExpression no longer has span
+# Use parent Message/Term span or track externally
+message = ...  # Message containing SelectExpression
+if message.span:
+    print(f"Located at: {message.span}")
+```
+
+#### Type Guard Migration
+
+```python
+# OLD (0.8.0):
+from ftllexbuffer import is_message, is_term, is_placeable
+for entry in resource.entries:
+    if is_message(entry):
+        print(f"Message: {entry.id.name}")
+
+# NEW (0.9.0):
+from ftllexbuffer import Message, Term, Placeable
+for entry in resource.entries:
+    if Message.guard(entry):
+        print(f"Message: {entry.id.name}")
+```
+
 ## [0.8.0] - 2025-12-08
 
 ### Breaking Changes

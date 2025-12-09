@@ -334,7 +334,7 @@ class TestTypeNarrowingIntegration:
         formatted = number_format(value, "en_US")
         result, errors = parse_number(formatted, "en_US")
 
-        if not has_parse_errors(errors) and is_valid_number(result):
+        if not has_parse_errors(errors) and result is not None and is_valid_number(result):
             # After type narrowing, mypy knows result is float
             assert isinstance(result, float)
 
@@ -354,7 +354,7 @@ class TestTypeNarrowingIntegration:
         formatted = number_format(float(value), "en_US", minimum_fraction_digits=2)
         result, errors = parse_decimal(formatted, "en_US")
 
-        if not has_parse_errors(errors) and is_valid_decimal(result):
+        if not has_parse_errors(errors) and result is not None and is_valid_decimal(result):
             # After type narrowing, mypy knows result is Decimal
             assert isinstance(result, Decimal)
             assert result.is_finite()

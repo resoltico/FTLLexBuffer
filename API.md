@@ -2,7 +2,7 @@
 
 Complete reference documentation for FTLLexBuffer's public API.
 
-**Latest Version**: 0.8.0 | [Changelog](CHANGELOG.md)
+**Latest Version**: 0.9.0 | [Changelog](CHANGELOG.md)
 
 **Package**: `ftllexbuffer`
 **Python Version**: 3.13+
@@ -268,12 +268,12 @@ Both styles work identically. Choose based on your project's preferences.
     - ParseResult
     - ParseError
 - [AST Type Guards](#ast-type-guards)
-  - is_message()
-  - is_term()
-  - is_comment()
-  - is_junk()
-  - is_placeable()
-  - is_text_element()
+  - Message.guard()
+  - Term.guard()
+  - Comment.guard()
+  - Junk.guard()
+  - Placeable.guard()
+  - TextElement.guard()
   - has_value()
 - [Message Introspection](#message-introspection)
   - [introspect_message()](#introspect_message) - Module-level function
@@ -313,9 +313,9 @@ FluentBundle(locale: LocaleCode, *, use_isolating: bool = True)
 - **`locale`** (LocaleCode): Locale code determining CLDR plural rules
   - Format: `"language_TERRITORY"` or `"language-TERRITORY"` (both separators supported)
   - Examples: `"en_US"`, `"en-US"`, `"ar_SA"`, `"ar-SA"`, `"lv_LV"`, `"lv-LV"`
-  - Language extracted from prefix (e.g., `"en_US"` → `"en"`, `"ar-SA"` → `"ar"`)
-  - Built-in support: 30 locales (top world languages by speaker count)
-  - Fallback: Simple one/other rules for unsupported locales
+  - Automatic normalization: Both BCP 47 (hyphen) and POSIX (underscore) formats supported
+  - **v0.9.0**: Uses Babel's CLDR data (200+ locales supported)
+  - Fallback: Simple one/other rules for unsupported/invalid locales
 
 - **`use_isolating`** (bool, default=True): Wrap interpolated values in Unicode bidi isolation marks
   - **CRITICAL for RTL languages** (Arabic, Hebrew, Persian, Urdu)
@@ -569,7 +569,8 @@ result = bundle.validate_resource(ftl_source)
 if not result.is_valid:
     print(f"[FAIL] Found {result.error_count} syntax errors:")
     for error in result.errors:
-        print(f"  - {error.content[:80]}")
+        location = f"line {error.line}" if error.line else "unknown"
+        print(f"  - {location}: {error.message[:80]}")
     sys.exit(1)
 else:
     print(f"[OK] FTL syntax valid ({len(ftl_source)} bytes)")
@@ -597,14 +598,16 @@ print(f"  Semantic warnings: {result.warning_count}")
 if not result.is_valid:
     print("\n[ERROR] Syntax errors found:")
     for error in result.errors:
-        print(f"  - {error.content[:100]}")
+        location = f"line {error.line}" if error.line else "unknown"
+        print(f"  - {location}: {error.message[:100]}")
     sys.exit(1)
 
 # Check for semantic warnings (non-fatal - log and decide)
 if result.warning_count > 0:
     print("\n[WARN] Semantic issues found:")
     for warning in result.warnings:
-        print(f"  - {warning}")
+        location = f"line {warning.line}" if warning.line else "unknown"
+        print(f"  - {location}: {warning.message}")
 
     # Production decision: warnings might indicate real problems
     # Option 1: Fail build (strict)
@@ -649,13 +652,15 @@ def validate_all_ftl_files(locale_dir: Path, strict: bool = False) -> bool:
         if not result.is_valid:
             print(f"[FAIL] {ftl_file.relative_to(locale_dir)}: {result.error_count} error(s)")
             for error in result.errors:
-                print(f"  Parse error: {error.content[:80]}")
+                location = f"line {error.line}" if error.line else "unknown"
+                print(f"  Parse error at {location}: {error.message[:80]}")
             total_errors += result.error_count
         elif result.warning_count > 0:
             status = "[WARN]" if strict else "[OK]"
             print(f"{status} {ftl_file.relative_to(locale_dir)}: {result.warning_count} warning(s)")
             for warning in result.warnings:
-                print(f"  {warning}")
+                location = f"line {warning.line}" if warning.line else "unknown"
+                print(f"  {location}: {warning.message}")
             total_warnings += result.warning_count
         else:
             print(f"[OK] {ftl_file.relative_to(locale_dir)}")
@@ -1662,29 +1667,39 @@ Number of semantic warnings found (duplicate IDs, messages without values, etc.)
 #### errors
 
 ```python
-errors: list[Junk]
+errors: list[ValidationError]
 ```
 
-List of parse error entries. Each `Junk` object has:
+List of parse error entries. Each `ValidationError` object has structured fields:
 
-- `.content` (str): Source text that failed to parse
+- `.message` (str): Error description
+- `.line` (int | None): Line number where error occurred
+- `.column` (int | None): Column number where error occurred
+- `.source_path` (str | None): Source file path (if available)
+
+**Note**: In v0.9.0+, errors are structured `ValidationError` instances (not raw `Junk` AST nodes).
 
 #### warnings
 
 ```python
-warnings: list[str]
+warnings: list[ValidationWarning]
 ```
 
-List of semantic validation warnings. Warnings indicate potential issues that don't prevent parsing but may cause runtime problems:
+List of semantic validation warnings. Each `ValidationWarning` object has structured fields:
+
+- `.message` (str): Warning description
+- `.line` (int | None): Line number where warning occurred
+- `.column` (int | None): Column number where warning occurred
+- `.source_path` (str | None): Source file path (if available)
+
+Warnings indicate potential issues that don't prevent parsing but may cause runtime problems:
 
 - **Duplicate message IDs**: Later definitions overwrite earlier ones (last-write-wins behavior)
 - **Messages without values**: Messages that have neither a value pattern nor attributes
+- **Undefined references**: References to non-existent messages or terms
+- **Circular dependencies**: Messages or terms that reference themselves
 
-**Example warning strings**:
-- `"Duplicate message ID 'hello' (later definition will overwrite earlier)"`
-- `"Message 'empty-msg' has neither value nor attributes"`
-
-**Note**: Warnings don't affect `is_valid` - only syntax errors (Junk entries) make validation fail.
+**Note**: Warnings don't affect `is_valid` - only syntax errors make validation fail.
 
 ### Example
 
@@ -1695,22 +1710,24 @@ print(f"Valid: {result.is_valid}")
 print(f"Errors: {result.error_count}")
 print(f"Warnings: {result.warning_count}")
 
-# Check syntax errors
+# Check syntax errors (v0.9.0: ValidationError instances)
 if not result.is_valid:
     for error in result.errors:
-        print(f"Parse error: {error.content[:100]}")
+        location = f"line {error.line}" if error.line else "unknown location"
+        print(f"Parse error at {location}: {error.message}")
 
-# Check semantic warnings
+# Check semantic warnings (v0.9.0: ValidationWarning instances)
 if result.warning_count > 0:
     for warning in result.warnings:
-        print(f"Warning: {warning}")
+        location = f"line {warning.line}" if warning.line else "unknown location"
+        print(f"Warning at {location}: {warning.message}")
 
 # Example: Duplicate IDs trigger warnings
 ftl = "msg = First\\nmsg = Second"
 result = bundle.validate_resource(ftl)
 # result.is_valid → True (no syntax errors)
 # result.warning_count → 1 (semantic warning about duplicate)
-# result.warnings[0] → "Duplicate message ID 'msg' (later definition will overwrite earlier)"
+# result.warnings[0].message → "Duplicate message ID 'msg'"
 ```
 
 ---
@@ -3471,7 +3488,8 @@ bundle.add_resource(ftl_source)
 result = bundle.validate_resource(ftl_source)
 if not result.is_valid:
     for error in result.errors:
-        print(f"Parse error: {error.content}")
+        location = f"line {error.line}" if error.line else "unknown"
+        print(f"Parse error at {location}: {error.message}")
     # Decide: reject file or log warnings
 ```
 
@@ -3540,8 +3558,9 @@ if not result.is_valid:
 result = bundle.validate_resource(ftl_source)
 if result.warning_count > 0:
     for warning in result.warnings:
-        if "Circular" in warning:
-            print(f"Cycle detected: {warning}")
+        if "Circular" in warning.message:
+            location = f"line {warning.line}" if warning.line else "unknown"
+            print(f"Cycle detected at {location}: {warning.message}")
 
 # Fix the circular reference in FTL source
 # WRONG:
@@ -3629,7 +3648,8 @@ result = bundle.validate_resource(ftl_source)
 if not result.is_valid:
     print(f"Found {result.error_count} syntax errors:")
     for error in result.errors:
-        print(f"  Line: {error.content[:100]}")
+        location = f"line {error.line}" if error.line else "unknown"
+        print(f"  {location}: {error.message[:100]}")
     # Fix syntax errors in FTL source before deployment
 
 # Common syntax errors:
@@ -3898,7 +3918,8 @@ def validate_ftl_directory(locale_dir: Path) -> bool:
         if not result.is_valid:
             print(f"[FAIL] {ftl_file}: {result.error_count} error(s)")
             for error in result.errors:
-                print(f"  {error.content[:80]}")
+                location = f"line {error.line}" if error.line else "unknown"
+                print(f"  {location}: {error.message[:80]}")
             errors_found = True
         else:
             print(f"[OK] {ftl_file}")
@@ -4736,7 +4757,11 @@ def test_all_ftl_files_valid():
 
         assert result.is_valid, (
             f"{ftl_file} has {result.error_count} syntax errors:\n"
-            + "\n".join(err.content[:80] for err in result.errors)
+            + "\n".join(
+                f"line {err.line}: {err.message[:80]}" if err.line
+                else err.message[:80]
+                for err in result.errors
+            )
         )
 
 def test_message_coverage():
@@ -5529,16 +5554,11 @@ class SelectExpression:
 ```python
 @dataclass(frozen=True, slots=True)
 class NumberLiteral:
-    value: str  # Number as string (e.g., "42", "3.14")
-
-    @property
-    def parsed_value(self) -> int | float:
-        """Parse string to Python int or float.
-
-        Returns int for integer literals, float for decimal literals.
-        Example: "42" → 42 (int), "3.14" → 3.14 (float)
-        """
+    value: int | float  # Parsed numeric value
+    raw: str           # Original source text (for serialization)
 ```
+
+**v0.9.0 Breaking Change**: `value` is now the parsed numeric value (int | float), not a string. Use `raw` for the original source text.
 
 **Example:**
 ```python
@@ -5546,15 +5566,15 @@ from ftllexbuffer import parse_ftl
 
 resource = parse_ftl("msg = { 42 }")
 number_literal = resource.entries[0].value.elements[0].expression
-print(number_literal.value)         # "42" (str)
-print(number_literal.parsed_value)  # 42 (int)
-print(type(number_literal.parsed_value))  # <class 'int'>
+print(number_literal.value)  # 42 (int)
+print(number_literal.raw)    # "42" (str - original source)
+print(type(number_literal.value))  # <class 'int'>
 
 resource = parse_ftl("msg = { 3.14 }")
 number_literal = resource.entries[0].value.elements[0].expression
-print(number_literal.value)         # "3.14" (str)
-print(number_literal.parsed_value)  # 3.14 (float)
-print(type(number_literal.parsed_value))  # <class 'float'>
+print(number_literal.value)  # 3.14 (float)
+print(number_literal.raw)    # "3.14" (str - original source)
+print(type(number_literal.value))  # <class 'float'>
 ```
 
 **StringLiteral** - Quoted string
@@ -5857,22 +5877,26 @@ for element in pattern.elements:
 
 ## AST Type Guards
 
-FTLLexBuffer provides type guard functions for runtime type checking of AST nodes. These utilities use Python 3.13's `TypeIs` for type-safe narrowing, making them ideal for pattern matching and visitor implementations.
+FTLLexBuffer provides type guard methods for runtime type checking of AST nodes. These utilities use Python 3.13's `TypeIs` for type-safe narrowing, making them ideal for pattern matching and visitor implementations.
 
-**Import Location**:
+**v0.9.0**: Type guards are static methods on AST classes.
+
+**Import AST Classes**:
 ```python
 from ftllexbuffer import (
-    is_message,
-    is_term,
-    is_comment,
-    is_junk,
-    is_placeable,
-    is_text_element,
-    has_value,
+    Message,     # Message.guard()
+    Term,        # Term.guard()
+    Comment,     # Comment.guard()
+    Junk,        # Junk.guard()
+    Placeable,   # Placeable.guard()
+    TextElement, # TextElement.guard()
+    has_value,   # Helper function (not a class method)
 )
 ```
 
-**Why use type guards?** They provide both runtime checking AND type narrowing for mypy. After calling `is_message(entry)`, mypy knows `entry` is a `Message` type.
+**Why use type guards?** They provide both runtime checking AND type narrowing for mypy. After calling `Message.guard(entry)`, mypy knows `entry` is a `Message` type.
+
+**v0.9.0 Breaking Change**: Type guards are now static methods on AST classes (e.g., `Message.guard()`) instead of standalone functions (e.g., `is_message()`).
 
 ### Understanding TypeIs Type Narrowing
 
@@ -5881,7 +5905,7 @@ Type guards in FTLLexBuffer use Python 3.13's `TypeIs` (PEP 727) to enable **typ
 **How TypeIs works**:
 
 ```python
-from ftllexbuffer import parse_ftl, is_message, is_term, Message, Term
+from ftllexbuffer import parse_ftl, Message, Term
 
 resource = parse_ftl("""
 hello = Hello!
@@ -5893,12 +5917,12 @@ entry = resource.entries[0]
 # Type: Message | Term | Comment | Junk (union type)
 # entry.id.name  # Type error! Not all union members have 'id'
 
-# With type guard - type is narrowed
-if is_message(entry):
+# With type guard - type is narrowed (v0.9.0: static method API)
+if Message.guard(entry):
     # Inside this block, type checker knows entry is Message
     print(entry.id.name)  # No type error - Message has 'id'
     print(entry.value)    # No type error - Message has 'value'
-elif is_term(entry):
+elif Term.guard(entry):
     # Inside this block, type checker knows entry is Term
     print(entry.id.name)  # No type error - Term has 'id'
     print(entry.value)    # No type error - Term has 'value'
@@ -5913,15 +5937,15 @@ elif is_term(entry):
 **Common pattern in visitors**:
 
 ```python
-from ftllexbuffer import ASTVisitor, is_message, is_term
+from ftllexbuffer import ASTVisitor, Message, Term
 
 class MyVisitor(ASTVisitor):
     def visit_Resource(self, node):
         for entry in node.entries:
-            # Type narrowing enables safe attribute access
-            if is_message(entry):
+            # Type narrowing enables safe attribute access (v0.9.0: static methods)
+            if Message.guard(entry):
                 self.process_message(entry)  # entry: Message
-            elif is_term(entry):
+            elif Term.guard(entry):
                 self.process_term(entry)      # entry: Term
 
     def process_message(self, msg: Message) -> None:
@@ -5934,10 +5958,11 @@ class MyVisitor(ASTVisitor):
 
 ### Available Type Guards
 
-#### is_message()
+#### Message.guard()
 
 ```python
-def is_message(entry: object) -> TypeIs[Message]:
+@staticmethod
+def guard(entry: object) -> TypeIs[Message]:
 ```
 
 Check if an AST entry is a `Message` node.
@@ -5946,21 +5971,21 @@ Check if an AST entry is a `Message` node.
 
 **Example**:
 ```python
-from ftllexbuffer import parse_ftl
-from ftllexbuffer import is_message
+from ftllexbuffer import parse_ftl, Message
 
 resource = parse_ftl("msg = value")
 entry = resource.entries[0]
 
-if is_message(entry):
+if Message.guard(entry):
     # Type-safe: mypy knows entry is Message
     print(f"Message ID: {entry.id.name}")  # No type error
 ```
 
-#### is_term()
+#### Term.guard()
 
 ```python
-def is_term(entry: object) -> TypeIs[Term]:
+@staticmethod
+def guard(entry: object) -> TypeIs[Term]:
 ```
 
 Check if an AST entry is a `Term` node (private message prefixed with `-`).
@@ -5969,30 +5994,31 @@ Check if an AST entry is a `Term` node (private message prefixed with `-`).
 
 **Example**:
 ```python
-from ftllexbuffer import parse_ftl
-from ftllexbuffer import is_term
+from ftllexbuffer import parse_ftl, Term
 
 resource = parse_ftl("-brand = Firefox")
 entry = resource.entries[0]
 
-if is_term(entry):
+if Term.guard(entry):
     print(f"Term ID: {entry.id.name}")  # Type-safe
 ```
 
-#### is_comment()
+#### Comment.guard()
 
 ```python
-def is_comment(entry: object) -> TypeIs[Comment]:
+@staticmethod
+def guard(entry: object) -> TypeIs[Comment]:
 ```
 
 Check if an AST entry is a `Comment` node.
 
 **Returns**: `True` if entry is a Comment, `False` otherwise (with type narrowing)
 
-#### is_junk()
+#### Junk.guard()
 
 ```python
-def is_junk(entry: object) -> TypeIs[Junk]:
+@staticmethod
+def guard(entry: object) -> TypeIs[Junk]:
 ```
 
 Check if an AST entry is a `Junk` node (parse error recovery).
@@ -6001,22 +6027,22 @@ Check if an AST entry is a `Junk` node (parse error recovery).
 
 **Example**:
 ```python
-from ftllexbuffer import parse_ftl
-from ftllexbuffer import is_junk
+from ftllexbuffer import parse_ftl, Junk
 
 resource = parse_ftl("invalid = { $")  # Syntax error
 entry = resource.entries[0]
 
-if is_junk(entry):
+if Junk.guard(entry):
     print(f"Parse error: {entry.content}")
     for annotation in entry.annotations:
         print(f"  Error: {annotation.message}")
 ```
 
-#### is_placeable()
+#### Placeable.guard()
 
 ```python
-def is_placeable(element: object) -> TypeIs[Placeable]:
+@staticmethod
+def guard(element: object) -> TypeIs[Placeable]:
 ```
 
 Check if a pattern element is a `Placeable` node (expression in braces).
@@ -6025,21 +6051,21 @@ Check if a pattern element is a `Placeable` node (expression in braces).
 
 **Example**:
 ```python
-from ftllexbuffer import parse_ftl
-from ftllexbuffer import is_placeable
+from ftllexbuffer import parse_ftl, Placeable
 
 resource = parse_ftl("msg = Text { $var } more text")
 message = resource.entries[0]
 
 for element in message.value.elements:
-    if is_placeable(element):
+    if Placeable.guard(element):
         print(f"Found placeable: {element.expression}")
 ```
 
-#### is_text_element()
+#### TextElement.guard()
 
 ```python
-def is_text_element(element: object) -> TypeIs[TextElement]:
+@staticmethod
+def guard(element: object) -> TypeIs[TextElement]:
 ```
 
 Check if a pattern element is a `TextElement` node (plain text).
@@ -6078,17 +6104,17 @@ for entry in resource.entries:
 Type guards are particularly useful in visitor patterns:
 
 ```python
-from ftllexbuffer import parse_ftl
-from ftllexbuffer import is_message, is_term, is_junk
+from ftllexbuffer import parse_ftl, Message, Term, Junk
 
 resource = parse_ftl(ftl_source)
 
+# v0.9.0: Use static method API for type guards
 for entry in resource.entries:
-    if is_message(entry):
+    if Message.guard(entry):
         print(f"Message: {entry.id.name}")
-    elif is_term(entry):
+    elif Term.guard(entry):
         print(f"Term: {entry.id.name}")
-    elif is_junk(entry):
+    elif Junk.guard(entry):
         print(f"Parse error: {entry.content[:50]}...")
 ```
 
@@ -6546,15 +6572,6 @@ __all__ = [
     # AST - Visitor pattern
     "ASTVisitor",
     "ASTTransformer",
-
-    # AST - Type guards
-    "is_message",
-    "is_term",
-    "is_comment",
-    "is_junk",
-    "is_placeable",
-    "is_text_element",
-    "has_value",
 
     # Module constants
     "__version__",

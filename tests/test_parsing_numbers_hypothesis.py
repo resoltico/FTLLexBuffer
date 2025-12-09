@@ -60,6 +60,7 @@ class TestParseNumberHypothesis:
         parsed, errors = parse_number(formatted, locale)
 
         assert not errors
+        assert parsed is not None
         # Float precision: allow small rounding error
         assert abs(parsed - value) < 0.01
 
@@ -81,7 +82,7 @@ class TestParseNumberHypothesis:
         """Invalid numbers return error in list (v0.8.0 - no exceptions)."""
         result, errors = parse_number(invalid_input, "en_US")
         assert len(errors) > 0
-        assert result == 0.0  # Default fallback value
+        assert result is None  # v0.9.0: Returns None on failure
 
     @given(
         value=st.one_of(
@@ -95,7 +96,7 @@ class TestParseNumberHypothesis:
         """Non-string types return error in list (v0.8.0 - no exceptions)."""
         result, errors = parse_number(value, "en_US")
         assert len(errors) > 0
-        assert result == 0.0
+        assert result is None  # v0.9.0: Returns None on failure
 
 
 class TestParseDecimalHypothesis:
@@ -196,7 +197,7 @@ class TestParseDecimalHypothesis:
         """Invalid decimals return error in list (v0.8.0 - no exceptions)."""
         result, errors = parse_decimal(invalid_input, "en_US")
         assert len(errors) > 0
-        assert result == Decimal("0")  # Default fallback value
+        assert result is None  # v0.9.0: Returns None on failure
 
     @given(
         locale=st.sampled_from(["en_US", "de_DE", "fr_FR", "lv_LV", "pl_PL", "ja_JP"]),
@@ -333,6 +334,7 @@ class TestParsingMetamorphicProperties:
         parsed, errors = parse_decimal(formatted, "en_US")
 
         assert not errors
+        assert parsed is not None
         # Large numbers must not lose precision
         assert abs(parsed - value) < Decimal("0.01")
 

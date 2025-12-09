@@ -135,7 +135,6 @@ def example_2_parse_serialize_roundtrip() -> None:
         except FluentSyntaxError:
             # Invalid FTL - property doesn't apply, skip this example
             assume(False)
-            return
 
         # Only test roundtrip for valid FTL
         serialized = serialize_ftl(resource1)

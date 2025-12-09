@@ -735,7 +735,7 @@ button = Save
                             id=Identifier("DOUBLE"),
                             arguments=CallArguments(
                                 positional=(
-                                    NumberLiteral(value="5"),
+                                    NumberLiteral(value=5, raw="5"),
                                 ),  # parsed_value is a property
                                 named=(),
                             ),

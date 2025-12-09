@@ -486,7 +486,7 @@ class FluentResolverStateMachine(RuleBasedStateMachine):
         func_ref = FunctionReference(
             id=Identifier(name=func_name),
             arguments=CallArguments(
-                positional=(NumberLiteral(value="42"),),
+                positional=(NumberLiteral(value=42, raw="42"),),
                 named=(),
             ),
         )
@@ -691,7 +691,7 @@ class TestResolverErrorPaths:
         """Line 237: Select expression with no variants error."""
         # Create select expression with empty variants
         select_expr = SelectExpression(
-            selector=NumberLiteral(value="1"),
+            selector=NumberLiteral(value=1, raw="1"),
             variants=(),  # Empty!
         )
 

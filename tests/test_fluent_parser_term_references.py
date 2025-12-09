@@ -16,6 +16,7 @@ from __future__ import annotations
 import pytest
 
 from ftllexbuffer.syntax import (
+    Message,
     NumberLiteral,
     Placeable,
     SelectExpression,
@@ -25,7 +26,6 @@ from ftllexbuffer.syntax import (
     VariableReference,
 )
 from ftllexbuffer.syntax.parser import FluentParserV1
-from ftllexbuffer.syntax.type_guards import has_value, is_message, is_placeable
 
 
 @pytest.fixture
@@ -48,7 +48,7 @@ class TestFluentParserBasicTermReferences:
         resource = parser.parse(source)
 
         msg = resource.entries[0]
-        assert is_message(msg) and has_value(msg)
+        assert Message.guard(msg) and msg.value is not None
         msg_value = msg.value
         assert msg_value is not None
         assert len(msg_value.elements) == 3
@@ -59,7 +59,7 @@ class TestFluentParserBasicTermReferences:
         assert elem0.value == "Use "
 
         elem1 = msg_value.elements[1]
-        assert is_placeable(elem1)
+        assert Placeable.guard(elem1)
         expr = elem1.expression
         assert isinstance(expr, TermReference)
         assert expr.id.name == "brand"
@@ -77,13 +77,13 @@ class TestFluentParserBasicTermReferences:
         resource = parser.parse(source)
 
         msg = resource.entries[0]
-        assert is_message(msg) and has_value(msg)
+        assert Message.guard(msg) and msg.value is not None
         msg_value = msg.value
         assert msg_value is not None
         assert len(msg_value.elements) == 1
 
         placeable = msg_value.elements[0]
-        assert is_placeable(placeable)
+        assert Placeable.guard(placeable)
         assert isinstance(placeable.expression, TermReference)
         assert placeable.expression.id.name == "brand"
 
@@ -93,7 +93,7 @@ class TestFluentParserBasicTermReferences:
         resource = parser.parse(source)
 
         msg = resource.entries[0]
-        assert is_message(msg) and has_value(msg)
+        assert Message.guard(msg) and msg.value is not None
         msg_value = msg.value
         assert msg_value is not None
 
@@ -101,7 +101,7 @@ class TestFluentParserBasicTermReferences:
         assert len(msg_value.elements) == 3
 
         placeable1 = msg_value.elements[0]
-        assert is_placeable(placeable1)
+        assert Placeable.guard(placeable1)
         assert isinstance(placeable1.expression, TermReference)
         assert placeable1.expression.id.name == "brand"
 
@@ -109,7 +109,7 @@ class TestFluentParserBasicTermReferences:
         assert msg_value.elements[1].value == " by "
 
         placeable2 = msg_value.elements[2]
-        assert is_placeable(placeable2)
+        assert Placeable.guard(placeable2)
         assert isinstance(placeable2.expression, TermReference)
         assert placeable2.expression.id.name == "vendor"
 
@@ -128,12 +128,12 @@ class TestFluentParserTermReferencesWithAttributes:
         resource = parser.parse(source)
 
         msg = resource.entries[0]
-        assert is_message(msg) and has_value(msg)
+        assert Message.guard(msg) and msg.value is not None
         msg_value = msg.value
         assert msg_value is not None
 
         placeable = msg_value.elements[1]
-        assert is_placeable(placeable)
+        assert Placeable.guard(placeable)
         term_ref = placeable.expression
         assert isinstance(term_ref, TermReference)
         assert term_ref.id.name == "brand"
@@ -148,12 +148,12 @@ class TestFluentParserTermReferencesWithAttributes:
         resource = parser.parse(source)
 
         msg = resource.entries[0]
-        assert is_message(msg) and has_value(msg)
+        assert Message.guard(msg) and msg.value is not None
         msg_value = msg.value
         assert msg_value is not None
 
         placeable = msg_value.elements[0]
-        assert is_placeable(placeable)
+        assert Placeable.guard(placeable)
         term_ref = placeable.expression
         assert isinstance(term_ref, TermReference)
         assert term_ref.id.name == "brand"
@@ -179,12 +179,12 @@ class TestFluentParserTermReferencesWithArguments:
         resource = parser.parse(source)
 
         msg = resource.entries[0]
-        assert is_message(msg) and has_value(msg)
+        assert Message.guard(msg) and msg.value is not None
         msg_value = msg.value
         assert msg_value is not None
 
         placeable = msg_value.elements[1]
-        assert is_placeable(placeable)
+        assert Placeable.guard(placeable)
         term_ref = placeable.expression
         assert isinstance(term_ref, TermReference)
         assert term_ref.id.name == "brand"
@@ -206,7 +206,7 @@ class TestFluentParserTermReferencesInSelect:
         resource = parser.parse(source)
 
         msg = resource.entries[0]
-        assert is_message(msg) and has_value(msg)
+        assert Message.guard(msg) and msg.value is not None
         msg_value = msg.value
         assert msg_value is not None
 
@@ -230,7 +230,7 @@ class TestFluentParserTermReferencesInSelect:
         resource = parser.parse(source)
 
         msg = resource.entries[0]
-        assert is_message(msg) and has_value(msg)
+        assert Message.guard(msg) and msg.value is not None
         msg_value = msg.value
         assert msg_value is not None
 
@@ -262,11 +262,11 @@ message = Use { -brand } browser"""
 
         # Second entry: message with reference
         msg = resource.entries[1]
-        assert is_message(msg) and has_value(msg)
+        assert Message.guard(msg) and msg.value is not None
         msg_value = msg.value
         assert msg_value is not None
         placeable = msg_value.elements[1]
-        assert is_placeable(placeable)
+        assert Placeable.guard(placeable)
         assert isinstance(placeable.expression, TermReference)
         assert placeable.expression.id.name == "brand"
 
@@ -288,11 +288,11 @@ message = { -brand.short } is the short name"""
 
         # Message referencing term attribute
         msg = resource.entries[1]
-        assert is_message(msg) and has_value(msg)
+        assert Message.guard(msg) and msg.value is not None
         msg_value = msg.value
         assert msg_value is not None
         placeable = msg_value.elements[0]
-        assert is_placeable(placeable)
+        assert Placeable.guard(placeable)
         term_ref = placeable.expression
         assert isinstance(term_ref, TermReference)
         assert term_ref.id.name == "brand"
@@ -314,15 +314,15 @@ class TestFluentParserTermReferenceEdgeCases:
         resource = parser.parse(source)
 
         msg = resource.entries[0]
-        assert is_message(msg) and has_value(msg)
+        assert Message.guard(msg) and msg.value is not None
         msg_value = msg.value
         assert msg_value is not None
 
         placeable = msg_value.elements[1]
-        assert is_placeable(placeable)
+        assert Placeable.guard(placeable)
         # Should be NumberLiteral, not TermReference
         assert isinstance(placeable.expression, NumberLiteral)
-        assert placeable.expression.value == "-42"
+        assert placeable.expression.value == -42
 
     def test_parse_term_reference_with_variable(self, parser: FluentParserV1) -> None:
         """Parse term reference alongside variable."""
@@ -330,7 +330,7 @@ class TestFluentParserTermReferenceEdgeCases:
         resource = parser.parse(source)
 
         msg = resource.entries[0]
-        assert is_message(msg) and has_value(msg)
+        assert Message.guard(msg) and msg.value is not None
         msg_value = msg.value
         assert msg_value is not None
 
@@ -347,11 +347,11 @@ class TestFluentParserTermReferenceEdgeCases:
         resource = parser.parse(source)
 
         msg = resource.entries[0]
-        assert is_message(msg) and has_value(msg)
+        assert Message.guard(msg) and msg.value is not None
         msg_value = msg.value
         assert msg_value is not None
         placeable = msg_value.elements[0]
-        assert is_placeable(placeable)
+        assert Placeable.guard(placeable)
         assert isinstance(placeable.expression, TermReference)
         assert placeable.expression.id.name == "brand"
 
@@ -373,7 +373,7 @@ about = { -brand-name } by { -vendor }"""
 
         assert len(resource.entries) == 3
         msg = resource.entries[2]
-        assert is_message(msg) and has_value(msg)
+        assert Message.guard(msg) and msg.value is not None
         msg_value = msg.value
         assert msg_value is not None
 
@@ -396,11 +396,11 @@ message = Open { -firefox.genitive } settings"""
         resource = parser.parse(source)
 
         msg = resource.entries[1]
-        assert is_message(msg) and has_value(msg)
+        assert Message.guard(msg) and msg.value is not None
         msg_value = msg.value
         assert msg_value is not None
         placeable = msg_value.elements[1]
-        assert is_placeable(placeable)
+        assert Placeable.guard(placeable)
         term_ref = placeable.expression
         assert isinstance(term_ref, TermReference)
         assert term_ref.id.name == "firefox"
@@ -418,7 +418,7 @@ message = Open { -firefox.genitive } settings"""
         resource = parser.parse(source)
 
         msg = resource.entries[1]
-        assert is_message(msg) and has_value(msg)
+        assert Message.guard(msg) and msg.value is not None
         msg_value = msg.value
         assert msg_value is not None
 

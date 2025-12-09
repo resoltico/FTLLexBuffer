@@ -71,12 +71,14 @@ def parse_date(
         diagnostic = ErrorTemplate.parse_date_failed(  # type: ignore[unreachable]
             str(value), locale_code, f"Expected string, got {type(value).__name__}"
         )
-        errors.append(FluentParseError(
-            diagnostic,
-            input_value=str(value),
-            locale_code=locale_code,
-            parse_type="date",
-        ))
+        errors.append(
+            FluentParseError(
+                diagnostic,
+                input_value=str(value),
+                locale_code=locale_code,
+                parse_type="date",
+            )
+        )
         return (None, errors)
 
     # Try ISO 8601 first (fastest path)
@@ -90,12 +92,14 @@ def parse_date(
     if not patterns:
         # Unknown locale
         diagnostic = ErrorTemplate.parse_locale_unknown(locale_code)
-        errors.append(FluentParseError(
-            diagnostic,
-            input_value=value,
-            locale_code=locale_code,
-            parse_type="date",
-        ))
+        errors.append(
+            FluentParseError(
+                diagnostic,
+                input_value=value,
+                locale_code=locale_code,
+                parse_type="date",
+            )
+        )
         return (None, errors)
 
     for pattern in patterns:
@@ -108,12 +112,14 @@ def parse_date(
     diagnostic = ErrorTemplate.parse_date_failed(
         value, locale_code, "No matching date pattern found"
     )
-    errors.append(FluentParseError(
-        diagnostic,
-        input_value=value,
-        locale_code=locale_code,
-        parse_type="date",
-    ))
+    errors.append(
+        FluentParseError(
+            diagnostic,
+            input_value=value,
+            locale_code=locale_code,
+            parse_type="date",
+        )
+    )
     return (None, errors)
 
 
@@ -168,12 +174,14 @@ def parse_datetime(
         diagnostic = ErrorTemplate.parse_datetime_failed(  # type: ignore[unreachable]
             str(value), locale_code, f"Expected string, got {type(value).__name__}"
         )
-        errors.append(FluentParseError(
-            diagnostic,
-            input_value=str(value),
-            locale_code=locale_code,
-            parse_type="datetime",
-        ))
+        errors.append(
+            FluentParseError(
+                diagnostic,
+                input_value=str(value),
+                locale_code=locale_code,
+                parse_type="datetime",
+            )
+        )
         return (None, errors)
 
     # Try ISO 8601 first (fastest path)
@@ -190,12 +198,14 @@ def parse_datetime(
     if not patterns:
         # Unknown locale
         diagnostic = ErrorTemplate.parse_locale_unknown(locale_code)
-        errors.append(FluentParseError(
-            diagnostic,
-            input_value=value,
-            locale_code=locale_code,
-            parse_type="datetime",
-        ))
+        errors.append(
+            FluentParseError(
+                diagnostic,
+                input_value=value,
+                locale_code=locale_code,
+                parse_type="datetime",
+            )
+        )
         return (None, errors)
 
     for pattern in patterns:
@@ -211,12 +221,14 @@ def parse_datetime(
     diagnostic = ErrorTemplate.parse_datetime_failed(
         value, locale_code, "No matching datetime pattern found"
     )
-    errors.append(FluentParseError(
-        diagnostic,
-        input_value=value,
-        locale_code=locale_code,
-        parse_type="datetime",
-    ))
+    errors.append(
+        FluentParseError(
+            diagnostic,
+            input_value=value,
+            locale_code=locale_code,
+            parse_type="datetime",
+        )
+    )
     return (None, errors)
 
 
@@ -291,12 +303,14 @@ def _get_datetime_patterns(locale_code: str) -> list[str]:
 
         # Add datetime combinations using locale-specific date patterns
         for date_pat in date_patterns:
-            patterns.extend([
-                f"{date_pat} %H:%M:%S",      # 24-hour with seconds
-                f"{date_pat} %H:%M",         # 24-hour without seconds
-                f"{date_pat} %I:%M:%S %p",   # 12-hour with seconds + AM/PM
-                f"{date_pat} %I:%M %p",      # 12-hour without seconds + AM/PM
-            ])
+            patterns.extend(
+                [
+                    f"{date_pat} %H:%M:%S",  # 24-hour with seconds
+                    f"{date_pat} %H:%M",  # 24-hour without seconds
+                    f"{date_pat} %I:%M:%S %p",  # 12-hour with seconds + AM/PM
+                    f"{date_pat} %I:%M %p",  # 12-hour without seconds + AM/PM
+                ]
+            )
 
         return patterns
 
@@ -311,41 +325,34 @@ def _get_datetime_patterns(locale_code: str) -> list[str]:
 # Token mapping: Babel CLDR pattern -> Python strptime directive
 _BABEL_TOKEN_MAP: dict[str, str] = {
     # Year
-    "yyyy": "%Y",     # 4-digit year
-    "yy": "%y",       # 2-digit year
-    "y": "%Y",        # Year (default to 4-digit)
-
+    "yyyy": "%Y",  # 4-digit year
+    "yy": "%y",  # 2-digit year
+    "y": "%Y",  # Year (default to 4-digit)
     # Month
-    "MMMM": "%B",     # Full month name
-    "MMM": "%b",      # Short month name
-    "MM": "%m",       # 2-digit month
-    "M": "%m",        # Month
-
+    "MMMM": "%B",  # Full month name
+    "MMM": "%b",  # Short month name
+    "MM": "%m",  # 2-digit month
+    "M": "%m",  # Month
     # Day
-    "dd": "%d",       # 2-digit day
-    "d": "%d",        # Day
-
+    "dd": "%d",  # 2-digit day
+    "d": "%d",  # Day
     # Weekday
-    "EEEE": "%A",     # Full weekday name
-    "EEE": "%a",      # Short weekday name
-    "E": "%a",        # Weekday
-
+    "EEEE": "%A",  # Full weekday name
+    "EEE": "%a",  # Short weekday name
+    "E": "%a",  # Weekday
     # Hour
-    "HH": "%H",       # 2-digit hour (0-23)
-    "H": "%H",        # Hour (0-23)
-    "hh": "%I",       # 2-digit hour (1-12)
-    "h": "%I",        # Hour (1-12)
-
+    "HH": "%H",  # 2-digit hour (0-23)
+    "H": "%H",  # Hour (0-23)
+    "hh": "%I",  # 2-digit hour (1-12)
+    "h": "%I",  # Hour (1-12)
     # Minute
-    "mm": "%M",       # 2-digit minute
-    "m": "%M",        # Minute
-
+    "mm": "%M",  # 2-digit minute
+    "m": "%M",  # Minute
     # Second
-    "ss": "%S",       # 2-digit second
-    "s": "%S",        # Second
-
+    "ss": "%S",  # 2-digit second
+    "s": "%S",  # Second
     # AM/PM
-    "a": "%p",        # AM/PM marker
+    "a": "%p",  # AM/PM marker
 }
 
 
@@ -377,7 +384,7 @@ def _tokenize_babel_pattern(pattern: str) -> list[str]:
                 j += 1
             # Include content between quotes as literal
             if j > i + 1:
-                tokens.append(pattern[i + 1:j])
+                tokens.append(pattern[i + 1 : j])
             i = j + 1
             continue
 

@@ -727,4 +727,4 @@ result, errors = parse_date("2025-01-02", locale)  # Always Jan 2
 
 ---
 
-**FTLLexBuffer v0.8.0** - Production-ready bi-directional localization
+**FTLLexBuffer v0.9.0** - Production-ready bi-directional localization

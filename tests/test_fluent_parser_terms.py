@@ -25,7 +25,6 @@ from ftllexbuffer.syntax import (
     VariableReference,
 )
 from ftllexbuffer.syntax.parser import FluentParserV1
-from ftllexbuffer.syntax.type_guards import has_value, is_message, is_term, is_text_element
 
 
 @pytest.fixture
@@ -49,7 +48,7 @@ class TestFluentParserBasicTerms:
 
         assert len(resource.entries) == 1
         term = resource.entries[0]
-        assert is_term(term) and has_value(term)
+        assert Term.guard(term) and term.value is not None
         term_value = term.value
         assert term_value is not None
         assert term.id.name == "brand"
@@ -59,7 +58,7 @@ class TestFluentParserBasicTerms:
         assert len(term_value.elements) == 1
         assert isinstance(term_value.elements[0], TextElement)
         elem0 = term_value.elements[0]
-        assert is_text_element(elem0)
+        assert TextElement.guard(elem0)
         assert elem0.value == "Firefox"
 
         # No attributes
@@ -71,12 +70,12 @@ class TestFluentParserBasicTerms:
         resource = parser.parse(source)
 
         term = resource.entries[0]
-        assert is_term(term) and has_value(term)
+        assert Term.guard(term) and term.value is not None
         term_value = term.value
         assert term_value is not None
         assert term.id.name == "brand-name"
         elem0 = term_value.elements[0]
-        assert is_text_element(elem0)
+        assert TextElement.guard(elem0)
         assert elem0.value == "Mozilla Firefox"
 
     def test_parse_term_with_numbers(self, parser: FluentParserV1) -> None:
@@ -85,12 +84,12 @@ class TestFluentParserBasicTerms:
         resource = parser.parse(source)
 
         term = resource.entries[0]
-        assert is_term(term) and has_value(term)
+        assert Term.guard(term) and term.value is not None
         term_value = term.value
         assert term_value is not None
         assert term.id.name == "version2"
         elem0 = term_value.elements[0]
-        assert is_text_element(elem0)
+        assert TextElement.guard(elem0)
         assert elem0.value == "Build 115"
 
     def test_parse_multiple_terms(self, parser: FluentParserV1) -> None:
@@ -103,13 +102,13 @@ class TestFluentParserBasicTerms:
         assert len(resource.entries) == 3
         assert all(isinstance(entry, Term) for entry in resource.entries)
         entry0 = resource.entries[0]
-        assert is_term(entry0)
+        assert Term.guard(entry0)
         assert entry0.id.name == "brand"
         entry1 = resource.entries[1]
-        assert is_term(entry1)
+        assert Term.guard(entry1)
         assert entry1.id.name == "version"
         entry2 = resource.entries[2]
-        assert is_term(entry2)
+        assert Term.guard(entry2)
         assert entry2.id.name == "vendor"
 
 
@@ -129,7 +128,7 @@ class TestFluentParserTermsWithAttributes:
 
         assert len(resource.entries) == 1
         term = resource.entries[0]
-        assert is_term(term)
+        assert Term.guard(term)
         assert term.id.name == "brand"
 
         # Check attribute
@@ -137,7 +136,7 @@ class TestFluentParserTermsWithAttributes:
         attr = term.attributes[0]
         assert attr.id.name == "gender"
         attr_elem = attr.value.elements[0]
-        assert is_text_element(attr_elem)
+        assert TextElement.guard(attr_elem)
         assert attr_elem.value == "masculine"
 
     def test_parse_term_with_multiple_attributes(self, parser: FluentParserV1) -> None:
@@ -186,7 +185,7 @@ class TestFluentParserTermsWithPlaceables:
         resource = parser.parse(source)
 
         term = resource.entries[0]
-        assert is_term(term) and has_value(term)
+        assert Term.guard(term) and term.value is not None
         term_value = term.value
         assert term_value is not None
         assert len(term_value.elements) == 3
@@ -194,7 +193,7 @@ class TestFluentParserTermsWithPlaceables:
         # Check pattern: "Hello, " + {$name} + "!"
         assert isinstance(term_value.elements[0], TextElement)
         elem0 = term_value.elements[0]
-        assert is_text_element(elem0)
+        assert TextElement.guard(elem0)
         assert elem0.value == "Hello, "
 
         assert isinstance(term_value.elements[1], Placeable)
@@ -204,7 +203,7 @@ class TestFluentParserTermsWithPlaceables:
 
         assert isinstance(term_value.elements[2], TextElement)
         elem2 = term_value.elements[2]
-        assert is_text_element(elem2)
+        assert TextElement.guard(elem2)
         assert elem2.value == "!"
 
     def test_parse_term_with_select_expression(self, parser: FluentParserV1) -> None:
@@ -216,7 +215,7 @@ class TestFluentParserTermsWithPlaceables:
         resource = parser.parse(source)
 
         term = resource.entries[0]
-        assert is_term(term) and has_value(term)
+        assert Term.guard(term) and term.value is not None
         term_value = term.value
         assert term_value is not None
         assert len(term_value.elements) == 1
@@ -254,16 +253,16 @@ message2 = World"""
         assert isinstance(resource.entries[3], Message)
 
         entry0 = resource.entries[0]
-        assert is_term(entry0)
+        assert Term.guard(entry0)
         assert entry0.id.name == "brand"
         entry1 = resource.entries[1]
-        assert is_message(entry1)
+        assert Message.guard(entry1)
         assert entry1.id.name == "message1"
         entry2 = resource.entries[2]
-        assert is_term(entry2)
+        assert Term.guard(entry2)
         assert entry2.id.name == "version"
         entry3 = resource.entries[3]
-        assert is_message(entry3)
+        assert Message.guard(entry3)
         assert entry3.id.name == "message2"
 
     def test_parse_term_followed_by_message_with_attributes(self, parser: FluentParserV1) -> None:
@@ -278,7 +277,7 @@ button = Click
         assert len(resource.entries) == 2
 
         term = resource.entries[0]
-        assert is_term(term)
+        assert Term.guard(term)
         assert term.id.name == "brand"
         assert len(term.attributes) == 1
 
@@ -302,11 +301,11 @@ class TestFluentParserTermEdgeCases:
         resource = parser.parse(source)
 
         term = resource.entries[0]
-        assert is_term(term) and has_value(term)
+        assert Term.guard(term) and term.value is not None
         term_value = term.value
         assert term_value is not None
         elem0 = term_value.elements[0]
-        assert is_text_element(elem0)
+        assert TextElement.guard(elem0)
         assert elem0.value == "你好 👋"
 
     def test_parse_term_with_whitespace_variations(self, parser: FluentParserV1) -> None:
@@ -315,12 +314,12 @@ class TestFluentParserTermEdgeCases:
         resource = parser.parse(source)
 
         term = resource.entries[0]
-        assert is_term(term) and has_value(term)
+        assert Term.guard(term) and term.value is not None
         term_value = term.value
         assert term_value is not None
         assert term.id.name == "brand"
         elem0 = term_value.elements[0]
-        assert is_text_element(elem0)
+        assert TextElement.guard(elem0)
         assert elem0.value == "Firefox   "
 
     def test_parse_multiple_terms_with_blank_lines(self, parser: FluentParserV1) -> None:
@@ -386,7 +385,7 @@ class TestFluentParserTermsRealWorld:
         resource = parser.parse(source)
 
         term = resource.entries[0]
-        assert is_term(term)
+        assert Term.guard(term)
         assert term.id.name == "firefox"
         assert len(term.attributes) == 7
 
@@ -418,13 +417,13 @@ class TestFluentParserTermsRealWorld:
 
         assert len(resource.entries) == 3
         entry0 = resource.entries[0]
-        assert is_term(entry0)
+        assert Term.guard(entry0)
         assert entry0.id.name == "file-menu"
         entry1 = resource.entries[1]
-        assert is_term(entry1)
+        assert Term.guard(entry1)
         assert entry1.id.name == "edit-menu"
         entry2 = resource.entries[2]
-        assert is_term(entry2)
+        assert Term.guard(entry2)
         assert entry2.id.name == "view-menu"
 
     def test_parse_term_with_complex_select(self, parser: FluentParserV1) -> None:
@@ -437,7 +436,7 @@ class TestFluentParserTermsRealWorld:
         resource = parser.parse(source)
 
         term = resource.entries[0]
-        assert is_term(term) and has_value(term)
+        assert Term.guard(term) and term.value is not None
         term_value = term.value
         assert term_value is not None
         assert term.id.name == "photos"

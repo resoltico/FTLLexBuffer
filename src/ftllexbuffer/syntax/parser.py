@@ -2,12 +2,12 @@
 
 Design:
 - Immutable cursor prevents infinite loops (no manual guards needed)
-- Type-safe by design (no `str | None` patterns)
+- Type-safe by design (no custom Result monad)
 - Error messages include line:column with source context
 
 Architecture:
 - Every parser method takes Cursor (immutable) as input
-- Every parser returns Success[ParseResult[T]] | Failure[ParseError]
+- Every parser returns ParseResult[T] | None (None indicates parse failure)
 - No mutation - compiler enforces progress
 
 Module Organization:
@@ -15,11 +15,16 @@ This module is intentionally monolithic (>1000 lines).
 
 Rationale:
 - High cohesion: All methods parse FTL syntax into AST nodes
-- Single dependency: Result monad from ftllexbuffer.result
+- Zero custom dependencies: stdlib-only design
 - Implements complete Fluent 1.0 specification
 - Splitting would introduce coupling between parser submodules
 
 See docs/adr/ADR-003-parser-module-organization.md for analysis.
+
+v0.9.0 Breaking Change:
+    Removed custom Result monad. Parser methods now return `ParseResult[T] | None`
+    instead of `ParseResult[T] | None`. This is simpler,
+    more Pythonic, and uses only stdlib types.
 """
 
 # Pylint suppression: Monolithic parser module by design
@@ -29,7 +34,7 @@ from __future__ import annotations
 
 import logging
 
-from ftllexbuffer.result import Failure, Success
+from ftllexbuffer.enums import CommentType
 
 from .ast import (
     Annotation,
@@ -56,14 +61,19 @@ from .ast import (
     VariableReference,
     Variant,
 )
-from .cursor import Cursor, ParseError, ParseResult
+from .cursor import Cursor, ParseResult
 
 # Module-level logger (after imports per PEP 8)
 logger = logging.getLogger(__name__)
 
 
 class FluentParserV1:
-    """Fluent FTL parser using immutable cursor pattern."""
+    """Fluent FTL parser using immutable cursor pattern.
+
+    v0.9.0: Added __slots__ for memory efficiency.
+    """
+
+    __slots__ = ()
 
     def parse(self, source: str) -> Resource:
         """Parse FTL source into AST Resource.
@@ -95,8 +105,8 @@ class FluentParserV1:
             # Parse comments (per Fluent spec: #, ##, ###)
             if cursor.current == "#":
                 comment_result = self._parse_comment(cursor)
-                if isinstance(comment_result, Success):
-                    comment_parse = comment_result.unwrap()
+                if comment_result is not None:
+                    comment_parse = comment_result
                     entries.append(comment_parse.value)
                     cursor = comment_parse.cursor
                     continue
@@ -111,8 +121,8 @@ class FluentParserV1:
             if cursor.current == "-":
                 term_result = self._parse_term(cursor)
 
-                if isinstance(term_result, Success):
-                    term_parse = term_result.unwrap()
+                if term_result is not None:
+                    term_parse = term_result
                     entries.append(term_parse.value)
                     cursor = term_parse.cursor
                     continue
@@ -120,30 +130,14 @@ class FluentParserV1:
             # Try to parse message
             message_result = self._parse_message(cursor)
 
-            if isinstance(message_result, Success):
-                message_parse = message_result.unwrap()
+            if message_result is not None:
+                message_parse = message_result
                 entries.append(message_parse.value)
                 cursor = message_parse.cursor
             else:
                 # Parse error - create Junk entry and continue (robustness principle)
-                error = message_result.failure()
-
-                # Structured logging for production observability
-                # Only logs at DEBUG level to avoid performance impact
-                if logger.isEnabledFor(logging.DEBUG):
-                    line, col = error.cursor.line_col
-                    logger.debug(
-                        "parse_error_created_junk",
-                        extra={
-                            "message": error.message,
-                            "line": line,
-                            "column": col,
-                            "position": error.cursor.pos,
-                            "expected": error.expected,
-                            "found": error.cursor.current if not error.cursor.is_eof else "<EOF>",
-                        },
-                    )
-
+                # v0.9.0: Detailed error info removed with Result monad elimination
+                # Junk creation still preserves robustness
                 junk_start = cursor.pos
 
                 # Per FTL spec: Junk ::= junk_line (junk_line - "#" - "-" - [a-zA-Z])*
@@ -154,11 +148,11 @@ class FluentParserV1:
                 junk_content = cursor.source[junk_start : cursor.pos]
                 junk_span = Span(start=junk_start, end=cursor.pos)
 
-                # Create annotation from parse error
+                # v0.9.0: Create generic annotation (detailed error info removed with Result monad)
                 annotation = Annotation(
                     code="E0099",  # Generic parse error code
-                    message=error.message,
-                    span=Span(start=error.cursor.pos, end=error.cursor.pos),
+                    message="Parse error",
+                    span=Span(start=junk_start, end=junk_start),
                 )
 
                 entries.append(
@@ -174,7 +168,7 @@ class FluentParserV1:
 
         Per Fluent EBNF:
             Junk ::= junk_line (junk_line - "#" - "-" - [a-zA-Z])*
-            junk_line ::= /[^\n]*/ ("\u000A" | EOF)
+            junk_line ::= /[^\n]*/ ("\u000a" | EOF)
 
         This means:
         1. First junk line: consume to end of line
@@ -231,7 +225,7 @@ class FluentParserV1:
 
         return cursor
 
-    def _parse_identifier(self, cursor: Cursor) -> Success[ParseResult[str]] | Failure[ParseError]:
+    def _parse_identifier(self, cursor: Cursor) -> ParseResult[str] | None:
         """Parse identifier: [a-zA-Z][a-zA-Z0-9_-]*
 
         Fluent identifiers start with a letter and continue with letters,
@@ -251,11 +245,7 @@ class FluentParserV1:
         """
         # Check first character is alpha
         if cursor.is_eof or not cursor.current.isalpha():
-            return Failure(
-                ParseError(
-                    "Expected identifier (must start with letter)", cursor, expected=["a-z", "A-Z"]
-                )
-            )
+            return None  # "Expected identifier (must start with letter)"
 
         # Save start position
         start_pos = cursor.pos
@@ -271,12 +261,27 @@ class FluentParserV1:
 
         # Extract identifier
         identifier = Cursor(cursor.source, start_pos).slice_to(cursor.pos)
-        return Success(ParseResult(identifier, cursor))
+        return ParseResult(identifier, cursor)
 
-    def _parse_number(self, cursor: Cursor) -> Success[ParseResult[str]] | Failure[ParseError]:
+    @staticmethod
+    def _parse_number_value(num_str: str) -> int | float:
+        """Parse number string to int or float.
+
+        v0.9.0: Helper for NumberLiteral construction.
+
+        Args:
+            num_str: Number string from _parse_number
+
+        Returns:
+            int if no decimal point, float otherwise
+        """
+        return int(num_str) if "." not in num_str else float(num_str)
+
+    def _parse_number(self, cursor: Cursor) -> ParseResult[str] | None:
         """Parse number literal: -?[0-9]+(.[0-9]+)?
 
-        Numbers are stored as strings to preserve precision (like Decimal).
+        Returns the raw string representation. Use _parse_number_value()
+        to convert to int or float for NumberLiteral construction.
 
         Examples:
             42 → "42"
@@ -298,7 +303,7 @@ class FluentParserV1:
 
         # Must have at least one digit
         if cursor.is_eof or not cursor.current.isdigit():
-            return Failure(ParseError("Expected number", cursor, expected=["0-9"]))
+            return None  # "Expected number", cursor, expected=["0-9"]
 
         # Integer part
         while not cursor.is_eof and cursor.current.isdigit():
@@ -310,16 +315,14 @@ class FluentParserV1:
 
             # Must have digit after decimal
             if cursor.is_eof or not cursor.current.isdigit():
-                return Failure(
-                    ParseError("Expected digit after decimal point", cursor, expected=["0-9"])
-                )
+                return None  # "Expected digit after decimal point", cursor, expected=["0-9"]
 
             while not cursor.is_eof and cursor.current.isdigit():
                 cursor = cursor.advance()
 
         # Extract number string
         number_str = Cursor(cursor.source, start_pos).slice_to(cursor.pos)
-        return Success(ParseResult(number_str, cursor))
+        return ParseResult(number_str, cursor)
 
     def _skip_blank_inline(self, cursor: Cursor) -> Cursor:
         """Skip inline whitespace (ONLY space U+0020, per FTL spec).
@@ -354,7 +357,7 @@ class FluentParserV1:
         Per Fluent EBNF specification:
             blank ::= (blank_inline | line_end)+
             blank_inline ::= "\u0020"+
-            line_end ::= "\u000D\u000A" | "\u000A" | EOF
+            line_end ::= "\u000d\u000a" | "\u000a" | EOF
 
         This accepts spaces and newlines, but NOT tabs.
 
@@ -375,7 +378,6 @@ class FluentParserV1:
         while not cursor.is_eof and cursor.current in (" ", "\n", "\r"):
             cursor = cursor.advance()  # Always makes progress
         return cursor
-
 
     def _is_indented_continuation(self, cursor: Cursor) -> bool:
         """Check if the next line is an indented pattern continuation.
@@ -412,7 +414,7 @@ class FluentParserV1:
 
     def _parse_escape_sequence(  # noqa: PLR0911
         self, cursor: Cursor
-    ) -> Success[tuple[str, Cursor]] | Failure[ParseError]:
+    ) -> tuple[str, Cursor] | None:
         """Parse escape sequence after backslash in string.
 
         Helper method extracted from _parse_string_literal to reduce complexity.
@@ -436,18 +438,18 @@ class FluentParserV1:
             Failure(ParseError(...)) on invalid escape
         """
         if cursor.is_eof:
-            return Failure(ParseError("Unexpected EOF in string", cursor))
+            return None  # "Unexpected EOF in string", cursor
 
         escape_ch = cursor.current
 
         if escape_ch == '"':
-            return Success(('"', cursor.advance()))
+            return ('"', cursor.advance())
         if escape_ch == "\\":
-            return Success(("\\", cursor.advance()))
+            return ("\\", cursor.advance())
         if escape_ch == "n":
-            return Success(("\n", cursor.advance()))
+            return ("\n", cursor.advance())
         if escape_ch == "t":
-            return Success(("\t", cursor.advance()))
+            return ("\t", cursor.advance())
 
         if escape_ch == "u":
             # Unicode escape: \uXXXX (4 hex digits)
@@ -455,15 +457,13 @@ class FluentParserV1:
             hex_digits = ""
             for _ in range(4):
                 if cursor.is_eof or cursor.current not in "0123456789abcdefABCDEF":
-                    return Failure(
-                        ParseError("Invalid Unicode escape (expected 4 hex digits)", cursor)
-                    )
+                    return None  # "Invalid Unicode escape (expected 4 hex digits)", cursor
                 hex_digits += cursor.current
                 cursor = cursor.advance()
 
             # Convert to character
             code_point = int(hex_digits, 16)
-            return Success((chr(code_point), cursor))
+            return (chr(code_point), cursor)
 
         if escape_ch == "U":
             # Unicode escape: \UXXXXXX (6 hex digits)
@@ -471,9 +471,7 @@ class FluentParserV1:
             hex_digits = ""
             for _ in range(6):
                 if cursor.is_eof or cursor.current not in "0123456789abcdefABCDEF":
-                    return Failure(
-                        ParseError("Invalid Unicode escape (expected 6 hex digits)", cursor)
-                    )
+                    return None  # "Invalid Unicode escape (expected 6 hex digits)", cursor
                 hex_digits += cursor.current
                 cursor = cursor.advance()
 
@@ -481,16 +479,14 @@ class FluentParserV1:
             code_point = int(hex_digits, 16)
             # Validate Unicode code point range
             if code_point > 0x10FFFF:
-                return Failure(
-                    ParseError(f"Invalid Unicode code point: U+{hex_digits} (max U+10FFFF)", cursor)
-                )
-            return Success((chr(code_point), cursor))
+                return None  # f"Invalid Unicode code point: U+{hex_digits} (max U+10FFFF)", cursor
+            return (chr(code_point), cursor)
 
-        return Failure(ParseError(f"Invalid escape sequence: \\{escape_ch}", cursor))
+        return None  # f"Invalid escape sequence: \\{escape_ch}", cursor
 
     def _parse_string_literal(
         self, cursor: Cursor
-    ) -> Success[ParseResult[str]] | Failure[ParseError]:
+    ) -> ParseResult[str] | None:
         """Parse string literal: "text"
 
         Supports escape sequences:
@@ -516,7 +512,7 @@ class FluentParserV1:
         """
         # Expect opening quote
         if cursor.is_eof or cursor.current != '"':
-            return Failure(ParseError("Expected opening quote", cursor, expected=['"']))
+            return None  # "Expected opening quote", cursor, expected=['"']
 
         cursor = cursor.advance()  # Skip opening "
         value = ""
@@ -527,16 +523,16 @@ class FluentParserV1:
             if ch == '"':
                 # Closing quote - done!
                 cursor = cursor.advance()
-                return Success(ParseResult(value, cursor))
+                return ParseResult(value, cursor)
 
             if ch == "\\":
                 # Escape sequence - use extracted helper
                 cursor = cursor.advance()
                 escape_result = self._parse_escape_sequence(cursor)
-                if isinstance(escape_result, Failure):
+                if escape_result is None:
                     return escape_result
 
-                escaped_char, cursor = escape_result.unwrap()
+                escaped_char, cursor = escape_result
                 value += escaped_char
 
             else:
@@ -545,13 +541,13 @@ class FluentParserV1:
                 cursor = cursor.advance()
 
         # EOF without closing quote
-        return Failure(ParseError("Unterminated string literal", cursor))
+        return None  # "Unterminated string literal", cursor
 
     # ===== Pattern & Message Methods (Session 3) =====
 
     def _parse_variable_reference(
         self, cursor: Cursor
-    ) -> Success[ParseResult[VariableReference]] | Failure[ParseError]:
+    ) -> ParseResult[VariableReference] | None:
         """Parse variable reference: $variable
 
         Variables start with $ followed by an identifier.
@@ -569,24 +565,22 @@ class FluentParserV1:
         """
         # Expect $
         if cursor.is_eof or cursor.current != "$":
-            return Failure(
-                ParseError("Expected variable reference (starts with $)", cursor, expected=["$"])
-            )
+            return None  # "Expected variable reference (starts with $)", cursor, expected=["$"]
 
         cursor = cursor.advance()  # Skip $
 
         # Parse identifier
         result = self._parse_identifier(cursor)
-        if isinstance(result, Failure):
+        if result is None:
             return result
 
-        parse_result = result.unwrap()
+        parse_result = result
         var_ref = VariableReference(id=Identifier(parse_result.value))
-        return Success(ParseResult(var_ref, parse_result.cursor))
+        return ParseResult(var_ref, parse_result.cursor)
 
     def _parse_simple_pattern(
         self, cursor: Cursor
-    ) -> Success[ParseResult[Pattern]] | Failure[ParseError]:
+    ) -> ParseResult[Pattern] | None:
         """Parse simple pattern (text with optional placeables).
 
         Handles:
@@ -626,10 +620,10 @@ class FluentParserV1:
                 # Use full placeable parser which handles all expression types
                 # (variables, terms, functions, strings, numbers, select expressions)
                 placeable_result = self._parse_placeable(cursor)
-                if isinstance(placeable_result, Failure):
+                if placeable_result is None:
                     return placeable_result
 
-                placeable_parse = placeable_result.unwrap()
+                placeable_parse = placeable_result
                 cursor = placeable_parse.cursor
                 elements.append(placeable_parse.value)
 
@@ -653,13 +647,13 @@ class FluentParserV1:
                     cursor = cursor.advance()
 
         pattern = Pattern(elements=tuple(elements))
-        return Success(ParseResult(pattern, cursor))
+        return ParseResult(pattern, cursor)
 
     # ===== Select Expression Methods (Session 4) =====
 
     def _parse_variant_key(
         self, cursor: Cursor
-    ) -> Success[ParseResult[Identifier | NumberLiteral]] | Failure[ParseError]:
+    ) -> ParseResult[Identifier | NumberLiteral] | None:
         """Parse variant key (identifier or number).
 
         Helper method extracted from _parse_variant to reduce complexity.
@@ -674,28 +668,32 @@ class FluentParserV1:
         # Try number first
         if not cursor.is_eof and (cursor.current.isdigit() or cursor.current == "-"):
             num_result = self._parse_number(cursor)
-            if isinstance(num_result, Success):
-                num_parse = num_result.unwrap()
-                return Success(ParseResult(NumberLiteral(value=num_parse.value), num_parse.cursor))
+            if num_result is not None:
+                num_parse = num_result
+                num_str = num_parse.value
+                num_value = self._parse_number_value(num_str)
+                return ParseResult(
+                    NumberLiteral(value=num_value, raw=num_str), num_parse.cursor
+                )
 
             # Failed to parse as number, try identifier
             id_result = self._parse_identifier(cursor)
-            if isinstance(id_result, Failure):
+            if id_result is None:
                 # Both failed - return parse error
-                return Failure(ParseError("Expected variant key (identifier or number)", cursor))
+                return None  # "Expected variant key (identifier or number)", cursor
 
-            id_parse = id_result.unwrap()
-            return Success(ParseResult(Identifier(id_parse.value), id_parse.cursor))
+            id_parse = id_result
+            return ParseResult(Identifier(id_parse.value), id_parse.cursor)
 
         # Parse as identifier
         id_result = self._parse_identifier(cursor)
-        if isinstance(id_result, Failure):
+        if id_result is None:
             return id_result
 
-        id_parse = id_result.unwrap()
-        return Success(ParseResult(Identifier(id_parse.value), id_parse.cursor))
+        id_parse = id_result
+        return ParseResult(Identifier(id_parse.value), id_parse.cursor)
 
-    def _parse_variant(self, cursor: Cursor) -> Success[ParseResult[Variant]] | Failure[ParseError]:
+    def _parse_variant(self, cursor: Cursor) -> ParseResult[Variant] | None:
         """Parse variant: [key] pattern or *[key] pattern
 
         Variants are the cases in a select expression.
@@ -722,7 +720,7 @@ class FluentParserV1:
 
         # Expect [
         if cursor.is_eof or cursor.current != "[":
-            return Failure(ParseError("Expected '[' at start of variant", cursor))
+            return None  # "Expected '[' at start of variant", cursor
 
         cursor = cursor.advance()  # Skip [
 
@@ -730,16 +728,16 @@ class FluentParserV1:
         # Per spec: VariantKey ::= "[" blank? (NumberLiteral | Identifier) blank? "]"
         cursor = self._skip_blank_inline(cursor)
         key_result = self._parse_variant_key(cursor)
-        if isinstance(key_result, Failure):
+        if key_result is None:
             return key_result
 
-        key_parse = key_result.unwrap()
+        key_parse = key_result
         variant_key = key_parse.value
         cursor = self._skip_blank_inline(key_parse.cursor)
 
         # Expect ]
         if cursor.is_eof or cursor.current != "]":
-            return Failure(ParseError("Expected ']' after variant key", cursor))
+            return None  # "Expected ']' after variant key", cursor
 
         cursor = cursor.advance()  # Skip ]
         # After ], before pattern: blank_inline (same line) or newline+indent
@@ -748,21 +746,19 @@ class FluentParserV1:
         # Parse pattern (on same line or next line with indent)
         # Simplified: parse until newline that's not indented
         pattern_result = self._parse_simple_pattern(cursor)
-        if isinstance(pattern_result, Failure):
+        if pattern_result is None:
             return pattern_result
 
-        pattern_parse = pattern_result.unwrap()
+        pattern_parse = pattern_result
 
-        # Create span from start to current position
-        span = Span(start=start_pos, end=pattern_parse.cursor.pos)
-
+        # v0.9.0: Variant no longer has span (only top-level entries have spans)
         # Don't skip trailing whitespace - let select expression parser handle it
-        variant = Variant(key=variant_key, value=pattern_parse.value, default=is_default, span=span)
-        return Success(ParseResult(variant, pattern_parse.cursor))
+        variant = Variant(key=variant_key, value=pattern_parse.value, default=is_default)
+        return ParseResult(variant, pattern_parse.cursor)
 
     def _parse_select_expression(
         self, cursor: Cursor, selector: InlineExpression, start_pos: int
-    ) -> Success[ParseResult[SelectExpression]] | Failure[ParseError]:
+    ) -> ParseResult[SelectExpression] | None:
         """Parse select expression after seeing selector and ->
 
         Format: {$var -> [key1] value1 *[key2] value2}
@@ -803,42 +799,30 @@ class FluentParserV1:
 
             # Parse variant
             variant_result = self._parse_variant(cursor)
-            if isinstance(variant_result, Failure):
+            if variant_result is None:
                 return variant_result
 
-            variant_parse = variant_result.unwrap()
+            variant_parse = variant_result
             variants.append(variant_parse.value)
             cursor = variant_parse.cursor
 
         if not variants:
-            return Failure(ParseError("Select expression must have at least one variant", cursor))
+            return None  # "Select expression must have at least one variant", cursor
 
         # Validate exactly one default variant (FTL spec requirement)
         default_count = sum(1 for v in variants if v.default)
         if default_count == 0:
-            return Failure(
-                ParseError(
-                    "Select expression must have exactly one default variant (marked with *)",
-                    cursor,
-                )
-            )
+            return None  # "Select expression must have exactly one default variant (marked with *)"
         if default_count > 1:
-            return Failure(
-                ParseError(
-                    "Select expression must have exactly one default variant, found multiple",
-                    cursor,
-                )
-            )
+            return None  # "Select expression must have exactly one default variant, found multiple"
 
-        # Create span from selector start to end of last variant
-        span = Span(start=start_pos, end=cursor.pos)
-
-        select_expr = SelectExpression(selector=selector, variants=tuple(variants), span=span)
-        return Success(ParseResult(select_expr, cursor))
+        # v0.9.0: SelectExpression no longer has span (only top-level entries have spans)
+        select_expr = SelectExpression(selector=selector, variants=tuple(variants))
+        return ParseResult(select_expr, cursor)
 
     def _parse_argument_expression(  # noqa: PLR0911
         self, cursor: Cursor
-    ) -> Success[ParseResult[InlineExpression]] | Failure[ParseError]:
+    ) -> ParseResult[InlineExpression] | None:
         """Parse a single argument expression (variable, string, number, or identifier).
 
         Helper method extracted from _parse_call_arguments to reduce complexity.
@@ -852,44 +836,43 @@ class FluentParserV1:
         """
         if cursor.current == "$":
             var_result = self._parse_variable_reference(cursor)
-            if isinstance(var_result, Failure):
+            if var_result is None:
                 return var_result
-            var_parse = var_result.unwrap()
-            return Success(ParseResult(var_parse.value, var_parse.cursor))
+            var_parse = var_result
+            return ParseResult(var_parse.value, var_parse.cursor)
 
         if cursor.current == '"':
             str_result = self._parse_string_literal(cursor)
-            if isinstance(str_result, Failure):
+            if str_result is None:
                 return str_result
-            str_parse = str_result.unwrap()
-            return Success(ParseResult(StringLiteral(value=str_parse.value), str_parse.cursor))
+            str_parse = str_result
+            return ParseResult(StringLiteral(value=str_parse.value), str_parse.cursor)
 
         if cursor.current.isdigit() or cursor.current == "-":
             num_result = self._parse_number(cursor)
-            if isinstance(num_result, Failure):
+            if num_result is None:
                 return num_result
-            num_parse = num_result.unwrap()
-            return Success(ParseResult(NumberLiteral(value=num_parse.value), num_parse.cursor))
+            num_parse = num_result
+            num_str = num_parse.value
+            num_value = self._parse_number_value(num_str)
+            return ParseResult(
+                NumberLiteral(value=num_value, raw=num_str), num_parse.cursor
+            )
 
         if cursor.current.isalpha():
             id_result = self._parse_identifier(cursor)
-            if isinstance(id_result, Failure):
+            if id_result is None:
                 return id_result
-            id_parse = id_result.unwrap()
-            return Success(
-                ParseResult(MessageReference(id=Identifier(id_parse.value)), id_parse.cursor)
+            id_parse = id_result
+            return ParseResult(
+                MessageReference(id=Identifier(id_parse.value)), id_parse.cursor
             )
 
-        return Failure(
-            ParseError(
-                "Expected argument expression (variable, string, number, or identifier)",
-                cursor,
-            )
-        )
+        return None  # "Expected argument expression (variable, string, number, or identifier)"
 
     def _parse_call_arguments(  # noqa: PLR0911
         self, cursor: Cursor
-    ) -> Success[ParseResult[CallArguments]] | Failure[ParseError]:
+    ) -> ParseResult[CallArguments] | None:
         """Parse function call arguments: (pos1, pos2, name1: val1, name2: val2)
 
         Arguments consist of positional arguments followed by named arguments.
@@ -925,10 +908,10 @@ class FluentParserV1:
 
             # Parse the argument expression using extracted helper
             arg_result = self._parse_argument_expression(cursor)
-            if isinstance(arg_result, Failure):
+            if arg_result is None:
                 return arg_result
 
-            arg_parse = arg_result.unwrap()
+            arg_parse = arg_result
             arg_expr = arg_parse.value
             cursor = self._skip_blank_inline(arg_parse.cursor)
 
@@ -940,29 +923,25 @@ class FluentParserV1:
 
                 # The argument expression must be an identifier (MessageReference)
                 if not isinstance(arg_expr, MessageReference):
-                    return Failure(
-                        ParseError("Named argument name must be an identifier", cursor)
-                    )
+                    return None  # "Named argument name must be an identifier", cursor
 
                 arg_name = arg_expr.id.name
 
                 # Check for duplicate named argument names
                 if arg_name in seen_named_arg_names:
-                    return Failure(
-                        ParseError(f"Duplicate named argument: '{arg_name}'", cursor)
-                    )
+                    return None  # f"Duplicate named argument: '{arg_name}'", cursor
                 seen_named_arg_names.add(arg_name)
 
                 # Parse the value (must be inline expression)
                 if cursor.is_eof:
-                    return Failure(ParseError("Expected value after ':'", cursor))
+                    return None  # "Expected value after ':'", cursor
 
                 # Parse value expression using extracted helper
                 value_result = self._parse_argument_expression(cursor)
-                if isinstance(value_result, Failure):
+                if value_result is None:
                     return value_result
 
-                value_parse = value_result.unwrap()
+                value_parse = value_result
                 value_expr = value_parse.value
                 cursor = value_parse.cursor
 
@@ -985,7 +964,7 @@ class FluentParserV1:
                         f"              }}\n\n"
                         f"See: https://projectfluent.org/fluent/guide/selectors.html"
                     )
-                    return Failure(ParseError(error_msg, cursor))
+                    return None  # error_msg, cursor
 
                 named.append(NamedArgument(name=Identifier(arg_name), value=value_expr))
                 seen_named = True
@@ -993,9 +972,7 @@ class FluentParserV1:
             else:
                 # This is a positional argument
                 if seen_named:
-                    return Failure(
-                        ParseError("Positional arguments must come before named arguments", cursor)
-                    )
+                    return None  # "Positional arguments must come before named arguments", cursor
                 positional.append(arg_expr)
 
             cursor = self._skip_blank_inline(cursor)
@@ -1006,11 +983,11 @@ class FluentParserV1:
                 cursor = self._skip_blank_inline(cursor)
 
         call_args = CallArguments(positional=tuple(positional), named=tuple(named))
-        return Success(ParseResult(call_args, cursor))
+        return ParseResult(call_args, cursor)
 
     def _parse_function_reference(
         self, cursor: Cursor
-    ) -> Success[ParseResult[FunctionReference]] | Failure[ParseError]:
+    ) -> ParseResult[FunctionReference] | None:
         """Parse function reference: FUNCTION(args)
 
         Function names must be uppercase identifiers.
@@ -1029,54 +1006,52 @@ class FluentParserV1:
         """
         # Parse function name (must be uppercase identifier)
         id_result = self._parse_identifier(cursor)
-        if isinstance(id_result, Failure):
+        if id_result is None:
             return id_result
 
-        id_parse = id_result.unwrap()
+        id_parse = id_result
         func_name = id_parse.value
 
         # Validate function name is uppercase
         if not func_name.isupper():
-            return Failure(
-                ParseError(f"Function name must be uppercase: '{func_name}'", id_parse.cursor)
-            )
+            return None  # f"Function name must be uppercase: '{func_name}'", id_parse.cursor
 
         # Per spec: FunctionReference uses blank? before "("
         cursor = self._skip_blank_inline(id_parse.cursor)
 
         # Expect opening parenthesis
         if cursor.is_eof or cursor.current != "(":
-            return Failure(ParseError("Expected '(' after function name", cursor))
+            return None  # "Expected '(' after function name", cursor
 
         cursor = cursor.advance()  # Skip (
 
         # Parse arguments
         args_result = self._parse_call_arguments(cursor)
-        if isinstance(args_result, Failure):
+        if args_result is None:
             return args_result
 
-        args_parse = args_result.unwrap()
+        args_parse = args_result
         cursor = self._skip_blank_inline(args_parse.cursor)
 
         # Expect closing parenthesis
         if cursor.is_eof or cursor.current != ")":
-            return Failure(ParseError("Expected ')' after function arguments", cursor))
+            return None  # "Expected ')' after function arguments"
 
         cursor = cursor.advance()  # Skip )
 
         func_ref = FunctionReference(id=Identifier(func_name), arguments=args_parse.value)
-        return Success(ParseResult(func_ref, cursor))
+        return ParseResult(func_ref, cursor)
 
     def _parse_inline_expression(  # noqa: PLR0911, PLR0915  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
         self, cursor: Cursor
-    ) -> Success[ParseResult[
-            VariableReference
-            | StringLiteral
-            | NumberLiteral
-            | FunctionReference
-            | MessageReference
-            | TermReference
-        ]] | Failure[ParseError,]:
+    ) -> ParseResult[
+        VariableReference
+        | StringLiteral
+        | NumberLiteral
+        | FunctionReference
+        | MessageReference
+        | TermReference
+    ] | None:
         """Parse inline expression (variable, string, number, function, message, or term reference).
 
         Helper method extracted to reduce complexity in _parse_placeable.
@@ -1099,18 +1074,18 @@ class FluentParserV1:
         if not cursor.is_eof and cursor.current == "$":
             # Parse variable reference
             var_result = self._parse_variable_reference(cursor)
-            if isinstance(var_result, Failure):
+            if var_result is None:
                 return var_result
-            var_parse = var_result.unwrap()
-            return Success(ParseResult(var_parse.value, var_parse.cursor))
+            var_parse = var_result
+            return ParseResult(var_parse.value, var_parse.cursor)
 
         if not cursor.is_eof and cursor.current == '"':
             # Parse string literal
             str_result = self._parse_string_literal(cursor)
-            if isinstance(str_result, Failure):
+            if str_result is None:
                 return str_result
-            str_parse = str_result.unwrap()
-            return Success(ParseResult(StringLiteral(value=str_parse.value), str_parse.cursor))
+            str_parse = str_result
+            return ParseResult(StringLiteral(value=str_parse.value), str_parse.cursor)
 
         if not cursor.is_eof and cursor.current == "-":
             # Could be negative number or term reference
@@ -1119,33 +1094,41 @@ class FluentParserV1:
             if not next_cursor.is_eof and next_cursor.current.isalpha():
                 # It's a term reference: -brand
                 term_result = self._parse_term_reference(cursor)
-                if isinstance(term_result, Failure):
+                if term_result is None:
                     return term_result
-                term_parse = term_result.unwrap()
-                return Success(ParseResult(term_parse.value, term_parse.cursor))
+                term_parse = term_result
+                return ParseResult(term_parse.value, term_parse.cursor)
             # It's a negative number: -123
             num_result = self._parse_number(cursor)
-            if isinstance(num_result, Failure):
+            if num_result is None:
                 return num_result
-            num_parse = num_result.unwrap()
-            return Success(ParseResult(NumberLiteral(value=num_parse.value), num_parse.cursor))
+            num_parse = num_result
+            num_str = num_parse.value
+            num_value = self._parse_number_value(num_str)
+            return ParseResult(
+                NumberLiteral(value=num_value, raw=num_str), num_parse.cursor
+            )
 
         if not cursor.is_eof and cursor.current.isdigit():
             # Parse number literal
             num_result = self._parse_number(cursor)
-            if isinstance(num_result, Failure):
+            if num_result is None:
                 return num_result
-            num_parse = num_result.unwrap()
-            return Success(ParseResult(NumberLiteral(value=num_parse.value), num_parse.cursor))
+            num_parse = num_result
+            num_str = num_parse.value
+            num_value = self._parse_number_value(num_str)
+            return ParseResult(
+                NumberLiteral(value=num_value, raw=num_str), num_parse.cursor
+            )
 
         if not cursor.is_eof and cursor.current.isupper():
             # Might be a function call (uppercase identifier followed by '(')
             # Peek ahead to check for opening parenthesis
             id_result = self._parse_identifier(cursor)
-            if isinstance(id_result, Failure):
+            if id_result is None:
                 return id_result
 
-            id_parse = id_result.unwrap()
+            id_parse = id_result
             func_name = id_parse.value
 
             # Check if uppercase and followed by '('
@@ -1158,10 +1141,10 @@ class FluentParserV1:
             if is_function_call:
                 # It's a function call! Parse it fully
                 func_result = self._parse_function_reference(cursor)
-                if isinstance(func_result, Failure):
+                if func_result is None:
                     return func_result
-                func_parse = func_result.unwrap()
-                return Success(ParseResult(func_parse.value, func_parse.cursor))
+                func_parse = func_result
+                return ParseResult(func_parse.value, func_parse.cursor)
 
             # Not a function - must be a message reference (lowercase or no parens)
             # Check for optional attribute access (.attribute)
@@ -1172,27 +1155,25 @@ class FluentParserV1:
                 cursor_after_id = cursor_after_id.advance()  # Skip '.'
 
                 attr_id_result = self._parse_identifier(cursor_after_id)
-                if isinstance(attr_id_result, Failure):
+                if attr_id_result is None:
                     return attr_id_result
 
-                attr_id_parse = attr_id_result.unwrap()
+                attr_id_parse = attr_id_result
                 attribute = Identifier(attr_id_parse.value)
                 cursor_after_id = attr_id_parse.cursor
 
-            return Success(
-                ParseResult(
-                    MessageReference(id=Identifier(func_name), attribute=attribute),
-                    cursor_after_id,
-                )
+            return ParseResult(
+                MessageReference(id=Identifier(func_name), attribute=attribute),
+                cursor_after_id
             )
 
         # Try parsing as lowercase message reference (msg or msg.attr)
         if not cursor.is_eof and (cursor.current.islower() or cursor.current == "_"):
             id_result = self._parse_identifier(cursor)
-            if isinstance(id_result, Failure):
+            if id_result is None:
                 return id_result
 
-            id_parse = id_result.unwrap()
+            id_parse = id_result
             msg_name = id_parse.value
             cursor_after_id = id_parse.cursor
             msg_attribute: Identifier | None = None
@@ -1202,30 +1183,23 @@ class FluentParserV1:
                 cursor_after_id = cursor_after_id.advance()  # Skip '.'
 
                 attr_id_result = self._parse_identifier(cursor_after_id)
-                if isinstance(attr_id_result, Failure):
+                if attr_id_result is None:
                     return attr_id_result
 
-                attr_id_parse = attr_id_result.unwrap()
+                attr_id_parse = attr_id_result
                 msg_attribute = Identifier(attr_id_parse.value)
                 cursor_after_id = attr_id_parse.cursor
 
-            return Success(
-                ParseResult(
-                    MessageReference(id=Identifier(msg_name), attribute=msg_attribute),
-                    cursor_after_id,
-                )
+            return ParseResult(
+                MessageReference(id=Identifier(msg_name), attribute=msg_attribute),
+                cursor_after_id
             )
 
-        return Failure(
-            ParseError(
-                'Expected variable ($var), string (""), number, or function call',
-                cursor,
-            )
-        )
+        return None  # 'Expected variable ($var), string (""), number, or function call'
 
     def _parse_placeable(
         self, cursor: Cursor
-    ) -> Success[ParseResult[Placeable]] | Failure[ParseError]:
+    ) -> ParseResult[Placeable] | None:
         """Parse placeable expression: {$var}, {"\n"}, {$var -> [key] value}, or {FUNC()}.
 
         Parser combinator helper that reduces nesting in _parse_pattern().
@@ -1258,10 +1232,10 @@ class FluentParserV1:
 
         # Parse the inline expression using extracted helper
         expr_result = self._parse_inline_expression(cursor)
-        if isinstance(expr_result, Failure):
+        if expr_result is None:
             return expr_result
 
-        expr_parse = expr_result.unwrap()
+        expr_parse = expr_result
         expression = expr_parse.value
         parse_result_cursor = expr_parse.cursor
 
@@ -1295,31 +1269,29 @@ class FluentParserV1:
                 # It's a select expression!
                 cursor = next_cursor.advance()  # Skip ->
 
-                select_result = self._parse_select_expression(
-                    cursor, expression, expr_start_pos
-                )
-                if isinstance(select_result, Failure):
+                select_result = self._parse_select_expression(cursor, expression, expr_start_pos)
+                if select_result is None:
                     return select_result
 
-                select_parse = select_result.unwrap()
+                select_parse = select_result
                 cursor = self._skip_blank_inline(select_parse.cursor)
 
                 # Expect }
                 if cursor.is_eof or cursor.current != "}":
-                    return Failure(ParseError("Expected '}' after select expression", cursor))
+                    return None  # "Expected '}' after select expression", cursor
 
                 cursor = cursor.advance()  # Skip }
-                return Success(ParseResult(Placeable(expression=select_parse.value), cursor))
+                return ParseResult(Placeable(expression=select_parse.value), cursor)
 
         # Just a simple inline expression {$var}, {"\n"}, or {42}
         # Expect }
         if cursor.is_eof or cursor.current != "}":
-            return Failure(ParseError("Expected '}'", cursor))
+            return None  # "Expected '}'", cursor
 
         cursor = cursor.advance()  # Skip }
-        return Success(ParseResult(Placeable(expression=expression), cursor))
+        return ParseResult(Placeable(expression=expression), cursor)
 
-    def _parse_pattern(self, cursor: Cursor) -> Success[ParseResult[Pattern]] | Failure[ParseError]:
+    def _parse_pattern(self, cursor: Cursor) -> ParseResult[Pattern] | None:
         """Parse full pattern with support for select expressions.
 
         This replaces _parse_simple_pattern() for complete functionality.
@@ -1374,10 +1346,10 @@ class FluentParserV1:
 
                 # Use helper method to parse placeable (reduces nesting!)
                 placeable_result = self._parse_placeable(cursor)
-                if isinstance(placeable_result, Failure):
+                if placeable_result is None:
                     return placeable_result
 
-                placeable_parse = placeable_result.unwrap()
+                placeable_parse = placeable_result
                 elements.append(placeable_parse.value)
                 cursor = placeable_parse.cursor
 
@@ -1401,9 +1373,9 @@ class FluentParserV1:
                     cursor = cursor.advance()
 
         pattern = Pattern(elements=tuple(elements))
-        return Success(ParseResult(pattern, cursor))
+        return ParseResult(pattern, cursor)
 
-    def _parse_message(self, cursor: Cursor) -> Success[ParseResult[Message]] | Failure[ParseError]:
+    def _parse_message(self, cursor: Cursor) -> ParseResult[Message] | None:
         """Parse message with full support for select expressions.
 
         This replaces _parse_simple_message() for complete functionality.
@@ -1424,32 +1396,32 @@ class FluentParserV1:
 
         # Parse: Identifier "="
         id_result = self._parse_message_header(cursor)
-        if isinstance(id_result, Failure):
+        if id_result is None:
             return id_result
-        id_parse = id_result.unwrap()
+        id_parse = id_result
         cursor = id_parse.cursor
 
         # Parse pattern (message value)
         cursor = self._skip_multiline_pattern_start(cursor)
         pattern_result = self._parse_pattern(cursor)
-        if isinstance(pattern_result, Failure):
+        if pattern_result is None:
             return pattern_result
-        pattern_parse = pattern_result.unwrap()
+        pattern_parse = pattern_result
         cursor = pattern_parse.cursor
 
         # Parse: Attribute* (zero or more attributes)
         attributes_result = self._parse_message_attributes(cursor)
-        if isinstance(attributes_result, Failure):
+        if attributes_result is None:
             return attributes_result
-        attributes_parse = attributes_result.unwrap()
+        attributes_parse = attributes_result
         cursor = attributes_parse.cursor
 
         # Validate: Per spec, Message must have Pattern OR Attribute
-        validation_result = self._validate_message_content(
+        is_valid = self._validate_message_content(
             id_parse.value, pattern_parse.value, attributes_parse.value
         )
-        if isinstance(validation_result, Failure):
-            return validation_result
+        if not is_valid:
+            return None  # Validation failed
 
         # Construct Message node
         message = Message(
@@ -1459,28 +1431,28 @@ class FluentParserV1:
             span=Span(start=start_pos, end=cursor.pos),
         )
 
-        return Success(ParseResult(message, cursor))
+        return ParseResult(message, cursor)
 
     def _parse_message_header(
         self, cursor: Cursor
-    ) -> Success[ParseResult[str]] | Failure[ParseError]:
+    ) -> ParseResult[str] | None:
         """Parse message header: Identifier "="
 
         Returns identifier string and cursor after '='.
         """
         id_result = self._parse_identifier(cursor)
-        if isinstance(id_result, Failure):
+        if id_result is None:
             return id_result
 
-        id_parse = id_result.unwrap()
+        id_parse = id_result
         # Per spec: Message ::= Identifier blank_inline? "=" ...
         cursor = self._skip_blank_inline(id_parse.cursor)
 
         if cursor.is_eof or cursor.current != "=":
-            return Failure(ParseError("Expected '=' after message ID", cursor))
+            return None  # "Expected '=' after message ID", cursor
 
         cursor = cursor.advance()  # Skip =
-        return Success(ParseResult(id_parse.value, cursor))
+        return ParseResult(id_parse.value, cursor)
 
     def _skip_multiline_pattern_start(self, cursor: Cursor) -> Cursor:
         """Skip whitespace and handle multiline pattern start.
@@ -1511,7 +1483,7 @@ class FluentParserV1:
 
     def _parse_message_attributes(
         self, cursor: Cursor
-    ) -> Success[ParseResult[list[Attribute]]] | Failure[ParseError]:
+    ) -> ParseResult[list[Attribute]] | None:
         """Parse zero or more message attributes.
 
         Attributes must appear on new lines starting with '.'.
@@ -1541,40 +1513,35 @@ class FluentParserV1:
 
             # Parse attribute
             attr_result = self._parse_attribute(saved_cursor)
-            if isinstance(attr_result, Failure):
+            if attr_result is None:
                 cursor = saved_cursor
                 break  # Invalid attribute syntax
 
-            attr_parse = attr_result.unwrap()
+            attr_parse = attr_result
             attributes.append(attr_parse.value)
             cursor = attr_parse.cursor
 
-        return Success(ParseResult(attributes, cursor))
+        return ParseResult(attributes, cursor)
 
     def _validate_message_content(
         self, msg_id: str, pattern: Pattern | None, attributes: list[Attribute]
-    ) -> Success[None] | Failure[ParseError]:
+    ) -> bool:
         """Validate message has either pattern or attributes.
 
         Per Fluent spec: Message ::= ID "=" ((Pattern Attribute*) | (Attribute+))
+
+        Returns:
+            True if validation passed, False if validation failed
         """
         has_pattern = pattern is not None and len(pattern.elements) > 0
         has_attributes = len(attributes) > 0
 
-        if not has_pattern and not has_attributes:
-            # Create dummy cursor for error reporting (position doesn't matter here)
-            return Failure(
-                ParseError(
-                    f'Message "{msg_id}" must have either a value or at least one attribute',
-                    Cursor("", 0),
-                )
-            )
-
-        return Success(None)
+        # Message must have either value or attributes
+        return has_pattern or has_attributes
 
     def _parse_attribute(
         self, cursor: Cursor
-    ) -> Success[ParseResult[Attribute]] | Failure[ParseError]:
+    ) -> ParseResult[Attribute] | None:
         """Parse message attribute (.attribute = pattern).
 
         FTL syntax:
@@ -1601,24 +1568,22 @@ class FluentParserV1:
 
         # Check for '.' at start
         if cursor.is_eof or cursor.current != ".":
-            return Failure(ParseError("Expected '.' at start of attribute", cursor, expected=["."]))
+            return None  # "Expected '.' at start of attribute", cursor, expected=["."]
 
         cursor = cursor.advance()  # Skip '.'
 
         # Parse identifier after '.'
         id_result = self._parse_identifier(cursor)
-        if isinstance(id_result, Failure):
+        if id_result is None:
             return id_result
 
-        id_parse = id_result.unwrap()
+        id_parse = id_result
         # Per spec: Attribute ::= line_end blank? "." Identifier blank_inline? "=" ...
         cursor = self._skip_blank_inline(id_parse.cursor)
 
         # Expect '='
         if cursor.is_eof or cursor.current != "=":
-            return Failure(
-                ParseError("Expected '=' after attribute identifier", cursor, expected=["="])
-            )
+            return None  # "Expected '=' after attribute identifier", cursor, expected=["="]
 
         cursor = cursor.advance()  # Skip '='
         # After '=', handle multiline pattern start (same as messages)
@@ -1628,21 +1593,19 @@ class FluentParserV1:
 
         # Parse pattern
         pattern_result = self._parse_pattern(cursor)
-        if isinstance(pattern_result, Failure):
+        if pattern_result is None:
             return pattern_result
 
-        pattern_parse = pattern_result.unwrap()
+        pattern_parse = pattern_result
 
-        # Create span from start to current position
-        span = Span(start=start_pos, end=pattern_parse.cursor.pos)
+        # v0.9.0: Attribute no longer has span (only top-level entries have spans)
+        attribute = Attribute(id=Identifier(id_parse.value), value=pattern_parse.value)
 
-        attribute = Attribute(id=Identifier(id_parse.value), value=pattern_parse.value, span=span)
-
-        return Success(ParseResult(attribute, pattern_parse.cursor))
+        return ParseResult(attribute, pattern_parse.cursor)
 
     def _parse_term(  # pylint: disable=too-many-branches
         self, cursor: Cursor
-    ) -> Success[ParseResult[Term]] | Failure[ParseError]:
+    ) -> ParseResult[Term] | None:
         """Parse term definition (-term-id = pattern).
 
         FTL syntax:
@@ -1664,22 +1627,22 @@ class FluentParserV1:
 
         # Expect '-' prefix
         if cursor.is_eof or cursor.current != "-":
-            return Failure(ParseError("Expected '-' at start of term", cursor, expected=["-"]))
+            return None  # "Expected '-' at start of term", cursor, expected=["-"]
 
         cursor = cursor.advance()  # Skip '-'
 
         # Parse identifier
         id_result = self._parse_identifier(cursor)
-        if isinstance(id_result, Failure):
+        if id_result is None:
             return id_result
 
-        id_parse = id_result.unwrap()
+        id_parse = id_result
         # Per spec: Term ::= "-" Identifier blank_inline? "=" ...
         cursor = self._skip_blank_inline(id_parse.cursor)
 
         # Expect '='
         if cursor.is_eof or cursor.current != "=":
-            return Failure(ParseError("Expected '=' after term ID", cursor, expected=["="]))
+            return None  # "Expected '=' after term ID", cursor, expected=["="]
 
         cursor = cursor.advance()  # Skip '='
 
@@ -1703,20 +1666,15 @@ class FluentParserV1:
 
         # Parse pattern
         pattern_result = self._parse_pattern(cursor)
-        if isinstance(pattern_result, Failure):
+        if pattern_result is None:
             return pattern_result
 
-        pattern_parse = pattern_result.unwrap()
+        pattern_parse = pattern_result
         cursor = pattern_parse.cursor
 
         # Validate term has non-empty value (FTL spec requirement)
         if not pattern_parse.value.elements:
-            return Failure(
-                ParseError(
-                    f'Expected term "-{id_parse.value}" to have a value',
-                    cursor,
-                )
-            )
+            return None  # f'Expected term "-{id_parse.value}" to have a value'
 
         # Parse attributes (reuse attribute parsing logic)
         attributes: list[Attribute] = []
@@ -1744,12 +1702,12 @@ class FluentParserV1:
 
             # Parse attribute
             attr_result = self._parse_attribute(saved_cursor)
-            if isinstance(attr_result, Failure):
+            if attr_result is None:
                 # Not a valid attribute, restore and break
                 cursor = saved_cursor
                 break
 
-            attr_parse = attr_result.unwrap()
+            attr_parse = attr_result
             attributes.append(attr_parse.value)
             cursor = attr_parse.cursor
 
@@ -1763,11 +1721,11 @@ class FluentParserV1:
             span=span,
         )
 
-        return Success(ParseResult(term, cursor))
+        return ParseResult(term, cursor)
 
     def _parse_term_reference(
         self, cursor: Cursor
-    ) -> Success[ParseResult[TermReference]] | Failure[ParseError]:
+    ) -> ParseResult[TermReference] | None:
         """Parse term reference in inline expression (-term-id or -term.attr).
 
         FTL syntax:
@@ -1786,18 +1744,16 @@ class FluentParserV1:
         """
         # Expect '-' prefix
         if cursor.is_eof or cursor.current != "-":
-            return Failure(
-                ParseError("Expected '-' at start of term reference", cursor, expected=["-"])
-            )
+            return None  # "Expected '-' at start of term reference", cursor, expected=["-"]
 
         cursor = cursor.advance()  # Skip '-'
 
         # Parse identifier
         id_result = self._parse_identifier(cursor)
-        if isinstance(id_result, Failure):
+        if id_result is None:
             return id_result
 
-        id_parse = id_result.unwrap()
+        id_parse = id_result
         cursor = id_parse.cursor
 
         # Check for optional attribute access (.attribute)
@@ -1806,10 +1762,10 @@ class FluentParserV1:
             cursor = cursor.advance()  # Skip '.'
 
             attr_id_result = self._parse_identifier(cursor)
-            if isinstance(attr_id_result, Failure):
+            if attr_id_result is None:
                 return attr_id_result
 
-            attr_id_parse = attr_id_result.unwrap()
+            attr_id_parse = attr_id_result
             attribute = Identifier(attr_id_parse.value)
             cursor = attr_id_parse.cursor
 
@@ -1822,15 +1778,15 @@ class FluentParserV1:
             # Parse call arguments (reuse function argument parsing)
             cursor = cursor.advance()  # Skip '('
             args_result = self._parse_call_arguments(cursor)
-            if isinstance(args_result, Failure):
+            if args_result is None:
                 return args_result
 
-            args_parse = args_result.unwrap()
+            args_parse = args_result
             cursor = self._skip_blank_inline(args_parse.cursor)
 
             # Expect closing parenthesis
             if cursor.is_eof or cursor.current != ")":
-                return Failure(ParseError("Expected ')' after term arguments", cursor))
+                return None  # "Expected ')' after term arguments"
 
             cursor = cursor.advance()  # Skip ')'
             arguments = args_parse.value
@@ -1839,9 +1795,9 @@ class FluentParserV1:
             id=Identifier(id_parse.value), attribute=attribute, arguments=arguments
         )
 
-        return Success(ParseResult(term_ref, cursor))
+        return ParseResult(term_ref, cursor)
 
-    def _parse_comment(self, cursor: Cursor) -> Success[ParseResult[Comment]] | Failure[ParseError]:
+    def _parse_comment(self, cursor: Cursor) -> ParseResult[Comment] | None:
         """Parse comment line per Fluent spec.
 
         Per spec, comments come in three types:
@@ -1871,15 +1827,14 @@ class FluentParserV1:
 
         # Validate comment type (1, 2, or 3 hashes)
         if hash_count > 3:
-            return Failure(
-                ParseError(
-                    f"Invalid comment: expected 1-3 '#' characters, found {hash_count}",
-                    cursor,
-                )
-            )
+            return None  # f"Invalid comment: expected 1-3 '#' characters, found {hash_count}"
 
         # Map hash count to comment type
-        comment_type = {1: "comment", 2: "group", 3: "resource"}.get(hash_count, "comment")
+        comment_type = {
+            1: CommentType.COMMENT,
+            2: CommentType.GROUP,
+            3: CommentType.RESOURCE,
+        }.get(hash_count, CommentType.COMMENT)
 
         # Advance cursor past the '#' characters
         cursor = temp_cursor
@@ -1913,4 +1868,4 @@ class FluentParserV1:
             span=Span(start=start_pos, end=cursor.pos),
         )
 
-        return Success(ParseResult(comment_node, cursor))
+        return ParseResult(comment_node, cursor)

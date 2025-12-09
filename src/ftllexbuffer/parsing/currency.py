@@ -24,7 +24,7 @@ from ftllexbuffer.diagnostics.templates import ErrorTemplate
 # Ambiguous currency symbols shared by multiple currencies
 # These symbols require explicit default_currency parameter
 _AMBIGUOUS_SYMBOLS: set[str] = {
-    "$",   # USD, CAD, AUD, SGD, HKD, NZD, MXN, etc.
+    "$",  # USD, CAD, AUD, SGD, HKD, NZD, MXN, etc.
     "kr",  # SEK, NOK, DKK, ISK (krona/krone)
 }
 
@@ -32,29 +32,28 @@ _AMBIGUOUS_SYMBOLS: set[str] = {
 # Ambiguous symbols will require default_currency parameter
 _CURRENCY_SYMBOL_MAP: dict[str, str] = {
     # Ambiguous symbols (default mappings - will fail without default_currency)
-    "$": "USD",    # AMBIGUOUS: Also CAD, AUD, SGD, HKD, NZD, MXN
-
+    "$": "USD",  # AMBIGUOUS: Also CAD, AUD, SGD, HKD, NZD, MXN
     # Unambiguous symbols
     "€": "EUR",
     "£": "GBP",
-    "¥": "JPY",    # Also CNY, but typically means JPY
-    "¢": "USD",    # US cents
-    "₨": "INR",    # Rupee (also PKR, NPR, LKR)
-    "₱": "PHP",    # Philippine peso (also CUP)
-    "₹": "INR",    # Official Indian rupee symbol
+    "¥": "JPY",  # Also CNY, but typically means JPY
+    "¢": "USD",  # US cents
+    "₨": "INR",  # Rupee (also PKR, NPR, LKR)
+    "₱": "PHP",  # Philippine peso (also CUP)
+    "₹": "INR",  # Official Indian rupee symbol
     "₽": "RUB",
-    "₡": "CRC",    # Costa Rican colon
-    "₦": "NGN",    # Nigerian naira
-    "₧": "ESP",    # Spanish peseta (historical)
-    "₩": "KRW",    # South Korean won
-    "₪": "ILS",    # Israeli new shekel
-    "₫": "VND",    # Vietnamese dong
-    "₴": "UAH",    # Ukrainian hryvnia
-    "₵": "GHS",    # Ghanaian cedi
-    "₸": "KZT",    # Kazakhstani tenge
-    "₺": "TRY",    # Turkish lira
-    "₼": "AZN",    # Azerbaijani manat
-    "₾": "GEL",    # Georgian lari
+    "₡": "CRC",  # Costa Rican colon
+    "₦": "NGN",  # Nigerian naira
+    "₧": "ESP",  # Spanish peseta (historical)
+    "₩": "KRW",  # South Korean won
+    "₪": "ILS",  # Israeli new shekel
+    "₫": "VND",  # Vietnamese dong
+    "₴": "UAH",  # Ukrainian hryvnia
+    "₵": "GHS",  # Ghanaian cedi
+    "₸": "KZT",  # Kazakhstani tenge
+    "₺": "TRY",  # Turkish lira
+    "₼": "AZN",  # Azerbaijani manat
+    "₾": "GEL",  # Georgian lari
 }
 
 # Locale to default currency mapping (for infer_from_locale=True)
@@ -163,24 +162,30 @@ def parse_currency(
         diagnostic = ErrorTemplate.parse_currency_failed(  # type: ignore[unreachable]
             str(value), locale_code, f"Expected string, got {type(value).__name__}"
         )
-        errors.append(FluentParseError(
-            diagnostic,
-            input_value=str(value),
-            locale_code=locale_code,
-            parse_type="currency",
-        ))
+        errors.append(
+            FluentParseError(
+                diagnostic,
+                input_value=str(value),
+                locale_code=locale_code,
+                parse_type="currency",
+            )
+        )
         return (None, errors)
 
     try:
-        locale = Locale.parse(locale_code)
+        # v0.9.0: Normalize locale format (en-US → en_US) for Babel
+        normalized_locale = locale_code.replace("-", "_")
+        locale = Locale.parse(normalized_locale)
     except (UnknownLocaleError, ValueError):
         diagnostic = ErrorTemplate.parse_locale_unknown(locale_code)
-        errors.append(FluentParseError(
-            diagnostic,
-            input_value=value,
-            locale_code=locale_code,
-            parse_type="currency",
-        ))
+        errors.append(
+            FluentParseError(
+                diagnostic,
+                input_value=value,
+                locale_code=locale_code,
+                parse_type="currency",
+            )
+        )
         return (None, errors)
 
     # Extract currency symbol or code
@@ -192,12 +197,14 @@ def parse_currency(
         diagnostic = ErrorTemplate.parse_currency_failed(
             value, locale_code, "No currency symbol or code found"
         )
-        errors.append(FluentParseError(
-            diagnostic,
-            input_value=value,
-            locale_code=locale_code,
-            parse_type="currency",
-        ))
+        errors.append(
+            FluentParseError(
+                diagnostic,
+                input_value=value,
+                locale_code=locale_code,
+                parse_type="currency",
+            )
+        )
         return (None, errors)
 
     currency_str = match.group(1)
@@ -213,35 +220,41 @@ def parse_currency(
                 inferred_currency = _LOCALE_TO_CURRENCY.get(locale_code)
                 if inferred_currency is None:
                     diagnostic = ErrorTemplate.parse_currency_ambiguous(currency_str, value)
-                    errors.append(FluentParseError(
-                        diagnostic,
-                        input_value=value,
-                        locale_code=locale_code,
-                        parse_type="currency",
-                    ))
+                    errors.append(
+                        FluentParseError(
+                            diagnostic,
+                            input_value=value,
+                            locale_code=locale_code,
+                            parse_type="currency",
+                        )
+                    )
                     return (None, errors)
                 currency_code = inferred_currency
             else:
                 # No default provided - error for ambiguous symbol
                 diagnostic = ErrorTemplate.parse_currency_ambiguous(currency_str, value)
-                errors.append(FluentParseError(
-                    diagnostic,
-                    input_value=value,
-                    locale_code=locale_code,
-                    parse_type="currency",
-                ))
+                errors.append(
+                    FluentParseError(
+                        diagnostic,
+                        input_value=value,
+                        locale_code=locale_code,
+                        parse_type="currency",
+                    )
+                )
                 return (None, errors)
         else:
             # Unambiguous symbol - use mapping
             mapped_currency = _CURRENCY_SYMBOL_MAP.get(currency_str)
             if mapped_currency is None:
                 diagnostic = ErrorTemplate.parse_currency_symbol_unknown(currency_str, value)
-                errors.append(FluentParseError(
-                    diagnostic,
-                    input_value=value,
-                    locale_code=locale_code,
-                    parse_type="currency",
-                ))
+                errors.append(
+                    FluentParseError(
+                        diagnostic,
+                        input_value=value,
+                        locale_code=locale_code,
+                        parse_type="currency",
+                    )
+                )
                 return (None, errors)
             currency_code = mapped_currency
     else:
@@ -256,12 +269,14 @@ def parse_currency(
         amount = parse_decimal(number_str, locale=locale)
     except NumberFormatError as e:
         diagnostic = ErrorTemplate.parse_amount_invalid(number_str, value, str(e))
-        errors.append(FluentParseError(
-            diagnostic,
-            input_value=value,
-            locale_code=locale_code,
-            parse_type="currency",
-        ))
+        errors.append(
+            FluentParseError(
+                diagnostic,
+                input_value=value,
+                locale_code=locale_code,
+                parse_type="currency",
+            )
+        )
         return (None, errors)
 
     return ((amount, currency_code), errors)

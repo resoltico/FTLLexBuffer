@@ -117,7 +117,7 @@ Fixes #123
 Use imperative mood.
 
 CI requirements:
-- All tests pass (2,131+ tests)
+- All tests pass (3,581+ tests)
 - Type checking passes (mypy --strict)
 - Linting passes (ruff, pylint)
 - Coverage 95%+

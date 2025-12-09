@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from hypothesis import given, settings
 
+from ftllexbuffer.enums import CommentType
 from ftllexbuffer.syntax import parse, serialize
 from ftllexbuffer.syntax.ast import (
     Comment,
@@ -145,12 +146,12 @@ def test_roundtrip_numeric_variant():
                         selector=VariableReference(id=Identifier(name="count")),
                         variants=(
                             Variant(
-                                key=NumberLiteral(value="0"),
+                                key=NumberLiteral(value=0, raw="0"),
                                 value=Pattern(elements=(TextElement(value="no items"),)),
                                 default=False,
                             ),
                             Variant(
-                                key=NumberLiteral(value="1"),
+                                key=NumberLiteral(value=1, raw="1"),
                                 value=Pattern(elements=(TextElement(value="one item"),)),
                                 default=False,
                             ),
@@ -184,7 +185,7 @@ def test_roundtrip_comment():
     silently ignored during parsing. This test documents the limitation.
     When parser support is added, this test should pass.
     """
-    comment = Comment(content=" This is a comment")
+    comment = Comment(content=" This is a comment", type=CommentType.COMMENT)
     resource = Resource(entries=(comment,))
 
     serialized = serialize(resource)
@@ -242,13 +243,13 @@ def test_roundtrip_mixed_entries():
     NOTE: Parser ignores standalone comments, so only messages survive roundtrip.
     """
     entries = (
-        Comment(content=" Header comment"),
+        Comment(content=" Header comment", type=CommentType.COMMENT),
         Message(
             id=Identifier(name="app-name"),
             value=Pattern(elements=(TextElement(value="MyApp"),)),
             attributes=(),
         ),
-        Comment(content=" Another comment"),
+        Comment(content=" Another comment", type=CommentType.COMMENT),
         Message(
             id=Identifier(name="version"),
             value=Pattern(elements=(TextElement(value="1.0.0"),)),

@@ -20,6 +20,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from ftllexbuffer.diagnostics import ErrorTemplate
+
 __all__ = ["Cursor", "ParseError", "ParseResult"]
 
 
@@ -96,8 +98,6 @@ class Cursor:
             Type safety: mypy knows current is ALWAYS str, never None.
         """
         if self.is_eof:
-            from ftllexbuffer.diagnostics import ErrorTemplate
-
             diagnostic = ErrorTemplate.unexpected_eof(self.pos)
             raise EOFError(diagnostic.message)
         return self.source[self.pos]
@@ -226,27 +226,6 @@ class Cursor:
         col = self.pos - last_newline if last_newline >= 0 else self.pos + 1
 
         return (line, col)
-
-    @property
-    def line_col(self) -> tuple[int, int]:
-        """Line and column position as property for cleaner API.
-
-        Property wrapper around compute_line_col() for Pythonic attribute access.
-        Consistent with cursor.current, cursor.is_eof (properties).
-
-        Returns:
-            Tuple of (line_number, column_number), both 1-indexed
-
-        Note:
-            This is an O(n) operation. Cache result if calling multiple times.
-
-        Example:
-            >>> cursor = Cursor("hello\nworld", 7)
-            >>> line, col = cursor.line_col
-            >>> print(f"Position: {line}:{col}")
-            Position: 2:2
-        """
-        return self.compute_line_col()
 
 
 @dataclass(frozen=True, slots=True)

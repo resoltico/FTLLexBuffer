@@ -38,8 +38,7 @@ class TestNamedArgumentValueRestriction:
 
         # Verify error annotation exists
         assert len(entry.annotations) > 0
-        annotation = entry.annotations[0]
-        assert "literal" in annotation.message.lower()
+        # v0.9.0: Generic error message (detailed info removed)
 
     def test_rejects_message_reference_as_named_arg_value(self):
         """Reject message reference as named argument value."""
@@ -270,8 +269,7 @@ msg = { $count ->
         assert len(resource.entries) == 1
         entry = resource.entries[0]
         assert type(entry).__name__ == "Junk"
-        # Verify error mentions default variant
-        assert any("default" in ann.message.lower() for ann in entry.annotations)
+        # v0.9.0: Generic error message (detailed info removed)
 
     def test_rejects_select_with_multiple_default_variants(self):
         """Reject select expression with multiple default variants."""

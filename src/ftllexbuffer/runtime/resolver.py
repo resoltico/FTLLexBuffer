@@ -16,6 +16,7 @@ from ftllexbuffer.diagnostics import (
     FluentResolutionError,
 )
 from ftllexbuffer.runtime.function_bridge import FunctionRegistry
+from ftllexbuffer.runtime.function_metadata import should_inject_locale
 from ftllexbuffer.runtime.plural_rules import select_plural_category
 from ftllexbuffer.syntax import (
     FunctionReference,
@@ -41,7 +42,19 @@ class FluentResolver:
     - Collects errors instead of embedding them in output
     - Returns (result, errors) tuples
     - Provides readable fallbacks per Fluent specification
+
+    v0.9.0: Added __slots__ for memory efficiency.
     """
+
+    __slots__ = (
+        "_resolution_stack",
+        "errors",
+        "function_registry",
+        "locale",
+        "messages",
+        "terms",
+        "use_isolating",
+    )
 
     def __init__(
         self,
@@ -185,7 +198,7 @@ class FluentResolver:
             case StringLiteral():
                 return expr.value
             case NumberLiteral():
-                return expr.parsed_value
+                return expr.value
             case Placeable():
                 return self._resolve_expression(expr.expression, args)
             case _:
@@ -255,10 +268,7 @@ class FluentResolver:
                 if str(selector_value) == variant.key.name:
                     matched_variant = variant
                     break
-            elif (
-                isinstance(variant.key, NumberLiteral)
-                and selector_value == variant.key.parsed_value
-            ):
+            elif isinstance(variant.key, NumberLiteral) and selector_value == variant.key.value:
                 # Number key
                 matched_variant = variant
                 break
@@ -291,8 +301,6 @@ class FluentResolver:
         Uses FunctionRegistry to handle camelCase → snake_case parameter conversion.
         Uses metadata system to determine if locale injection is needed.
         """
-        from ftllexbuffer.runtime.function_metadata import should_inject_locale
-
         func_name = func_ref.id.name
 
         # Evaluate positional arguments

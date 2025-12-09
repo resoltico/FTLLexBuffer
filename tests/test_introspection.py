@@ -9,6 +9,7 @@ from __future__ import annotations
 import pytest
 
 from ftllexbuffer import FluentBundle, extract_variables, introspect_message
+from ftllexbuffer.enums import ReferenceKind, VariableContext
 from ftllexbuffer.introspection import VariableInfo
 from ftllexbuffer.syntax.parser import FluentParserV1
 
@@ -152,7 +153,7 @@ greeting = Welcome to { brand }
         refs = list(info.references)
         assert len(refs) == 1
         assert refs[0].id == "brand"
-        assert refs[0].kind == "message"
+        assert refs[0].kind == ReferenceKind.MESSAGE
         assert refs[0].attribute is None
 
     def test_term_reference(self) -> None:
@@ -167,7 +168,7 @@ greeting = Welcome to { -brand }
         refs = list(info.references)
         assert len(refs) == 1
         assert refs[0].id == "brand"
-        assert refs[0].kind == "term"
+        assert refs[0].kind == ReferenceKind.TERM
 
     def test_attribute_reference(self) -> None:
         """Detect attribute reference."""
@@ -201,7 +202,7 @@ class TestMessageIntrospection:
 
     def test_variable_info_immutability(self) -> None:
         """VariableInfo is frozen and immutable."""
-        var_info = VariableInfo(name="test", context="pattern")
+        var_info = VariableInfo(name="test", context=VariableContext.PATTERN)
 
         with pytest.raises(AttributeError):
             var_info.name = "modified"  # type: ignore[misc]

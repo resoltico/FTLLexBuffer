@@ -26,7 +26,6 @@ from ftllexbuffer.syntax import (
     VariableReference,
 )
 from ftllexbuffer.syntax.parser import FluentParserV1
-from ftllexbuffer.syntax.type_guards import has_value, is_message, is_placeable
 
 
 @pytest.fixture
@@ -50,7 +49,7 @@ class TestFluentParserBasicFunctions:
 
         assert len(resource.entries) == 1
         msg = resource.entries[0]
-        assert is_message(msg) and has_value(msg)
+        assert Message.guard(msg) and msg.value is not None
         msg_value = msg.value
         assert msg_value is not None
         assert msg_value is not None
@@ -70,7 +69,7 @@ class TestFluentParserBasicFunctions:
         resource = parser.parse(source)
 
         msg = resource.entries[0]
-        assert is_message(msg) and has_value(msg)
+        assert Message.guard(msg) and msg.value is not None
         msg_value = msg.value
         assert msg_value is not None
         assert msg_value is not None
@@ -94,7 +93,7 @@ class TestFluentParserBasicFunctions:
         resource = parser.parse(source)
 
         msg = resource.entries[0]
-        assert is_message(msg) and has_value(msg)
+        assert Message.guard(msg) and msg.value is not None
         msg_value = msg.value
         assert msg_value is not None
         placeable = msg_value.elements[0]
@@ -111,7 +110,7 @@ class TestFluentParserBasicFunctions:
         resource = parser.parse(source)
 
         msg = resource.entries[0]
-        assert is_message(msg) and has_value(msg)
+        assert Message.guard(msg) and msg.value is not None
         msg_value = msg.value
         assert msg_value is not None
         placeable = msg_value.elements[0]
@@ -135,11 +134,11 @@ class TestFluentParserPositionalArguments:
         resource = parser.parse(source)
 
         msg = resource.entries[0]
-        assert is_message(msg) and has_value(msg)
+        assert Message.guard(msg) and msg.value is not None
         msg_value = msg.value
         assert msg_value is not None
         placeable = msg_value.elements[0]
-        assert is_placeable(placeable)
+        assert Placeable.guard(placeable)
         func = placeable.expression
         assert isinstance(func, FunctionReference)
 
@@ -154,11 +153,11 @@ class TestFluentParserPositionalArguments:
         resource = parser.parse(source)
 
         msg = resource.entries[0]
-        assert is_message(msg) and has_value(msg)
+        assert Message.guard(msg) and msg.value is not None
         msg_value = msg.value
         assert msg_value is not None
         elem_0 = msg_value.elements[0]
-        assert is_placeable(elem_0)
+        assert Placeable.guard(elem_0)
         func = elem_0.expression
         assert isinstance(func, FunctionReference)
 
@@ -180,18 +179,18 @@ class TestFluentParserPositionalArguments:
         resource = parser.parse(source)
 
         msg = resource.entries[0]
-        assert is_message(msg) and has_value(msg)
+        assert Message.guard(msg) and msg.value is not None
         msg_value = msg.value
         assert msg_value is not None
         elem_0 = msg_value.elements[0]
-        assert is_placeable(elem_0)
+        assert Placeable.guard(elem_0)
         func = elem_0.expression
         assert isinstance(func, FunctionReference)
 
         assert len(func.arguments.positional) == 1
         arg = func.arguments.positional[0]
         assert isinstance(arg, NumberLiteral)
-        assert arg.value == "42"
+        assert arg.value == 42
 
     def test_parse_function_string_literal_argument(self, parser: FluentParserV1) -> None:
         """Parse function with string literal argument."""
@@ -199,11 +198,11 @@ class TestFluentParserPositionalArguments:
         resource = parser.parse(source)
 
         msg = resource.entries[0]
-        assert is_message(msg) and has_value(msg)
+        assert Message.guard(msg) and msg.value is not None
         msg_value = msg.value
         assert msg_value is not None
         elem_0 = msg_value.elements[0]
-        assert is_placeable(elem_0)
+        assert Placeable.guard(elem_0)
         func = elem_0.expression
         assert isinstance(func, FunctionReference)
 
@@ -218,11 +217,11 @@ class TestFluentParserPositionalArguments:
         resource = parser.parse(source)
 
         msg = resource.entries[0]
-        assert is_message(msg) and has_value(msg)
+        assert Message.guard(msg) and msg.value is not None
         msg_value = msg.value
         assert msg_value is not None
         elem_0 = msg_value.elements[0]
-        assert is_placeable(elem_0)
+        assert Placeable.guard(elem_0)
         func = elem_0.expression
         assert isinstance(func, FunctionReference)
 
@@ -247,11 +246,11 @@ class TestFluentParserNamedArguments:
         resource = parser.parse(source)
 
         msg = resource.entries[0]
-        assert is_message(msg) and has_value(msg)
+        assert Message.guard(msg) and msg.value is not None
         msg_value = msg.value
         assert msg_value is not None
         elem_0 = msg_value.elements[0]
-        assert is_placeable(elem_0)
+        assert Placeable.guard(elem_0)
         func = elem_0.expression
         assert isinstance(func, FunctionReference)
 
@@ -261,7 +260,7 @@ class TestFluentParserNamedArguments:
         named_arg = func.arguments.named[0]
         assert named_arg.name.name == "minimumFractionDigits"
         assert isinstance(named_arg.value, NumberLiteral)
-        assert named_arg.value.value == "2"
+        assert named_arg.value.value == 2
 
     def test_parse_function_multiple_named_args(self, parser: FluentParserV1) -> None:
         """Parse function with multiple named arguments.
@@ -273,11 +272,11 @@ class TestFluentParserNamedArguments:
         resource = parser.parse(source)
 
         msg = resource.entries[0]
-        assert is_message(msg) and has_value(msg)
+        assert Message.guard(msg) and msg.value is not None
         msg_value = msg.value
         assert msg_value is not None
         elem_0 = msg_value.elements[0]
-        assert is_placeable(elem_0)
+        assert Placeable.guard(elem_0)
         func = elem_0.expression
         assert isinstance(func, FunctionReference)
 
@@ -299,11 +298,11 @@ class TestFluentParserNamedArguments:
         resource = parser.parse(source)
 
         msg = resource.entries[0]
-        assert is_message(msg) and has_value(msg)
+        assert Message.guard(msg) and msg.value is not None
         msg_value = msg.value
         assert msg_value is not None
         elem_0 = msg_value.elements[0]
-        assert is_placeable(elem_0)
+        assert Placeable.guard(elem_0)
         func = elem_0.expression
         assert isinstance(func, FunctionReference)
 
@@ -322,11 +321,11 @@ class TestFluentParserNamedArguments:
         resource = parser.parse(source)
 
         msg = resource.entries[0]
-        assert is_message(msg) and has_value(msg)
+        assert Message.guard(msg) and msg.value is not None
         msg_value = msg.value
         assert msg_value is not None
         elem_0 = msg_value.elements[0]
-        assert is_placeable(elem_0)
+        assert Placeable.guard(elem_0)
         func = elem_0.expression
         assert isinstance(func, FunctionReference)
 
@@ -348,7 +347,7 @@ class TestFluentParserFunctionRealWorld:
         resource = parser.parse(source)
 
         msg = resource.entries[0]
-        assert is_message(msg) and has_value(msg)
+        assert Message.guard(msg) and msg.value is not None
         msg_value = msg.value
         assert msg_value is not None
         assert msg.id.name == "price"
@@ -372,11 +371,11 @@ class TestFluentParserFunctionRealWorld:
         resource = parser.parse(source)
 
         msg = resource.entries[0]
-        assert is_message(msg) and has_value(msg)
+        assert Message.guard(msg) and msg.value is not None
         msg_value = msg.value
         assert msg_value is not None
         elem_1 = msg_value.elements[1]
-        assert is_placeable(elem_1)
+        assert Placeable.guard(elem_1)
         func = elem_1.expression
         assert isinstance(func, FunctionReference)
 
@@ -420,11 +419,11 @@ class TestFluentParserFunctionWhitespace:
         resource = parser.parse(source)
 
         msg = resource.entries[0]
-        assert is_message(msg) and has_value(msg)
+        assert Message.guard(msg) and msg.value is not None
         msg_value = msg.value
         assert msg_value is not None
         elem_0 = msg_value.elements[0]
-        assert is_placeable(elem_0)
+        assert Placeable.guard(elem_0)
         func = elem_0.expression
         assert isinstance(func, FunctionReference)
 
@@ -437,11 +436,11 @@ class TestFluentParserFunctionWhitespace:
         resource = parser.parse(source)
 
         msg = resource.entries[0]
-        assert is_message(msg) and has_value(msg)
+        assert Message.guard(msg) and msg.value is not None
         msg_value = msg.value
         assert msg_value is not None
         elem_0 = msg_value.elements[0]
-        assert is_placeable(elem_0)
+        assert Placeable.guard(elem_0)
         func = elem_0.expression
         assert isinstance(func, FunctionReference)
 
@@ -455,11 +454,11 @@ class TestFluentParserFunctionWhitespace:
         resource = parser.parse(source)
 
         msg = resource.entries[0]
-        assert is_message(msg) and has_value(msg)
+        assert Message.guard(msg) and msg.value is not None
         msg_value = msg.value
         assert msg_value is not None
         elem_0 = msg_value.elements[0]
-        assert is_placeable(elem_0)
+        assert Placeable.guard(elem_0)
         func = elem_0.expression
         assert isinstance(func, FunctionReference)
 
@@ -478,11 +477,11 @@ class TestFluentParserFunctionEdgeCases:
         resource = parser.parse(source)
 
         msg = resource.entries[0]
-        assert is_message(msg) and has_value(msg)
+        assert Message.guard(msg) and msg.value is not None
         msg_value = msg.value
         assert msg_value is not None
         elem_0 = msg_value.elements[0]
-        assert is_placeable(elem_0)
+        assert Placeable.guard(elem_0)
         func = elem_0.expression
         assert isinstance(func, FunctionReference)
 
@@ -496,17 +495,17 @@ class TestFluentParserFunctionEdgeCases:
         resource = parser.parse(source)
 
         msg = resource.entries[0]
-        assert is_message(msg) and has_value(msg)
+        assert Message.guard(msg) and msg.value is not None
         msg_value = msg.value
         assert msg_value is not None
         elem_0 = msg_value.elements[0]
-        assert is_placeable(elem_0)
+        assert Placeable.guard(elem_0)
         func = elem_0.expression
         assert isinstance(func, FunctionReference)
 
         arg = func.arguments.positional[0]
         assert isinstance(arg, NumberLiteral)
-        assert arg.value == "0"
+        assert arg.value == 0
 
     def test_parse_function_negative_number_arg(self, parser: FluentParserV1) -> None:
         """Parse function with negative number."""
@@ -514,17 +513,17 @@ class TestFluentParserFunctionEdgeCases:
         resource = parser.parse(source)
 
         msg = resource.entries[0]
-        assert is_message(msg) and has_value(msg)
+        assert Message.guard(msg) and msg.value is not None
         msg_value = msg.value
         assert msg_value is not None
         elem_0 = msg_value.elements[0]
-        assert is_placeable(elem_0)
+        assert Placeable.guard(elem_0)
         func = elem_0.expression
         assert isinstance(func, FunctionReference)
 
         arg = func.arguments.positional[0]
         assert isinstance(arg, NumberLiteral)
-        assert arg.value == "-42"
+        assert arg.value == -42
 
     def test_parse_function_decimal_number_arg(self, parser: FluentParserV1) -> None:
         """Parse function with decimal number."""
@@ -532,17 +531,17 @@ class TestFluentParserFunctionEdgeCases:
         resource = parser.parse(source)
 
         msg = resource.entries[0]
-        assert is_message(msg) and has_value(msg)
+        assert Message.guard(msg) and msg.value is not None
         msg_value = msg.value
         assert msg_value is not None
         elem_0 = msg_value.elements[0]
-        assert is_placeable(elem_0)
+        assert Placeable.guard(elem_0)
         func = elem_0.expression
         assert isinstance(func, FunctionReference)
 
         arg = func.arguments.positional[0]
         assert isinstance(arg, NumberLiteral)
-        assert arg.value == "3.14"
+        assert arg.value == 3.14
 
     def test_parse_multiple_functions_in_pattern(self, parser: FluentParserV1) -> None:
         """Parse message with multiple function calls."""
@@ -550,7 +549,7 @@ class TestFluentParserFunctionEdgeCases:
         resource = parser.parse(source)
 
         msg = resource.entries[0]
-        assert is_message(msg) and has_value(msg)
+        assert Message.guard(msg) and msg.value is not None
         msg_value = msg.value
         assert msg_value is not None
 
@@ -559,10 +558,10 @@ class TestFluentParserFunctionEdgeCases:
 
         # Check function calls at positions 1 and 3
         elem_1 = msg_value.elements[1]
-        assert is_placeable(elem_1)
+        assert Placeable.guard(elem_1)
         func1 = elem_1.expression
         elem_3 = msg_value.elements[3]
-        assert is_placeable(elem_3)
+        assert Placeable.guard(elem_3)
         func2 = elem_3.expression
         assert isinstance(func1, FunctionReference)
         assert isinstance(func2, FunctionReference)
@@ -582,7 +581,7 @@ class TestFluentParserFunctionIntegration:
         resource = parser.parse(source)
 
         msg = resource.entries[0]
-        assert is_message(msg) and has_value(msg)
+        assert Message.guard(msg) and msg.value is not None
         msg_value = msg.value
         assert msg_value is not None
 
@@ -598,7 +597,7 @@ class TestFluentParserFunctionIntegration:
         resource = parser.parse(source)
 
         msg = resource.entries[0]
-        assert is_message(msg) and has_value(msg)
+        assert Message.guard(msg) and msg.value is not None
         msg_value = msg.value
         assert msg_value is not None
 
@@ -607,9 +606,9 @@ class TestFluentParserFunctionIntegration:
         assert len(msg_value.elements) == 4
 
         var_placeable = msg_value.elements[1]
-        assert is_placeable(var_placeable)
+        assert Placeable.guard(var_placeable)
         func_placeable = msg_value.elements[3]
-        assert is_placeable(func_placeable)
+        assert Placeable.guard(func_placeable)
 
         assert isinstance(var_placeable.expression, VariableReference)
         assert isinstance(func_placeable.expression, FunctionReference)

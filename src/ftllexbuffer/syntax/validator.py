@@ -262,9 +262,7 @@ class SemanticValidator:
         else:
             self._validate_inline_expression(expr, context)
 
-    def _validate_inline_expression(
-        self, expr: InlineExpression, context: str
-    ) -> None:
+    def _validate_inline_expression(self, expr: InlineExpression, context: str) -> None:
         """Validate inline expression using structural pattern matching."""
         match expr:
             case StringLiteral():
@@ -282,9 +280,7 @@ class SemanticValidator:
             case Placeable():
                 self._validate_expression(expr.expression, context)
 
-    def _validate_message_reference(
-        self, ref: MessageReference, context: str
-    ) -> None:
+    def _validate_message_reference(self, ref: MessageReference, context: str) -> None:
         """Validate message reference.
 
         Per spec:
@@ -397,6 +393,7 @@ class SemanticValidator:
             return key.name
         # key must be NumberLiteral at this point
         return key.value
+
 
 # ============================================================================
 # CONVENIENCE FUNCTION

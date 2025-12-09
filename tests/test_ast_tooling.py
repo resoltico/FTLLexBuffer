@@ -110,7 +110,7 @@ class TestASTVisitorPattern:
 
             def visit_Message(self, node: Message) -> None:
                 self.count += 1
-                return super().visit_Message(node)
+                self.generic_visit(node)
 
         ftl = """
 hello = Hello!
@@ -131,7 +131,7 @@ welcome = Welcome!
 
             def visit_Message(self, node: Message) -> None:
                 self.ids.append(node.id.name)
-                return super().visit_Message(node)
+                self.generic_visit(node)
 
         ftl = """
 first = First
@@ -152,7 +152,7 @@ third = Third
 
             def visit_VariableReference(self, node: VariableReference) -> None:
                 self.variables.add(node.id.name)
-                return super().visit_VariableReference(node)
+                self.generic_visit(node)
 
         ftl = """
 greeting = Hello, { $name }!
@@ -185,6 +185,7 @@ goodbye = Goodbye!
 
         transformer = RemoveCommentsTransformer()
         cleaned = transformer.transform(resource)
+        assert isinstance(cleaned, Resource), f"Expected Resource, got {type(cleaned)}"
 
         # Should have fewer entries (comments removed)
         assert len(cleaned.entries) < original_count
@@ -209,6 +210,7 @@ goodbye = Goodbye!
 
         transformer = RenameVariablesTransformer({"userName": "user_name"})
         renamed = transformer.transform(resource)
+        assert isinstance(renamed, Resource), f"Expected Resource, got {type(renamed)}"
 
         serialized = serialize_ftl(renamed)
         assert "user_name" in serialized
@@ -231,6 +233,7 @@ goodbye = Goodbye!
 
         transformer = RemoveEmptyTransformer()
         filtered = transformer.transform(resource)
+        assert isinstance(filtered, Resource), f"Expected Resource, got {type(filtered)}"
 
         # Should only have 2 messages (empty removed)
         messages = [e for e in filtered.entries if isinstance(e, Message)]
@@ -305,7 +308,7 @@ goodbye = Goodbye, { $unknown_var }!
                 # In real linter, check against declared vars
                 if "unknown" in node.id.name:
                     self.undefined_vars.append(node.id.name)
-                return super().visit_VariableReference(node)
+                self.generic_visit(node)
 
         visitor = FindUnknownVarsVisitor()
         visitor.visit(resource)
@@ -341,6 +344,7 @@ goodbye = Goodbye, { $unknown_var }!
 
         transformer = ModernizeTransformer()
         modernized = transformer.transform(resource)
+        assert isinstance(modernized, Resource), f"Expected Resource, got {type(modernized)}"
 
         # Step 3: Serialize modernized FTL
         result = serialize_ftl(modernized)

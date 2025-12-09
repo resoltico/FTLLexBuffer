@@ -5,6 +5,7 @@ Validates serialization of AST nodes back to FTL syntax.
 
 from __future__ import annotations
 
+from ftllexbuffer.enums import CommentType
 from ftllexbuffer.syntax import serialize
 from ftllexbuffer.syntax.ast import (
     Attribute,
@@ -121,7 +122,7 @@ class TestSerializerMessage:
             id=Identifier(name="test"),
             value=Pattern(elements=(TextElement(value="Test"),)),
             attributes=(),
-            comment=Comment(content="This is a comment"),
+            comment=Comment(content="This is a comment", type=CommentType.COMMENT),
         )
         resource = Resource(entries=(msg,))
 
@@ -223,7 +224,7 @@ class TestSerializerTerm:
             id=Identifier(name="brand"),
             value=Pattern(elements=(TextElement(value="Firefox"),)),
             attributes=(),
-            comment=Comment(content="Brand name"),
+            comment=Comment(content="Brand name", type=CommentType.COMMENT),
         )
         resource = Resource(entries=(term,))
 
@@ -243,7 +244,7 @@ class TestSerializerCommentJunk:
 
     def test_serialize_standalone_comment(self) -> None:
         """Serialize standalone comment."""
-        comment = Comment(content="This is a comment")
+        comment = Comment(content="This is a comment", type=CommentType.COMMENT)
         resource = Resource(entries=(comment,))
 
         result = serialize(resource)
@@ -252,7 +253,7 @@ class TestSerializerCommentJunk:
 
     def test_serialize_group_comment(self) -> None:
         """Serialize group comment (##)."""
-        comment = Comment(content="Group comment", type="group")
+        comment = Comment(content="Group comment", type=CommentType.GROUP)
         resource = Resource(entries=(comment,))
 
         result = serialize(resource)
@@ -261,7 +262,7 @@ class TestSerializerCommentJunk:
 
     def test_serialize_resource_comment(self) -> None:
         """Serialize resource comment (###)."""
-        comment = Comment(content="Resource comment", type="resource")
+        comment = Comment(content="Resource comment", type=CommentType.RESOURCE)
         resource = Resource(entries=(comment,))
 
         result = serialize(resource)
@@ -270,7 +271,7 @@ class TestSerializerCommentJunk:
 
     def test_serialize_multiline_comment(self) -> None:
         """Serialize multi-line comment."""
-        comment = Comment(content="Line 1\nLine 2\nLine 3")
+        comment = Comment(content="Line 1\nLine 2\nLine 3", type=CommentType.COMMENT)
         resource = Resource(entries=(comment,))
 
         result = serialize(resource)
@@ -331,7 +332,7 @@ class TestSerializerExpressions:
         """Serialize number literal."""
         msg = Message(
             id=Identifier(name="test"),
-            value=Pattern(elements=(Placeable(expression=NumberLiteral(value="42")),)),
+            value=Pattern(elements=(Placeable(expression=NumberLiteral(value=42, raw="42")),)),
             attributes=(),
         )
         resource = Resource(entries=(msg,))
@@ -465,7 +466,7 @@ class TestSerializerReferences:
                             id=Identifier(name="brand"),
                             attribute=None,
                             arguments=CallArguments(
-                                positional=(NumberLiteral(value="1"),), named=()
+                                positional=(NumberLiteral(value=1, raw="1"),), named=()
                             ),
                         )
                     ),
@@ -548,8 +549,8 @@ class TestSerializerFunctionReference:
                             id=Identifier(name="TEST"),
                             arguments=CallArguments(
                                 positional=(
-                                    NumberLiteral(value="1"),
-                                    NumberLiteral(value="2"),
+                                    NumberLiteral(value=1, raw="1"),
+                                    NumberLiteral(value=2, raw="2"),
                                     StringLiteral(value="three"),
                                 ),
                                 named=(),
@@ -580,7 +581,7 @@ class TestSerializerFunctionReference:
                                 named=(
                                     NamedArgument(
                                         name=Identifier(name="minimumFractionDigits"),
-                                        value=NumberLiteral(value="2"),
+                                        value=NumberLiteral(value=2, raw="2"),
                                     ),
                                 ),
                             ),
@@ -692,14 +693,14 @@ class TestSerializerSelectExpression:
                             selector=VariableReference(id=Identifier(name="count")),
                             variants=(
                                 Variant(
-                                    key=NumberLiteral(value="0"),
+                                    key=NumberLiteral(value=0, raw="0"),
                                     value=Pattern(
                                         elements=(TextElement(value="no items"),)
                                     ),
                                     default=False,
                                 ),
                                 Variant(
-                                    key=NumberLiteral(value="1"),
+                                    key=NumberLiteral(value=1, raw="1"),
                                     value=Pattern(
                                         elements=(TextElement(value="one item"),)
                                     ),
@@ -740,7 +741,7 @@ class TestSerializerIntegration:
         """Serialize resource with comments, messages, and terms."""
         resource = Resource(
             entries=(
-                Comment(content="Header comment"),
+                Comment(content="Header comment", type=CommentType.COMMENT),
                 Message(
                     id=Identifier(name="hello"),
                     value=Pattern(elements=(TextElement(value="Hello"),)),
@@ -826,7 +827,7 @@ class TestSerializerIntegration:
                                 named=(
                                     NamedArgument(
                                         name=Identifier(name="minimumFractionDigits"),
-                                        value=NumberLiteral(value="2"),
+                                        value=NumberLiteral(value=2, raw="2"),
                                     ),
                                 ),
                             ),
@@ -840,7 +841,7 @@ class TestSerializerIntegration:
                     value=Pattern(elements=(TextElement(value="Product price"),)),
                 ),
             ),
-            comment=Comment(content="Displays formatted price"),
+            comment=Comment(content="Displays formatted price", type=CommentType.COMMENT),
         )
         resource = Resource(entries=(msg,))
 

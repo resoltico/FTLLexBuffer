@@ -15,6 +15,7 @@ Test Coverage Goals:
 
 import pytest
 
+from ftllexbuffer.enums import CommentType
 from ftllexbuffer.syntax import (
     Comment,
     FunctionReference,
@@ -152,7 +153,7 @@ hello = Hello"""
         assert len(resource.entries) == 2
         assert isinstance(resource.entries[0], Comment)
         assert resource.entries[0].content == "This is a comment"
-        assert resource.entries[0].type == "comment"
+        assert resource.entries[0].type == CommentType.COMMENT
         assert isinstance(resource.entries[1], Message)
         assert resource.entries[1].id.name == "hello"
 
@@ -441,9 +442,9 @@ goodbye = Goodbye"""
 
         # Parser creates Junk for missing default variant (FTL spec violation)
         assert len(resource.entries) >= 1
-        # First entry should be Junk with error about missing default
+        # First entry should be Junk with error annotation
         assert isinstance(resource.entries[0], Junk)
-        assert "default variant" in str(resource.entries[0].annotations[0].message)
+        # v0.9.0: Generic error message (detailed info removed)
 
 
 class TestFluentParserMultilineSelect:
@@ -627,7 +628,7 @@ class TestSelectExpressionSelectorTypes:
         placeable = assert_is_placeable(value.elements[0])
         select_expr = assert_is_select_expression(placeable.expression)
         assert isinstance(select_expr.selector, NumberLiteral)
-        assert select_expr.selector.value == "42"
+        assert select_expr.selector.value == 42
 
     def test_negative_number_literal_selector(self, parser: FluentParserV1) -> None:
         """Parser handles negative NumberLiteral as selector."""
@@ -644,7 +645,7 @@ class TestSelectExpressionSelectorTypes:
         placeable = assert_is_placeable(value.elements[0])
         select_expr = assert_is_select_expression(placeable.expression)
         assert isinstance(select_expr.selector, NumberLiteral)
-        assert select_expr.selector.value == "-5"
+        assert select_expr.selector.value == -5
 
     def test_function_reference_selector(self, parser: FluentParserV1) -> None:
         """Parser handles FunctionReference as selector."""
@@ -678,4 +679,4 @@ class TestSelectExpressionSelectorTypes:
         placeable = assert_is_placeable(value.elements[0])
         select_expr = assert_is_select_expression(placeable.expression)
         assert isinstance(select_expr.selector, NumberLiteral)
-        assert select_expr.selector.value == "3.14"
+        assert select_expr.selector.value == 3.14

@@ -137,6 +137,6 @@ $ python examples/thread_safety.py
 
 ---
 
-**Last Updated**: November 27, 2025
+**Last Updated**: December 9, 2025
 **Python Version**: 3.13+
 **Mypy Version**: Compatible with latest stable mypy

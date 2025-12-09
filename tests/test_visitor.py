@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from ftllexbuffer.enums import CommentType
 from ftllexbuffer.syntax.ast import (
     Attribute,
     CallArguments,
@@ -188,7 +189,7 @@ class TestVisitorMessage:
             id=Identifier(name="test"),
             value=Pattern(elements=(TextElement(value="Test"),)),
             attributes=(),
-            comment=Comment(content="This is a comment"),
+            comment=Comment(content="This is a comment", type=CommentType.COMMENT),
         )
 
         visitor.visit(msg)
@@ -262,7 +263,7 @@ class TestVisitorTerm:
             id=Identifier(name="brand"),
             value=Pattern(elements=(TextElement(value="Firefox"),)),
             attributes=(),
-            comment=Comment(content="Brand name"),
+            comment=Comment(content="Brand name", type=CommentType.COMMENT),
         )
 
         visitor.visit(term)
@@ -295,7 +296,7 @@ class TestVisitorCommentJunk:
     def test_visit_comment(self) -> None:
         """Visit comment node."""
         visitor = CountingVisitor()
-        comment = Comment(content="This is a comment")
+        comment = Comment(content="This is a comment", type=CommentType.COMMENT)
 
         visitor.visit(comment)
 
@@ -396,7 +397,7 @@ class TestVisitorLiterals:
     def test_visit_number_literal(self) -> None:
         """Visit number literal."""
         visitor = CountingVisitor()
-        literal = NumberLiteral(value="42")
+        literal = NumberLiteral(value=42, raw="42")
 
         visitor.visit(literal)
 
@@ -562,7 +563,7 @@ class TestVisitorVariant:
         """Visit variant with number literal key."""
         visitor = CountingVisitor()
         variant = Variant(
-            key=NumberLiteral(value="0"),
+            key=NumberLiteral(value=0, raw="0"),
             value=Pattern(elements=(TextElement(value="none"),)),
             default=False,
         )
@@ -596,7 +597,7 @@ class TestVisitorCallArguments:
         args = CallArguments(
             positional=(
                 VariableReference(id=Identifier(name="x")),
-                NumberLiteral(value="42"),
+                NumberLiteral(value=42, raw="42"),
             ),
             named=(),
         )
@@ -634,7 +635,7 @@ class TestVisitorNamedArgument:
         """Visit named argument."""
         visitor = CountingVisitor()
         arg = NamedArgument(
-            name=Identifier(name="minimumFractionDigits"), value=NumberLiteral(value="2")
+            name=Identifier(name="minimumFractionDigits"), value=NumberLiteral(value=2, raw="2")
         )
 
         visitor.visit(arg)
@@ -780,7 +781,7 @@ class TestVisitorIntegration:
                                 named=(
                                     NamedArgument(
                                         name=Identifier(name="minimumFractionDigits"),
-                                        value=NumberLiteral(value="2"),
+                                        value=NumberLiteral(value=2, raw="2"),
                                     ),
                                 ),
                             ),
@@ -803,7 +804,7 @@ class TestVisitorIntegration:
         visitor = CountingVisitor()
         resource = Resource(
             entries=(
-                Comment(content="Header comment"),
+                Comment(content="Header comment", type=CommentType.COMMENT),
                 Message(
                     id=Identifier(name="hello"),
                     value=Pattern(elements=(TextElement(value="Hello"),)),

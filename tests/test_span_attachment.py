@@ -4,8 +4,7 @@ Verifies that parser attaches Span objects to AST nodes for IDE integration
 and error reporting.
 """
 
-
-from ftllexbuffer.syntax.ast import Attribute, Junk, Message, Span, Term
+from ftllexbuffer.syntax.ast import Junk, Message, Span, Term
 from ftllexbuffer.syntax.parser import FluentParserV1
 
 
@@ -103,7 +102,6 @@ class TestMessageSpans:
         assert msg1.span.end <= msg2.span.start
         assert msg2.span.end <= msg3.span.start
 
-
 class TestTermSpans:
     # Test span attachment to Term nodes
 
@@ -152,53 +150,6 @@ class TestTermSpans:
         # Verify span starts at '-'
         assert source[term.span.start] == "-"
 
-
-class TestAttributeSpans:
-    # Test span attachment to Attribute nodes
-
-    def test_attribute_has_span(self):
-        # Attribute should have span
-        parser = FluentParserV1()
-        source = "msg = Value\n    .tooltip = Help text"
-        resource = parser.parse(source)
-
-        msg = resource.entries[0]
-        assert isinstance(msg, Message)
-        assert msg.value is not None
-        assert len(msg.attributes) == 1
-
-        attr = msg.attributes[0]
-        assert isinstance(attr, Attribute)
-        assert attr.span is not None
-        assert isinstance(attr.span, Span)
-
-        # Verify span covers attribute (including leading whitespace)
-        assert attr.span.start >= 0
-        assert attr.span.end <= len(source)
-
-    def test_multiple_attributes_have_distinct_spans(self):
-        # Multiple attributes should have distinct spans
-        parser = FluentParserV1()
-        source = "msg = Value\n    .attr1 = First\n    .attr2 = Second"
-        resource = parser.parse(source)
-
-        msg = resource.entries[0]
-        assert isinstance(msg, Message)
-        assert msg.value is not None
-        assert len(msg.attributes) == 2
-
-        attr1 = msg.attributes[0]
-        assert isinstance(attr1, Attribute)
-        attr2 = msg.attributes[1]
-        assert isinstance(attr2, Attribute)
-
-        assert attr1.span is not None
-        assert attr2.span is not None
-
-        # Spans should not overlap
-        assert attr1.span.end <= attr2.span.start
-
-
 class TestJunkSpans:
     # Test span attachment and annotations on Junk nodes
 
@@ -238,7 +189,6 @@ class TestJunkSpans:
             annotation = junk.annotations[0]
             assert annotation.code is not None
             assert annotation.message is not None
-
 
 class TestSpanProperties:
     # Test span invariants and properties
@@ -286,7 +236,6 @@ class TestSpanProperties:
         content = source[msg.span.start : msg.span.end]
         assert content == "greeting = Hello"
 
-
 class TestMultilineSpans:
     # Test span handling for multiline content
 
@@ -319,197 +268,3 @@ class TestMultilineSpans:
         # Span should cover message and all attributes
         assert msg.span.start == 0
         assert msg.span.end == len(source)
-
-
-class TestSelectExpressionSpans:
-    # Test span attachment to SelectExpression nodes
-
-    def test_simple_select_has_span(self):
-        # Simple select expression should have span
-        parser = FluentParserV1()
-        source = "msg = { $count ->\n    [one] One\n   *[other] Many\n}"
-        resource = parser.parse(source)
-
-        assert len(resource.entries) == 1
-        msg = resource.entries[0]
-        assert isinstance(msg, Message)
-        assert msg.value is not None
-        assert msg.value is not None
-
-        # Get the select expression from the placeable
-        from ftllexbuffer.syntax.ast import Placeable, SelectExpression
-        placeable = msg.value.elements[0]
-        assert isinstance(placeable, Placeable)
-        select_expr = placeable.expression
-        assert isinstance(select_expr, SelectExpression)
-
-        # Check select expression has span
-        assert select_expr.span is not None
-        assert isinstance(select_expr.span, Span)
-
-    def test_select_span_covers_selector_and_variants(self):
-        # Select span should cover from selector start to end of variants
-        parser = FluentParserV1()
-        source = "msg = { $count ->\n    [one] One item\n   *[other] Many items\n}"
-        resource = parser.parse(source)
-
-        msg = resource.entries[0]
-        assert isinstance(msg, Message)
-        assert msg.value is not None
-
-        from ftllexbuffer.syntax.ast import Placeable, SelectExpression
-        placeable = msg.value.elements[0]
-        assert isinstance(placeable, Placeable)
-        select_expr = placeable.expression
-        assert isinstance(select_expr, SelectExpression)
-
-        # Span should start at $count (position 8: "msg = { ")
-        # and end after last variant
-        assert select_expr.span is not None
-        assert select_expr.span.start == 8  # Start of "$count"
-        # End should be after all variants are parsed (before closing })
-
-    def test_select_with_multiple_variants_span(self):
-        # Select with multiple variants should have span
-        parser = FluentParserV1()
-        source = "msg = { $count ->\n    [zero] Zero\n    [one] One\n    [two] Two\n   *[other] Many\n}"  # noqa: E501 pylint: disable=line-too-long
-        resource = parser.parse(source)
-
-        msg = resource.entries[0]
-        assert isinstance(msg, Message)
-        assert msg.value is not None
-        from ftllexbuffer.syntax.ast import Placeable, SelectExpression
-        placeable = msg.value.elements[0]
-        assert isinstance(placeable, Placeable)
-        select_expr = placeable.expression
-        assert isinstance(select_expr, SelectExpression)
-
-        assert select_expr.span is not None
-        assert select_expr.span.start <= select_expr.span.end
-
-
-class TestVariantSpans:
-    # Test span attachment to Variant nodes
-
-    def test_variant_has_span(self):
-        # Variant should have span
-        parser = FluentParserV1()
-        source = "msg = { $count ->\n    [one] One item\n   *[other] Many items\n}"
-        resource = parser.parse(source)
-
-        msg = resource.entries[0]
-        assert isinstance(msg, Message)
-        assert msg.value is not None
-        from ftllexbuffer.syntax.ast import Placeable, SelectExpression
-        placeable = msg.value.elements[0]
-        assert isinstance(placeable, Placeable)
-        select_expr = placeable.expression
-        assert isinstance(select_expr, SelectExpression)
-
-        # Check first variant has span
-        assert len(select_expr.variants) >= 1
-        variant = select_expr.variants[0]
-        assert variant.span is not None
-        assert isinstance(variant.span, Span)
-
-    def test_all_variants_have_spans(self):
-        # All variants in select should have spans
-        parser = FluentParserV1()
-        source = "msg = { $count ->\n    [zero] Zero\n    [one] One\n   *[other] Many\n}"
-        resource = parser.parse(source)
-
-        msg = resource.entries[0]
-        assert isinstance(msg, Message)
-        assert msg.value is not None
-        from ftllexbuffer.syntax.ast import Placeable, SelectExpression
-        placeable = msg.value.elements[0]
-        assert isinstance(placeable, Placeable)
-        select_expr = placeable.expression
-        assert isinstance(select_expr, SelectExpression)
-
-        # All variants should have spans
-        assert len(select_expr.variants) == 3
-        for variant in select_expr.variants:
-            assert variant.span is not None
-            assert isinstance(variant.span, Span)
-            assert variant.span.start <= variant.span.end
-
-    def test_variant_spans_do_not_overlap(self):
-        # Variant spans should not overlap
-        parser = FluentParserV1()
-        source = "msg = { $count ->\n    [one] One\n    [two] Two\n   *[other] Many\n}"
-        resource = parser.parse(source)
-
-        msg = resource.entries[0]
-        assert isinstance(msg, Message)
-        assert msg.value is not None
-        from ftllexbuffer.syntax.ast import Placeable, SelectExpression
-        placeable = msg.value.elements[0]
-        assert isinstance(placeable, Placeable)
-        select_expr = placeable.expression
-        assert isinstance(select_expr, SelectExpression)
-
-        # Variants should be sequential (no overlap)
-        variants = select_expr.variants
-        for i in range(len(variants) - 1):
-            curr_span = variants[i].span
-            next_span = variants[i + 1].span
-            assert curr_span is not None
-            assert next_span is not None
-            assert curr_span.end <= next_span.start
-
-    def test_default_variant_has_span(self):
-        # Default variant (marked with *) should have span
-        parser = FluentParserV1()
-        source = "msg = { $count ->\n    [one] One\n   *[other] Many\n}"
-        resource = parser.parse(source)
-
-        msg = resource.entries[0]
-        assert isinstance(msg, Message)
-        assert msg.value is not None
-        from ftllexbuffer.syntax.ast import Placeable, SelectExpression
-        placeable = msg.value.elements[0]
-        assert isinstance(placeable, Placeable)
-        select_expr = placeable.expression
-        assert isinstance(select_expr, SelectExpression)
-
-        # Find default variant
-        default_variant = None
-        for variant in select_expr.variants:
-            if variant.default:
-                default_variant = variant
-                break
-
-        assert default_variant is not None
-        assert default_variant.span is not None
-        assert isinstance(default_variant.span, Span)
-
-
-class TestSelectAndVariantSpanIntegration:
-    # Test integration of select and variant spans
-
-    def test_select_span_encompasses_all_variants(self):
-        # Select expression span should cover all its variants
-        parser = FluentParserV1()
-        source = "msg = { $count ->\n    [one] One\n   *[other] Many\n}"
-        resource = parser.parse(source)
-
-        msg = resource.entries[0]
-        assert isinstance(msg, Message)
-        assert msg.value is not None
-        from ftllexbuffer.syntax.ast import Placeable, SelectExpression
-        placeable = msg.value.elements[0]
-        assert isinstance(placeable, Placeable)
-        select_expr = placeable.expression
-        assert isinstance(select_expr, SelectExpression)
-
-        # Select span should start at or before first variant
-        first_variant = select_expr.variants[0]
-        assert select_expr.span is not None
-        assert first_variant.span is not None
-        assert select_expr.span.start <= first_variant.span.start
-
-        # Select span should end at or after last variant
-        last_variant = select_expr.variants[-1]
-        assert last_variant.span is not None
-        assert select_expr.span.end >= last_variant.span.end

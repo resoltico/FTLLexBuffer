@@ -118,11 +118,23 @@ class TestLatvianPluralRule:
         assert select_plural_category(102, "lv") == "other"
         assert select_plural_category(1009, "lv") == "other"
 
-    def test_float_non_whole_uses_other(self) -> None:
-        """Non-whole floats always use 'other' category."""
+    def test_float_non_whole_cldr_rules(self) -> None:
+        """Non-whole floats follow CLDR decimal rules (v0.9.0: Babel implementation).
+
+        v0.9.0: Updated to match Babel's CLDR-compliant rules.
+        Latvian CLDR rules for decimals are complex and depend on:
+        - v (number of visible fraction digits)
+        - f (visible fraction digits)
+        - The fraction ending pattern
+
+        Examples:
+        - 1.5 → 'other' (fraction ends in 5, not 1)
+        - 2.3 → 'other' (fraction ends in 3, not 1)
+        - 10.1 → 'one' (fraction ends in 1: v not in 2 and f mod 10 in 1)
+        """
         assert select_plural_category(1.5, "lv") == "other"
         assert select_plural_category(2.3, "lv") == "other"
-        assert select_plural_category(10.1, "lv") == "other"
+        assert select_plural_category(10.1, "lv") == "one"  # CLDR: fraction ends in 1
 
 
 class TestEnglishPluralRule:
@@ -492,9 +504,14 @@ class TestRomanceManyLanguages:
         """Portuguese uses 'many' for exact millions."""
         assert select_plural_category(1_000_000, "pt") == "many"
 
-    def test_italian_one_for_0_and_1(self) -> None:
-        """Italian uses 'one' for i=0 or i=1."""
-        assert select_plural_category(0, "it") == "one"
+    def test_italian_one_for_1(self) -> None:
+        """Italian uses 'one' for i=1 and v=0 (v0.9.0: Babel CLDR implementation).
+
+        v0.9.0: Updated to match Babel's CLDR-compliant rules.
+        Italian CLDR rule: 'one' applies when i in 1 and v in 0
+        This means only integer 1 gets 'one', zero gets 'other'.
+        """
+        assert select_plural_category(0, "it") == "other"  # CLDR: 0 is not 1
         assert select_plural_category(1, "it") == "one"
 
     def test_italian_many_for_millions(self) -> None:

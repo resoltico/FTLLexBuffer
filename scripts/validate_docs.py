@@ -240,10 +240,10 @@ def main() -> int:
     markdown_files = sorted(set(markdown_files))
 
     # SAFEGUARD: Limit total files processed (safety cap)
-    MAX_FILES = 1000
-    if len(markdown_files) > MAX_FILES:
-        print(f"[WARN] Found {len(markdown_files)} markdown files, limiting to {MAX_FILES}")
-        markdown_files = markdown_files[:MAX_FILES]
+    max_files = 1000
+    if len(markdown_files) > max_files:
+        print(f"[WARN] Found {len(markdown_files)} markdown files, limiting to {max_files}")
+        markdown_files = markdown_files[:max_files]
 
     for md_file in markdown_files:
         try:

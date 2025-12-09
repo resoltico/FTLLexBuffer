@@ -178,9 +178,7 @@ class FunctionRegistry:
         try:
             return func_sig.callable(*positional, **python_kwargs)
         except Exception as e:
-            raise FluentResolutionError(
-                ErrorTemplate.function_failed(ftl_name, str(e))
-            ) from e
+            raise FluentResolutionError(ErrorTemplate.function_failed(ftl_name, str(e))) from e
 
     def has_function(self, ftl_name: str) -> bool:
         """Check if function is registered.
@@ -291,6 +289,21 @@ class FunctionRegistry:
             False
         """
         return ftl_name in self._functions
+
+    def __repr__(self) -> str:
+        """Return string representation for debugging.
+
+        v0.9.0: Added for better REPL and debugging experience.
+
+        Returns:
+            String representation showing registered functions
+
+        Example:
+            >>> registry = FunctionRegistry()
+            >>> repr(registry)
+            'FunctionRegistry(functions=0)'
+        """
+        return f"FunctionRegistry(functions={len(self._functions)})"
 
     def copy(self) -> FunctionRegistry:
         """Create a shallow copy of this registry.

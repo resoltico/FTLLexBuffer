@@ -423,8 +423,8 @@ Complete alphabetical reference:
 
 ---
 
-**Terminology Guide Last Updated**: December 7, 2025
-**FTLLexBuffer Version**: 0.7.0
+**Terminology Guide Last Updated**: December 9, 2025
+**FTLLexBuffer Version**: 0.9.0
 
 **See Also**:
 - [README.md - Terminology Section](README.md#terminology)

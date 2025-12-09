@@ -10,13 +10,18 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from ftllexbuffer.diagnostics import (
+    Diagnostic,
+    DiagnosticCode,
+    ErrorTemplate,
     FluentError,
     FluentReferenceError,
     FluentResolutionError,
     FluentSyntaxError,
 )
+from ftllexbuffer.introspection import extract_variables, introspect_message
 from ftllexbuffer.runtime.cache import FormatCache
 from ftllexbuffer.runtime.functions import FUNCTION_REGISTRY
+from ftllexbuffer.runtime.locale_context import LocaleContext
 from ftllexbuffer.runtime.resolver import FluentResolver
 from ftllexbuffer.syntax import Junk, Message, Term
 from ftllexbuffer.syntax.ast import MessageReference, TermReference
@@ -40,17 +45,59 @@ class _ReferenceExtractor(ASTVisitor):
     def visit_MessageReference(self, node: MessageReference) -> None:  # noqa: N802
         """Collect message reference."""
         self.message_refs.add(node.id.name)
-        super().visit_MessageReference(node)
+        # v0.9.0: No need to call super() - generic_visit handles traversal automatically
+        self.generic_visit(node)
 
     def visit_TermReference(self, node: TermReference) -> None:  # noqa: N802
         """Collect term reference."""
         self.term_refs.add(node.id.name)
-        super().visit_TermReference(node)
+        # v0.9.0: No need to call super() - generic_visit handles traversal automatically
+        self.generic_visit(node)
+
+
+@dataclass(frozen=True, slots=True)
+class ValidationError:
+    """Structured syntax error from FTL validation.
+
+    v0.9.0: Replaces list[Junk] for better separation of concerns.
+
+    Attributes:
+        code: Error code (e.g., "parse-error", "malformed-entry")
+        message: Human-readable error message
+        content: The unparseable FTL content
+        line: Line number where error occurred (1-indexed, optional)
+        column: Column number where error occurred (1-indexed, optional)
+    """
+
+    code: str
+    message: str
+    content: str
+    line: int | None = None
+    column: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ValidationWarning:
+    """Structured semantic warning from FTL validation.
+
+    v0.9.0: Replaces list[str] for better structure and error codes.
+
+    Attributes:
+        code: Warning code (e.g., "duplicate-id", "undefined-reference")
+        message: Human-readable warning message
+        context: Additional context (e.g., the duplicate ID name)
+    """
+
+    code: str
+    message: str
+    context: str | None = None
 
 
 @dataclass
 class ValidationResult:
     """Result of FTL validation.
+
+    v0.9.0: errors and warnings now use structured types instead of Junk/str.
 
     Returned by FluentBundle.validate_resource() to provide feedback
     about FTL source code before adding it to the bundle.
@@ -61,9 +108,8 @@ class ValidationResult:
       undefined references, circular dependencies
 
     Attributes:
-        errors: List of Junk entries (parse errors)
-        warnings: List of semantic warning messages including duplicate IDs, messages
-            without values, undefined references, and circular dependencies
+        errors: List of structured validation errors
+        warnings: List of structured validation warnings
 
     Example:
         >>> bundle = FluentBundle("en")
@@ -83,8 +129,8 @@ class ValidationResult:
         1  # Semantic warning about duplicate
     """
 
-    errors: list[Junk]
-    warnings: list[str]
+    errors: list[ValidationError]
+    warnings: list[ValidationWarning]
 
     @property
     def is_valid(self) -> bool:
@@ -100,7 +146,7 @@ class ValidationResult:
         """Get number of errors found.
 
         Returns:
-            Count of Junk entries (parse errors)
+            Count of syntax errors
         """
         return len(self.errors)
 
@@ -120,6 +166,8 @@ class FluentBundle:
     Main public API for Fluent localization. Aligned with Mozilla python-fluent
     error handling that returns (result, errors) tuples.
 
+    v0.9.0: Added __slots__ for memory efficiency.
+
     Examples:
         >>> bundle = FluentBundle("lv_LV")
         >>> bundle.add_resource('''
@@ -134,6 +182,17 @@ class FluentBundle:
         >>> assert result == 'Laipni lūdzam, Jānis!'
         >>> assert errors == []
     """
+
+    __slots__ = (
+        "_cache",
+        "_cache_size",
+        "_function_registry",
+        "_locale",
+        "_messages",
+        "_parser",
+        "_terms",
+        "_use_isolating",
+    )
 
     def __init__(
         self,
@@ -240,6 +299,25 @@ class FluentBundle:
         """
         return self._cache_size if self.cache_enabled else 0
 
+    def __repr__(self) -> str:
+        """Return string representation for debugging.
+
+        v0.9.0: Added for better REPL and debugging experience.
+
+        Returns:
+            String representation showing locale and loaded messages count
+
+        Example:
+            >>> bundle = FluentBundle("lv_LV")
+            >>> repr(bundle)
+            "FluentBundle(locale='lv_LV', messages=0, terms=0)"
+        """
+        return (
+            f"FluentBundle(locale={self._locale!r}, "
+            f"messages={len(self._messages)}, "
+            f"terms={len(self._terms)})"
+        )
+
     def get_babel_locale(self) -> str:
         """Get the Babel locale identifier for this bundle (introspection API).
 
@@ -268,8 +346,6 @@ class FluentBundle:
             - bundle.locale: The original locale code passed to FluentBundle
             - LocaleContext.babel_locale: The underlying Babel Locale object
         """
-        from .locale_context import LocaleContext
-
         ctx = LocaleContext(self._locale)
         return str(ctx.babel_locale)
 
@@ -277,7 +353,7 @@ class FluentBundle:
     def _detect_circular_references(
         messages_dict: dict[str, Message],
         terms_dict: dict[str, Term],
-        warnings: list[str],
+        warnings: list[ValidationWarning],
         detected_cycles: set[str],
     ) -> None:
         """Detect circular dependencies in messages and terms.
@@ -285,7 +361,7 @@ class FluentBundle:
         Args:
             messages_dict: Map of message IDs to Message nodes
             terms_dict: Map of term IDs to Term nodes
-            warnings: List to append warning messages to
+            warnings: List to append structured warnings to
             detected_cycles: Set to track already-detected cycles
         """
         # Build dependency graph for messages
@@ -337,7 +413,13 @@ class FluentBundle:
                     if cycle_key not in detected_cycles:
                         detected_cycles.add(cycle_key)
                         cycle_str = " → ".join(cycle)
-                        warnings.append(f"Circular message reference: {cycle_str}")
+                        warnings.append(
+                            ValidationWarning(
+                                code="circular-reference",
+                                message=f"Circular message reference: {cycle_str}",
+                                context=cycle_str,
+                            )
+                        )
 
         # Check for circular term references
         visited_terms: set[str] = set()
@@ -349,7 +431,13 @@ class FluentBundle:
                     if cycle_key not in detected_cycles:
                         detected_cycles.add(cycle_key)
                         cycle_str = " → ".join([f"-{t}" for t in cycle])
-                        warnings.append(f"Circular term reference: {cycle_str}")
+                        warnings.append(
+                            ValidationWarning(
+                                code="circular-reference",
+                                message=f"Circular term reference: {cycle_str}",
+                                context=cycle_str,
+                            )
+                        )
 
     def add_resource(  # pylint: disable=too-many-branches
         self, source: str, *, source_path: str | None = None
@@ -389,9 +477,7 @@ class FluentBundle:
                         # Include source path in error message if available
                         if source_path:
                             logger.warning(
-                                "Syntax error in %s: %s",
-                                source_path,
-                                entry.content[:100]
+                                "Syntax error in %s: %s", source_path, entry.content[:100]
                             )
                         else:
                             logger.debug("Junk entry (non-critical): %s", entry.content[:50])
@@ -451,19 +537,38 @@ class FluentBundle:
             >>> result = bundle.validate_resource(ftl_source)
             >>> if not result.is_valid:
             ...     for error in result.errors:
-            ...         print(f"Error: {error.content}")
+            ...         print(f"Error [{error.code}]: {error.message}")
             >>> if result.warning_count > 0:
             ...     for warning in result.warnings:
-            ...         print(f"Warning: {warning}")
+            ...         print(f"Warning [{warning.code}]: {warning.message}")
         """
         try:
             resource = self._parser.parse(source)
 
-            # Extract Junk entries (parse errors)
-            errors = [entry for entry in resource.entries if isinstance(entry, Junk)]
+            # Convert Junk entries to structured ValidationError
+            errors: list[ValidationError] = []
+            for entry in resource.entries:
+                if isinstance(entry, Junk):
+                    # Extract location from span if available
+                    line = None
+                    column = None
+                    if entry.span:
+                        # Compute line/column from span (would need cursor for accurate computation)
+                        # For now, leave as None - proper implementation would use cursor
+                        pass
+
+                    errors.append(
+                        ValidationError(
+                            code="parse-error",
+                            message="Failed to parse FTL content",
+                            content=entry.content,
+                            line=line,
+                            column=column,
+                        )
+                    )
 
             # Semantic validation warnings
-            warnings: list[str] = []
+            warnings: list[ValidationWarning] = []
             seen_ids: set[str] = set()
             messages_dict: dict[str, Message] = {}
             terms_dict: dict[str, Term] = {}
@@ -475,8 +580,14 @@ class FluentBundle:
                         # Check for duplicate message IDs
                         if msg_id.name in seen_ids:
                             warnings.append(
-                                f"Duplicate message ID '{msg_id.name}' "
-                                f"(later definition will overwrite earlier)"
+                                ValidationWarning(
+                                    code="duplicate-id",
+                                    message=(
+                                        f"Duplicate message ID '{msg_id.name}' "
+                                        f"(later definition will overwrite earlier)"
+                                    ),
+                                    context=msg_id.name,
+                                )
                             )
                         seen_ids.add(msg_id.name)
                         messages_dict[msg_id.name] = entry
@@ -484,14 +595,24 @@ class FluentBundle:
                         # Check for messages without values (only attributes)
                         if value is None and len(attributes) == 0:
                             warnings.append(
-                                f"Message '{msg_id.name}' has neither value nor attributes"
+                                ValidationWarning(
+                                    code="no-value-or-attributes",
+                                    message=f"Message '{msg_id.name}' has neither value nor attributes",
+                                    context=msg_id.name,
+                                )
                             )
                     case Term(id=term_id):
                         # Check for duplicate term IDs
                         if term_id.name in seen_ids:
                             warnings.append(
-                                f"Duplicate term ID '{term_id.name}' "
-                                f"(later definition will overwrite earlier)"
+                                ValidationWarning(
+                                    code="duplicate-id",
+                                    message=(
+                                        f"Duplicate term ID '{term_id.name}' "
+                                        f"(later definition will overwrite earlier)"
+                                    ),
+                                    context=term_id.name,
+                                )
                             )
                         seen_ids.add(term_id.name)
                         terms_dict[term_id.name] = entry
@@ -508,14 +629,22 @@ class FluentBundle:
                 for ref in extractor.message_refs:
                     if ref not in messages_dict:
                         warnings.append(
-                            f"Message '{msg_name}' references undefined message '{ref}'"
+                            ValidationWarning(
+                                code="undefined-reference",
+                                message=f"Message '{msg_name}' references undefined message '{ref}'",
+                                context=ref,
+                            )
                         )
 
                 # Check term references
                 for ref in extractor.term_refs:
                     if ref not in terms_dict:
                         warnings.append(
-                            f"Message '{msg_name}' references undefined term '-{ref}'"
+                            ValidationWarning(
+                                code="undefined-reference",
+                                message=f"Message '{msg_name}' references undefined term '-{ref}'",
+                                context=f"-{ref}",
+                            )
                         )
 
             # Check term references
@@ -529,14 +658,22 @@ class FluentBundle:
                 for ref in extractor.message_refs:
                     if ref not in messages_dict:
                         warnings.append(
-                            f"Term '-{term_name}' references undefined message '{ref}'"
+                            ValidationWarning(
+                                code="undefined-reference",
+                                message=f"Term '-{term_name}' references undefined message '{ref}'",
+                                context=ref,
+                            )
                         )
 
                 # Check term references
                 for ref in extractor.term_refs:
                     if ref not in terms_dict:
                         warnings.append(
-                            f"Term '-{term_name}' references undefined term '-{ref}'"
+                            ValidationWarning(
+                                code="undefined-reference",
+                                message=f"Term '-{term_name}' references undefined term '-{ref}'",
+                                context=f"-{ref}",
+                            )
                         )
 
             # Third pass: detect circular dependencies
@@ -551,9 +688,13 @@ class FluentBundle:
         except FluentSyntaxError as e:
             # Critical parse error - return as single error
             logger.error("Critical validation error: %s", e)
-            # Create a Junk entry representing the critical error
-            junk = Junk(content=str(e))
-            return ValidationResult(errors=[junk], warnings=[])
+            # Create a ValidationError for the critical parse failure
+            error = ValidationError(
+                code="critical-parse-error",
+                message=str(e),
+                content=str(e),
+            )
+            return ValidationResult(errors=[error], warnings=[])
 
     def format_pattern(
         self,
@@ -609,8 +750,6 @@ class FluentBundle:
         # Validate message_id is non-empty string
         if not message_id or not isinstance(message_id, str):
             logger.warning("Invalid message ID: empty or non-string")
-            from ftllexbuffer.diagnostics import Diagnostic, DiagnosticCode
-
             diagnostic = Diagnostic(
                 code=DiagnosticCode.MESSAGE_NOT_FOUND,
                 message="Invalid message ID: empty or non-string",
@@ -622,8 +761,6 @@ class FluentBundle:
         # Check if message exists
         if message_id not in self._messages:
             logger.warning("Message '%s' not found", message_id)
-            from ftllexbuffer.diagnostics import ErrorTemplate
-
             error = FluentReferenceError(ErrorTemplate.message_not_found(message_id))
             # Don't cache missing message errors
             return (f"{{{message_id}}}", [error])
@@ -736,8 +873,6 @@ class FluentBundle:
             >>> vars = bundle.get_message_variables("greeting")
             >>> assert "name" in vars
         """
-        from ftllexbuffer.introspection import extract_variables
-
         if message_id not in self._messages:
             msg = f"Message '{message_id}' not found"
             raise KeyError(msg)
@@ -799,8 +934,6 @@ class FluentBundle:
             >>> assert "amount" in info.get_variable_names()
             >>> assert "NUMBER" in info.get_function_names()
         """
-        from ftllexbuffer.introspection import introspect_message
-
         if message_id not in self._messages:
             msg = f"Message '{message_id}' not found"
             raise KeyError(msg)

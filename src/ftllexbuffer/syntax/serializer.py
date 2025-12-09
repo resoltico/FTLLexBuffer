@@ -12,6 +12,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from ftllexbuffer.enums import CommentType
+
 from .ast import (
     Attribute,
     Comment,
@@ -118,7 +120,13 @@ class FluentSerializer(ASTVisitor):
 
     def visit_Comment(self, node: Comment) -> None:
         """Serialize Comment."""
-        prefix = "#" if node.type == "comment" else ("##" if node.type == "group" else "###")
+        if node.type == CommentType.COMMENT:
+            prefix = "#"
+        elif node.type == CommentType.GROUP:
+            prefix = "##"
+        else:  # CommentType.RESOURCE
+            prefix = "###"
+
         lines = node.content.split("\n")
         for line in lines:
             self._output.append(f"{prefix} {line}\n")
@@ -147,7 +155,7 @@ class FluentSerializer(ASTVisitor):
                 self._output.append(f'"{escaped}"')
 
             case NumberLiteral():
-                self._output.append(expr.value)
+                self._output.append(expr.raw)
 
             case VariableReference():
                 self._output.append(f"${expr.id.name}")
@@ -205,7 +213,7 @@ class FluentSerializer(ASTVisitor):
             if isinstance(variant.key, Identifier):
                 self._output.append(variant.key.name)
             else:  # NumberLiteral
-                self._output.append(variant.key.value)
+                self._output.append(variant.key.raw)
 
             self._output.append("] ")
             self._visit_pattern(variant.value)

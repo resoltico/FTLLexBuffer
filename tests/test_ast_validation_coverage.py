@@ -60,7 +60,7 @@ class TestTypeIsImportFallback:
         assert not Identifier.guard("not an identifier")
 
         # Test NumberLiteral.guard
-        number = NumberLiteral(value="42")
+        number = NumberLiteral(value=42, raw="42")
         assert NumberLiteral.guard(number)
         assert not NumberLiteral.guard(42)
 

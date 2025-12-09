@@ -70,6 +70,7 @@ from .diagnostics import (
     FluentResolutionError,
     FluentSyntaxError,
 )
+from .enums import CommentType, ReferenceKind, VariableContext
 from .introspection import (
     FunctionCallInfo,
     MessageIntrospection,
@@ -98,7 +99,7 @@ from .parsing import (
     parse_number,
 )
 from .runtime import FluentBundle
-from .runtime.bundle import ValidationResult
+from .runtime.bundle import ValidationError, ValidationResult, ValidationWarning
 from .runtime.function_bridge import FunctionRegistry, FunctionSignature
 from .runtime.functions import (
     FUNCTION_REGISTRY,
@@ -133,15 +134,6 @@ from .syntax.ast import (
     Variant,
 )
 from .syntax.parser import FluentParserV1
-from .syntax.type_guards import (
-    has_value,
-    is_comment,
-    is_junk,
-    is_message,
-    is_placeable,
-    is_term,
-    is_text_element,
-)
 from .syntax.visitor import ASTTransformer, ASTVisitor
 
 # Version information - Auto-populated from package metadata
@@ -151,9 +143,7 @@ try:
     from importlib.metadata import version as _get_version
 except ImportError as e:
     # This should never happen on Python 3.13+ (importlib.metadata is stdlib since 3.8)
-    raise RuntimeError(
-        "importlib.metadata unavailable - Python version too old? " + str(e)
-    ) from e
+    raise RuntimeError("importlib.metadata unavailable - Python version too old? " + str(e)) from e
 
 try:
     __version__ = _get_version("ftllexbuffer")
@@ -175,6 +165,8 @@ __all__ = [
     "FluentBundle",
     "FluentLocalization",
     "ValidationResult",
+    "ValidationError",
+    "ValidationWarning",
     # Resource loading
     "PathResourceLoader",
     "ResourceLoader",
@@ -183,6 +175,10 @@ __all__ = [
     "LocaleCode",
     "ResourceId",
     "FTLSource",
+    # Enums - v0.9.0 type-safe constants
+    "CommentType",
+    "VariableContext",
+    "ReferenceKind",
     # Parsing and serialization
     "FluentParserV1",
     "parse_ftl",
@@ -244,14 +240,6 @@ __all__ = [
     # AST - Visitor pattern
     "ASTVisitor",
     "ASTTransformer",
-    # AST - Type guards
-    "is_message",
-    "is_term",
-    "is_comment",
-    "is_junk",
-    "is_placeable",
-    "is_text_element",
-    "has_value",
     # Module constants
     "__version__",
     "__fluent_spec_version__",

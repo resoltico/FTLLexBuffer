@@ -152,12 +152,7 @@ def get_line_content(source: str, line_number: int, zero_based: bool = True) -> 
     return lines[line_number]
 
 
-def get_error_context(
-    source: str,
-    pos: int,
-    context_lines: int = 2,
-    marker: str = "^"
-) -> str:
+def get_error_context(source: str, pos: int, context_lines: int = 2, marker: str = "^") -> str:
     """Get formatted error context showing position in source.
 
     Creates a multi-line string showing the error location with

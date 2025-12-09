@@ -78,15 +78,15 @@ class TestValidatorLine334:
         func_ref = FunctionReference(
             id=Identifier(name="NUMBER"),
             arguments=CallArguments(
-                positional=(NumberLiteral(value="42"),),
+                positional=(NumberLiteral(value=42, raw="42"),),
                 named=(
                     NamedArgument(
                         name=Identifier(name="minimumFractionDigits"),
-                        value=NumberLiteral(value="2"),
+                        value=NumberLiteral(value=2, raw="2"),
                     ),
                     NamedArgument(
                         name=Identifier(name="minimumFractionDigits"),  # Duplicate!
-                        value=NumberLiteral(value="3"),
+                        value=NumberLiteral(value=3, raw="3"),
                     ),
                 ),
             ),

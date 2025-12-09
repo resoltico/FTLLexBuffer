@@ -11,6 +11,7 @@ import string
 from hypothesis import strategies as st
 from hypothesis.strategies import composite
 
+from ftllexbuffer.enums import CommentType
 from ftllexbuffer.syntax.ast import (
     Comment,
     Identifier,
@@ -140,7 +141,7 @@ def ftl_variable_references(draw: st.DrawFn) -> VariableReference:
 def ftl_number_literals(draw: st.DrawFn) -> NumberLiteral:
     """Generate NumberLiteral AST nodes."""
     value = draw(ftl_numbers())
-    return NumberLiteral(value=str(value))
+    return NumberLiteral(value=value, raw=str(value))
 
 
 @composite
@@ -216,7 +217,7 @@ def ftl_messages(draw: st.DrawFn) -> Message:
 def ftl_comments(draw: st.DrawFn) -> Comment:
     """Generate Comment AST nodes."""
     content = draw(ftl_simple_text())
-    return Comment(content=content)
+    return Comment(content=content, type=CommentType.COMMENT)
 
 
 @composite

@@ -192,9 +192,7 @@ class FluentLocalization:
 
         # Store immutable locale chain
         self._locales: tuple[LocaleCode, ...] = tuple(locale_list)
-        self._resource_ids: tuple[ResourceId, ...] = (
-            tuple(resource_ids) if resource_ids else ()
-        )
+        self._resource_ids: tuple[ResourceId, ...] = tuple(resource_ids) if resource_ids else ()
         self._resource_loader: ResourceLoader | None = resource_loader
         self._use_isolating = use_isolating
         self._enable_cache = enable_cache
@@ -277,6 +275,21 @@ class FluentLocalization:
             Use cache_enabled to check if caching is active.
         """
         return self._cache_size if self._enable_cache else 0
+
+    def __repr__(self) -> str:
+        """Return string representation for debugging.
+
+        v0.9.0: Added for better REPL and debugging experience.
+
+        Returns:
+            String representation showing locales and resource count
+
+        Example:
+            >>> l10n = FluentLocalization(['lv', 'en'])
+            >>> repr(l10n)
+            "FluentLocalization(locales=('lv', 'en'), bundles=2)"
+        """
+        return f"FluentLocalization(locales={self._locales!r}, bundles={len(self._bundles)})"
 
     def add_resource(self, locale: LocaleCode, ftl_source: FTLSource) -> None:
         """Add FTL resource to specific locale bundle.
@@ -399,9 +412,7 @@ class FluentLocalization:
             bundle = self._bundles[locale]
 
             if bundle.has_message(message_id):
-                value, bundle_errors = bundle.format_pattern(
-                    message_id, args, attribute=attribute
-                )
+                value, bundle_errors = bundle.format_pattern(message_id, args, attribute=attribute)
                 errors.extend(bundle_errors)
                 return (value, errors)
 

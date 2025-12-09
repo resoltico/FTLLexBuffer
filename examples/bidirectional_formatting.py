@@ -45,7 +45,7 @@ total = Kopa: { CURRENCY($total, currency: "EUR") }
 
     # v0.8.0: Now returns tuple[Decimal, list[FluentParseError]]
     subtotal, errors = parse_decimal(user_input, "lv_LV")
-    if errors:
+    if errors or subtotal is None:
         print(f"Failed to parse subtotal: {errors[0]}")
         return
     print(f"Parsed to Decimal: {subtotal}")
@@ -111,15 +111,16 @@ def example_form_validation() -> None:
         print(f"  Parsed: {amount}")
 
         # Range validation
-        if amount <= 0:
+        if amount is not None and amount <= 0:
             print("  Error: Amount must be positive")
             continue
 
-        if amount > Decimal("1000000"):
+        if amount is not None and amount > Decimal("1000000"):
             print("  Error: Amount exceeds maximum")
             continue
 
         # Format for display
+        assert amount is not None, "Amount should not be None after error checks"
         formatted, _ = bundle.format_pattern("price", {"amount": float(amount)})
         print(f"  Display: {formatted}")
         print("  Status: Valid")

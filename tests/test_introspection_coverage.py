@@ -143,7 +143,7 @@ class TestFunctionWithVariableNamedArgs:
                     ),
                     NamedArgument(
                         name=Identifier(name="literal"),
-                        value=NumberLiteral(value="42")  # Literal (not a variable)
+                        value=NumberLiteral(value=42, raw="42")  # Literal (not a variable)
                     ),
                 )
             )

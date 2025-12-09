@@ -13,37 +13,38 @@ Python 3.13+.
 
 from __future__ import annotations
 
-from dataclasses import replace
-from typing import Any
+from dataclasses import fields, replace
+from typing import TYPE_CHECKING
 
 from .ast import (
+    ASTNode,
     Attribute,
     CallArguments,
-    Comment,
     FunctionReference,
-    Identifier,
-    Junk,
     Message,
     MessageReference,
     NamedArgument,
-    NumberLiteral,
     Pattern,
     Placeable,
     Resource,
     SelectExpression,
-    StringLiteral,
     Term,
     TermReference,
-    TextElement,
     VariableReference,
     Variant,
 )
+
+if TYPE_CHECKING:
+    pass
 
 
 class ASTVisitor:
     """Base visitor for traversing Fluent AST.
 
-    Implement visit_NodeType methods to process specific node types.
+    Follows stdlib ast.NodeVisitor convention: generic_visit() automatically
+    traverses all child nodes. Override visit_NodeType methods to add custom
+    behavior.
+
     Use this to create:
     - Validators
     - Transformers
@@ -56,16 +57,16 @@ class ASTVisitor:
         ...     def __init__(self):
         ...         self.count = 0
         ...
-        ...     def visit_Message(self, node: Message) -> Any:
+        ...     def visit_Message(self, node: Message) -> ASTNode:
         ...         self.count += 1
-        ...         return self.generic_visit(node)
+        ...         return self.generic_visit(node)  # Traverse children
         ...
         >>> visitor = CountMessagesVisitor()
         >>> visitor.visit(resource)
         >>> print(visitor.count)
     """
 
-    def visit(self, node: Any) -> Any:
+    def visit(self, node: ASTNode) -> ASTNode:
         """Visit a node (dispatcher).
 
         Args:
@@ -78,10 +79,11 @@ class ASTVisitor:
         method = getattr(self, method_name, self.generic_visit)
         return method(node)
 
-    def generic_visit(self, node: Any) -> Any:
+    def generic_visit(self, node: ASTNode) -> ASTNode:
         """Default visitor (traverses children).
 
-        Override to change default behavior.
+        Follows stdlib ast.NodeVisitor convention: automatically traverses
+        all child nodes. Override visit_* methods to customize behavior.
 
         Args:
             node: AST node to visit
@@ -89,133 +91,34 @@ class ASTVisitor:
         Returns:
             The node itself (identity)
         """
+        # Introspect dataclass fields to find and visit children
+        for field in fields(node):
+            value = getattr(node, field.name)
+
+            # Skip None values and non-node fields (str, int, bool, etc.)
+            if value is None or isinstance(value, (str, int, float, bool)):
+                continue
+
+            # Handle tuple of nodes (entries, elements, attributes, variants, etc.)
+            if isinstance(value, tuple):
+                for item in value:
+                    # Only visit if item looks like an ASTNode (has dataclass fields)
+                    if hasattr(item, "__dataclass_fields__"):
+                        self.visit(item)
+            # Handle single child node
+            elif hasattr(value, "__dataclass_fields__"):
+                self.visit(value)
+
         return node
 
-    # Resource and entries
-    def visit_Resource(self, node: Resource) -> Any:
-        """Visit Resource node."""
-        for entry in node.entries:
-            self.visit(entry)
-        return self.generic_visit(node)
-
-    def visit_Message(self, node: Message) -> Any:
-        """Visit Message node."""
-        self.visit(node.id)
-        if node.value:
-            self.visit(node.value)
-        for attr in node.attributes:
-            self.visit(attr)
-        if node.comment:
-            self.visit(node.comment)
-        return self.generic_visit(node)
-
-    def visit_Term(self, node: Term) -> Any:
-        """Visit Term node."""
-        self.visit(node.id)
-        self.visit(node.value)
-        for attr in node.attributes:
-            self.visit(attr)
-        if node.comment:
-            self.visit(node.comment)
-        return self.generic_visit(node)
-
-    def visit_Attribute(self, node: Attribute) -> Any:
-        """Visit Attribute node."""
-        self.visit(node.id)
-        self.visit(node.value)
-        return self.generic_visit(node)
-
-    def visit_Comment(self, node: Comment) -> Any:
-        """Visit Comment node."""
-        return self.generic_visit(node)
-
-    def visit_Junk(self, node: Junk) -> Any:
-        """Visit Junk node."""
-        return self.generic_visit(node)
-
-    # Patterns and elements
-    def visit_Pattern(self, node: Pattern) -> Any:
-        """Visit Pattern node."""
-        for element in node.elements:
-            self.visit(element)
-        return self.generic_visit(node)
-
-    def visit_TextElement(self, node: TextElement) -> Any:
-        """Visit TextElement node."""
-        return self.generic_visit(node)
-
-    def visit_Placeable(self, node: Placeable) -> Any:
-        """Visit Placeable node."""
-        self.visit(node.expression)
-        return self.generic_visit(node)
-
-    # Expressions
-    def visit_StringLiteral(self, node: StringLiteral) -> Any:
-        """Visit StringLiteral node."""
-        return self.generic_visit(node)
-
-    def visit_NumberLiteral(self, node: NumberLiteral) -> Any:
-        """Visit NumberLiteral node."""
-        return self.generic_visit(node)
-
-    def visit_MessageReference(self, node: MessageReference) -> Any:
-        """Visit MessageReference node."""
-        self.visit(node.id)
-        if node.attribute:
-            self.visit(node.attribute)
-        return self.generic_visit(node)
-
-    def visit_TermReference(self, node: TermReference) -> Any:
-        """Visit TermReference node."""
-        self.visit(node.id)
-        if node.attribute:
-            self.visit(node.attribute)
-        if node.arguments:
-            self.visit(node.arguments)
-        return self.generic_visit(node)
-
-    def visit_VariableReference(self, node: VariableReference) -> Any:
-        """Visit VariableReference node."""
-        self.visit(node.id)
-        return self.generic_visit(node)
-
-    def visit_FunctionReference(self, node: FunctionReference) -> Any:
-        """Visit FunctionReference node."""
-        self.visit(node.id)
-        self.visit(node.arguments)
-        return self.generic_visit(node)
-
-    def visit_SelectExpression(self, node: SelectExpression) -> Any:
-        """Visit SelectExpression node."""
-        self.visit(node.selector)
-        for variant in node.variants:
-            self.visit(variant)
-        return self.generic_visit(node)
-
-    def visit_Variant(self, node: Variant) -> Any:
-        """Visit Variant node."""
-        self.visit(node.key)
-        self.visit(node.value)
-        return self.generic_visit(node)
-
-    # Identifiers and arguments
-    def visit_Identifier(self, node: Identifier) -> Any:
-        """Visit Identifier node."""
-        return self.generic_visit(node)
-
-    def visit_CallArguments(self, node: CallArguments) -> Any:
-        """Visit CallArguments node."""
-        for arg in node.positional:
-            self.visit(arg)
-        for named_arg in node.named:
-            self.visit(named_arg)
-        return self.generic_visit(node)
-
-    def visit_NamedArgument(self, node: NamedArgument) -> Any:
-        """Visit NamedArgument node."""
-        self.visit(node.name)
-        self.visit(node.value)
-        return self.generic_visit(node)
+    # Note: All visit_* methods now delegate to generic_visit() which handles
+    # traversal automatically. Override these methods to add custom behavior
+    # before/after visiting children.
+    #
+    # Example custom visitor:
+    #     def visit_Message(self, node: Message) -> ASTNode:
+    #         print(f"Visiting message: {node.id.name}")
+    #         return self.generic_visit(node)  # Traverse children
 
 
 class ASTTransformer(ASTVisitor):
@@ -262,7 +165,7 @@ class ASTTransformer(ASTVisitor):
         >>> expanded_resource = transformer.transform(resource)
     """
 
-    def transform(self, node: Any) -> Any:
+    def transform(self, node: ASTNode) -> ASTNode | None | list[ASTNode]:
         """Transform an AST node or tree.
 
         This is the main entry point for transformations.
@@ -275,7 +178,7 @@ class ASTTransformer(ASTVisitor):
         """
         return self.visit(node)
 
-    def generic_visit(self, node: Any) -> Any:
+    def generic_visit(self, node: ASTNode) -> ASTNode:
         """Transform node children (default behavior).
 
         Recursively transforms all child nodes. Uses dataclasses.replace()
@@ -356,7 +259,7 @@ class ASTTransformer(ASTVisitor):
                 # Return as-is (immutable)
                 return node
 
-    def _transform_list(self, nodes: tuple[Any, ...]) -> tuple[Any, ...]:
+    def _transform_list(self, nodes: tuple[ASTNode, ...]) -> tuple[ASTNode, ...]:
         """Transform a tuple of nodes.
 
         Handles node removal (None) and expansion (lists) using Python 3.13 features.
@@ -368,7 +271,7 @@ class ASTTransformer(ASTVisitor):
         Returns:
             Transformed tuple (flattened, with None removed)
         """
-        result: list[Any] = []
+        result: list[ASTNode] = []
         for node in nodes:
             transformed = self.visit(node)
 

@@ -113,7 +113,7 @@ class FTLLinterVisitor(ASTVisitor):
         Visitor pattern: visit_* methods follow stdlib ast.NodeVisitor convention.
         """
         # Variables are provided at runtime, not declared in FTL
-        super().visit_VariableReference(node)
+        self.generic_visit(node)
 
     def visit_FunctionReference(self, node: FunctionReference) -> None:  # pylint: disable=invalid-name
         """Check function calls.
@@ -137,7 +137,7 @@ class FTLLinterVisitor(ASTVisitor):
                 )
             )
 
-        super().visit_FunctionReference(node)
+        self.generic_visit(node)
 
     def visit_MessageReference(self, node: MessageReference) -> None:  # pylint: disable=invalid-name
         """Check message references.
@@ -154,7 +154,7 @@ class FTLLinterVisitor(ASTVisitor):
                 )
             )
 
-        super().visit_MessageReference(node)
+        self.generic_visit(node)
 
     def visit_TermReference(self, node: TermReference) -> None:  # pylint: disable=invalid-name
         """Check term references (not implemented in this example).
@@ -162,7 +162,7 @@ class FTLLinterVisitor(ASTVisitor):
         Visitor pattern: visit_* methods follow stdlib ast.NodeVisitor convention.
         """
         # In a real linter, you'd track terms too
-        super().visit_TermReference(node)
+        self.generic_visit(node)
 
 
 def lint_ftl_file(source: str) -> list[LintIssue]:  # pylint: disable=redefined-outer-name

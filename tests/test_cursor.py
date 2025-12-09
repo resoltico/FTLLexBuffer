@@ -380,7 +380,7 @@ class TestCursorLineCol:
         """Test line_col property convenience wrapper."""
         cursor = Cursor("hello\nworld", 9)
 
-        line, col = cursor.line_col
+        line, col = cursor.compute_line_col()
 
         assert line == 2
         assert col == 4

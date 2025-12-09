@@ -20,7 +20,10 @@ Python 3.13+. Zero external dependencies.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Literal
+
+if TYPE_CHECKING:
+    from ftllexbuffer.runtime.function_bridge import FunctionRegistry
 
 
 @dataclass(frozen=True)
@@ -131,7 +134,7 @@ def get_python_name(ftl_name: str) -> str | None:
     return metadata.python_name if metadata else None
 
 
-def should_inject_locale(func_name: str, function_registry: Any) -> bool:
+def should_inject_locale(func_name: str, function_registry: FunctionRegistry) -> bool:
     """Check if locale should be injected for this function call.
 
     This is the CORRECT way to check locale injection, handling both
@@ -159,7 +162,8 @@ def should_inject_locale(func_name: str, function_registry: Any) -> bool:
         >>> should_inject_locale("CURRENCY", bundle._function_registry)
         False
     """
-    # Import here to avoid circular dependency
+    # Import here to avoid circular import at module load time
+    # (functions.py doesn't import function_metadata, but we import from functions.py)
     from ftllexbuffer.runtime.functions import FUNCTION_REGISTRY
 
     # Check if it's a built-in function that requires locale

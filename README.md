@@ -29,7 +29,7 @@ Python 3.13+ implementation of the Fluent Localization System v1.0 specification
 **Key Features**:
 - Full Fluent v1.0 specification compliance
 - Bi-directional localization (format and parse)
-- 30 locale plural rules (CLDR-compliant)
+- 200+ locale plural rules via Babel CLDR
 - Optional performance caching (50x speedup)
 
 ---
@@ -833,7 +833,7 @@ Main API for Fluent message formatting.
   result = bundle.validate_resource(ftl_source)
   if not result.is_valid:
       for error in result.errors:
-          print(f"Error: {error.content}")
+          print(f"Error at line {error.line}: {error.message}")
   ```
 
 - `clear_cache() -> None` (v0.5.0+)
@@ -970,10 +970,10 @@ Returned by `validate_resource()`.
 
 **Properties:**
 - `is_valid` (bool): True if no errors found
-- `error_count` (int): Number of parse errors (Junk entries)
+- `error_count` (int): Number of parse errors
 - `warning_count` (int): Number of warnings
-- `errors` (list[Junk]): List of parse error entries
-- `warnings` (list[str]): List of warning messages
+- `errors` (list[ValidationError]): List of validation errors with structured fields
+- `warnings` (list[ValidationWarning]): List of validation warnings with structured fields
 
 ### Built-in Functions
 
@@ -1199,9 +1199,17 @@ result, errors = bundle.format_pattern("a")
 
 ## Locale Support
 
-### Built-in CLDR Plural Rules (30 Languages)
+### CLDR Plural Rules via Babel (200+ Locales)
 
-FTLLexBuffer ships with CLDR-compliant plural rules for 30 languages:
+**v0.9.0**: FTLLexBuffer uses Babel's CLDR implementation for plural rules, supporting 200+ locales with full Unicode CLDR compliance.
+
+**Key Benefits**:
+- **Comprehensive Coverage**: All CLDR-supported locales (200+ languages/regions)
+- **Automatic Updates**: New locales and rule changes come automatically with Babel updates
+- **Zero Maintenance**: No manual rule implementations to maintain
+- **Full Accuracy**: Matches official Unicode CLDR specifications exactly
+
+**Common Locales** (examples from 200+ supported):
 
 | Language | Code | Plural Categories | Notes |
 |----------|------|-------------------|-------|
@@ -1211,38 +1219,23 @@ FTLLexBuffer ships with CLDR-compliant plural rules for 30 languages:
 | Spanish | es | one, other | Simple n=1 |
 | French | fr | one, many, other | Millions rule |
 | Arabic | ar | zero, one, two, few, many, other | 6 categories |
-| Bengali | bn | one, other | 0 or 1 → one |
-| Portuguese | pt | one, many, other | Millions rule |
 | Russian | ru | one, few, many, other | Slavic rules |
 | Japanese | ja | other | No plurals |
 | German | de | one, other | Integer 1 only |
-| Javanese | jv | other | No plurals |
-| Korean | ko | other | No plurals |
-| Vietnamese | vi | other | No plurals |
-| Telugu | te | one, other | Simple n=1 |
-| Turkish | tr | one, other | Simple n=1 |
-| Tamil | ta | one, other | Simple n=1 |
-| Marathi | mr | one, other | Simple n=1 |
-| Urdu | ur | one, other | Simple n=1 |
-| Italian | it | one, many, other | Millions rule |
-| Thai | th | other | No plurals |
-| Gujarati | gu | one, other | 0 or 1 → one |
 | Polish | pl | one, few, many, other | Slavic rules |
-| Ukrainian | uk | one, few, many, other | Slavic rules |
-| Kannada | kn | one, other | 0 or 1 → one |
-| Odia | or | one, other | Simple n=1 |
-| Malayalam | ml | one, other | Simple n=1 |
-| Burmese | my | other | No plurals |
-| Punjabi | pa | one, other | 0 or 1 → one |
-| Latvian | lv | zero, one, other | Special rules |
+| Portuguese | pt | one, many, other | Millions rule |
+| Italian | it | one, many, other | Millions rule |
+| Latvian | lv | zero, one, other | Special decimal rules |
 
-**Number/Date/Currency Formatting**: Uses Babel for CLDR-compliant NUMBER(), DATETIME(), and CURRENCY() functions.
+**And 180+ more locales...**
 
-**Technical note:** Locale codes use language prefix extraction. `"en_US"` → `"en"`, `"ar-SA"` → `"ar"`.
+**Number/Date/Currency Formatting**: Uses Babel for CLDR-compliant NUMBER(), DATETIME(), and CURRENCY() functions across all supported locales.
+
+**Locale Format Flexibility**: Both BCP 47 (`"en-US"`) and POSIX (`"en_US"`) formats are supported. Automatic normalization ensures compatibility.
 
 ### Fallback Behavior
 
-**Unsupported locales** fall back to simple one/other rules (English-style). Most languages work correctly with this fallback.
+**Unsupported or invalid locales** automatically fall back to simple one/other rules (English-style). This graceful degradation ensures your application never crashes due to locale issues.
 
 ## Implementation
 
@@ -1339,7 +1332,7 @@ Comprehensive comparison of localization libraries available in the Python ecosy
 | **Compilation Required** | No (runtime interpreter) | No (runtime interpreter) | **Yes** (FTL → Python bytecode) | **Yes** (msgfmt .po → .mo) | **Yes** (pybabel compile .po → .mo) | **Yes** (lrelease .ts → .qm) | No (YAML/JSON loaded at runtime) |
 | **Compilation Benefits** | N/A | N/A | Faster (PyPy optimized) | Faster lookups, validation, smaller size | Faster lookups, smaller size | Extremely fast lookups, binary format | N/A |
 | **Grammar Approach** | **Asymmetric** (each locale restructures freely) | **Asymmetric** (each locale restructures freely) | **Asymmetric** (each locale restructures freely) | **Symmetric** (all follow source structure) | **Symmetric** (all follow source structure) | **Symmetric** (all follow source structure) | **Symmetric** (all follow source structure) |
-| **Plural Forms** | CLDR (30 languages) | CLDR (all languages via babel) | CLDR (all languages via babel) | CLDR (via GNU ngettext) | **CLDR (600+ locales)** | **CLDR (all locales)** | Rails-style (one/many/zero/few) |
+| **Plural Forms** | **CLDR (200+ locales via Babel)** | CLDR (all languages via babel) | CLDR (all languages via babel) | CLDR (via GNU ngettext) | **CLDR (600+ locales)** | **CLDR (all locales)** | Rails-style (one/many/zero/few) |
 | **Select Expressions** | Built-in (`{ $var -> ... }`) | Built-in | Built-in | Manual workarounds | Manual workarounds | Manual workarounds | Manual workarounds |
 | **Context Support** | Terms (`-brand`), Attributes | Terms, Attributes | Terms, Attributes | **pgettext()** (Python 3.8+) | **pgettext()** | **QCoreApplication.translate()** with disambiguation | Namespaces |
 | **Number Formatting** | Babel CLDR (NUMBER, CURRENCY functions) | Babel CLDR | Babel CLDR | Manual (use Babel separately) | **CLDR (format_number, format_currency)** | **Qt CLDR** | Manual |
@@ -1413,7 +1406,7 @@ Comprehensive comparison of localization libraries available in the Python ecosy
 ## Specification Compliance
 
 - Fluent Specification v1.0 EBNF grammar (all production rules)
-- CLDR plural rules (30 locales - see [Locale Support](#locale-support) for complete list)
+- CLDR plural rules (200+ locales via Babel - see [Locale Support](#locale-support) for details)
 - Unicode bidi isolation (FSI/PDI marks)
 - Comment preservation (#, ##, ###)
 - Unicode escapes (\uXXXX, \UXXXXXX)

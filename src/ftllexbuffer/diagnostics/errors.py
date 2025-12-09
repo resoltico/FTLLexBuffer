@@ -8,10 +8,7 @@ Python 3.13+. Zero external dependencies.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from .codes import Diagnostic
+from .codes import Diagnostic
 
 
 class FluentError(Exception):
@@ -27,9 +24,6 @@ class FluentError(Exception):
         Args:
             message: Error message string OR Diagnostic object
         """
-        # Import at runtime to avoid circular dependency
-        from .codes import Diagnostic
-
         if isinstance(message, Diagnostic):
             self.diagnostic: Diagnostic | None = message
             super().__init__(message.format_error())

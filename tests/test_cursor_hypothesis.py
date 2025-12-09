@@ -235,7 +235,7 @@ class TestCursorLineColumn:
     def test_line_starts_at_one(self, source: str) -> None:
         """PROPERTY: Line numbers start at 1."""
         cursor = Cursor(source, 0)
-        line, _ = cursor.line_col
+        line, _ = cursor.compute_line_col()
 
         assert line >= 1
 
@@ -244,7 +244,7 @@ class TestCursorLineColumn:
     def test_column_starts_at_one(self, source: str) -> None:
         """PROPERTY: Column numbers start at 1."""
         cursor = Cursor(source, 0)
-        _, column = cursor.line_col
+        _, column = cursor.compute_line_col()
 
         assert column >= 1
 
@@ -259,7 +259,7 @@ class TestCursorLineColumn:
 
         # Advance to end
         cursor_end = Cursor(source, len(source))
-        line_end, _ = cursor_end.line_col
+        line_end, _ = cursor_end.compute_line_col()
 
         # Line number should be newline_count + 1
         assert line_end == newline_count + 1
@@ -271,7 +271,7 @@ class TestCursorLineColumn:
         cursor = Cursor(source, min(len(source), 10))
 
         result1 = cursor.compute_line_col()
-        result2 = cursor.line_col
+        result2 = cursor.compute_line_col()
 
         assert result1 == result2
 
@@ -391,8 +391,8 @@ class TestCursorIdempotence:
         pos = min(pos, len(source))
         cursor = Cursor(source, pos)
 
-        lc1 = cursor.line_col
-        lc2 = cursor.line_col
-        lc3 = cursor.line_col
+        lc1 = cursor.compute_line_col()
+        lc2 = cursor.compute_line_col()
+        lc3 = cursor.compute_line_col()
 
         assert lc1 == lc2 == lc3

@@ -9,19 +9,33 @@ Python 3.13+. Zero external dependencies.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
-
-try:
-    from typing import TypeIs
-except ImportError:
-    from typing import TypeIs
+from typing import TYPE_CHECKING, Protocol, TypeIs
 
 if TYPE_CHECKING:
-    pass
+    from ftllexbuffer.enums import CommentType
 
 # ============================================================================
 # BASE TYPES
 # ============================================================================
+
+
+class ASTNode(Protocol):
+    """Base protocol for all AST nodes.
+
+    v0.9.0: Added as a Protocol for structural typing.
+
+    All AST nodes are frozen dataclasses with slots. This Protocol allows
+    for type-safe visitor patterns without requiring explicit inheritance.
+
+    Using Protocol enables:
+    - Structural subtyping (duck typing with type checking)
+    - No runtime overhead
+    - Compatibility with frozen dataclasses
+    - Type-safe visitor methods accepting ASTNode
+
+    Note: This is a marker protocol. All frozen dataclass AST nodes
+    automatically conform to this protocol.
+    """
 
 
 @dataclass(frozen=True, slots=True)
@@ -123,6 +137,11 @@ class Message:
     comment: Comment | None = None
     span: Span | None = None
 
+    @staticmethod
+    def guard(entry: object) -> TypeIs[Message]:
+        """Type guard for Message (used in entry filtering)."""
+        return isinstance(entry, Message)
+
 
 @dataclass(frozen=True, slots=True)
 class Term:
@@ -138,10 +157,17 @@ class Term:
     comment: Comment | None = None
     span: Span | None = None
 
+    @staticmethod
+    def guard(entry: object) -> TypeIs[Term]:
+        """Type guard for Term (used in entry filtering)."""
+        return isinstance(entry, Term)
+
 
 @dataclass(frozen=True, slots=True)
 class Attribute:
     """Message or term attribute.
+
+    v0.9.0: Removed span (only top-level entries have spans).
 
     Example:
         login = Sign In
@@ -150,16 +176,23 @@ class Attribute:
 
     id: Identifier
     value: Pattern
-    span: Span | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class Comment:
-    """Comment (# single, ## group, ### resource)."""
+    """Comment (# single, ## group, ### resource).
+
+    v0.9.0: type changed from str to CommentType enum for type safety.
+    """
 
     content: str
-    type: str = "comment"  # "comment", "group", or "resource"
+    type: CommentType
     span: Span | None = None
+
+    @staticmethod
+    def guard(entry: object) -> TypeIs[Comment]:
+        """Type guard for Comment (used in entry filtering)."""
+        return isinstance(entry, Comment)
 
 
 @dataclass(frozen=True, slots=True)
@@ -191,6 +224,11 @@ class Junk:
     content: str
     annotations: tuple[Annotation, ...] = ()
     span: Span | None = None
+
+    @staticmethod
+    def guard(entry: object) -> TypeIs[Junk]:
+        """Type guard for Junk (used in entry filtering)."""
+        return isinstance(entry, Junk)
 
 
 # ============================================================================
@@ -261,6 +299,8 @@ type InlineExpression = (
 class SelectExpression:
     """Conditional expression with variants.
 
+    v0.9.0: Removed span (only top-level entries have spans).
+
     Example:
         { $count ->
             [one] 1 item
@@ -270,7 +310,6 @@ class SelectExpression:
 
     selector: InlineExpression
     variants: tuple[Variant, ...]
-    span: Span | None = None
 
     @staticmethod
     def guard(expr: object) -> TypeIs[SelectExpression]:
@@ -280,12 +319,14 @@ class SelectExpression:
 
 @dataclass(frozen=True, slots=True)
 class Variant:
-    """Single variant in select expression."""
+    """Single variant in select expression.
+
+    v0.9.0: Removed span (only top-level entries have spans).
+    """
 
     key: VariantKey
     value: Pattern
     default: bool = False
-    span: Span | None = None
 
 
 type VariantKey = "Identifier | NumberLiteral"
@@ -313,15 +354,15 @@ class StringLiteral:
 class NumberLiteral:
     """Number literal: 42 or 3.14
 
-    Stored as string to preserve precision.
+    v0.9.0: Stores parsed numeric value instead of string.
+    The raw field preserves original source for serialization.
     """
 
-    value: str
+    value: int | float
+    """Parsed numeric value."""
 
-    @property
-    def parsed_value(self) -> int | float:
-        """Parse to Python number."""
-        return int(self.value) if "." not in self.value else float(self.value)
+    raw: str
+    """Original source representation (for serialization)."""
 
     @staticmethod
     def guard(key: object) -> TypeIs[NumberLiteral]:
@@ -353,6 +394,11 @@ class MessageReference:
     id: Identifier
     attribute: Identifier | None = None
 
+    @staticmethod
+    def guard(expr: object) -> TypeIs[MessageReference]:
+        """Type guard for MessageReference."""
+        return isinstance(expr, MessageReference)
+
 
 @dataclass(frozen=True, slots=True)
 class TermReference:
@@ -362,6 +408,11 @@ class TermReference:
     attribute: Identifier | None = None
     arguments: CallArguments | None = None
 
+    @staticmethod
+    def guard(expr: object) -> TypeIs[TermReference]:
+        """Type guard for TermReference."""
+        return isinstance(expr, TermReference)
+
 
 @dataclass(frozen=True, slots=True)
 class FunctionReference:
@@ -369,6 +420,11 @@ class FunctionReference:
 
     id: Identifier
     arguments: CallArguments
+
+    @staticmethod
+    def guard(expr: object) -> TypeIs[FunctionReference]:
+        """Type guard for FunctionReference."""
+        return isinstance(expr, FunctionReference)
 
 
 @dataclass(frozen=True, slots=True)

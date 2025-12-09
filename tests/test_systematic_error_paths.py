@@ -20,7 +20,6 @@ See SYSTEM 4 in the testing strategy document.
 
 import pytest
 
-from ftllexbuffer.result import Failure
 from ftllexbuffer.syntax.ast import Junk, Message, Term
 from ftllexbuffer.syntax.cursor import Cursor
 from ftllexbuffer.syntax.parser import FluentParserV1
@@ -46,10 +45,7 @@ class TestParseNumberErrorPaths:
 
         result = parser._parse_number(cursor)
 
-        assert isinstance(result, Failure)
-        error = result.failure()
-        assert "Expected number" in error.message
-        assert "0-9" in error.expected
+        assert result is None
 
     def test_number_no_digits_after_minus_eof(self):
         """Line 222: '-' at end of string.
@@ -62,9 +58,7 @@ class TestParseNumberErrorPaths:
 
         result = parser._parse_number(cursor)
 
-        assert isinstance(result, Failure)
-        error = result.failure()
-        assert "Expected number" in error.message
+        assert result is None
 
     def test_number_no_digits_after_minus_non_digit(self):
         """Line 222: '-' followed by letter.
@@ -77,9 +71,7 @@ class TestParseNumberErrorPaths:
 
         result = parser._parse_number(cursor)
 
-        assert isinstance(result, Failure)
-        error = result.failure()
-        assert "Expected number" in error.message
+        assert result is None
 
     def test_number_decimal_no_digits(self):
         """Line 234: '3.' with no digits after decimal point.
@@ -92,10 +84,7 @@ class TestParseNumberErrorPaths:
 
         result = parser._parse_number(cursor)
 
-        assert isinstance(result, Failure)
-        error = result.failure()
-        assert "digit after decimal" in error.message.lower()
-        assert "0-9" in error.expected
+        assert result is None
 
     def test_number_decimal_no_digits_eof(self):
         """Line 234: Number ending with decimal at EOF.
@@ -108,9 +97,7 @@ class TestParseNumberErrorPaths:
 
         result = parser._parse_number(cursor)
 
-        assert isinstance(result, Failure)
-        error = result.failure()
-        assert "digit after decimal" in error.message.lower()
+        assert result is None
 
     def test_number_just_decimal_point(self):
         """Line 234: Just a decimal point with no integer part.
@@ -124,10 +111,8 @@ class TestParseNumberErrorPaths:
 
         result = parser._parse_number(cursor)
 
-        assert isinstance(result, Failure)
-        error = result.failure()
+        assert result is None
         # Should fail at the start - '.' is not a digit
-        assert "Expected number" in error.message
 
 
 class TestParseEscapeSequenceErrorPaths:
@@ -254,9 +239,7 @@ class TestParseIdentifierErrorPaths:
 
         result = parser._parse_identifier(cursor)
 
-        assert isinstance(result, Failure)
-        error = result.failure()
-        assert "identifier" in error.message.lower()
+        assert result is None
 
     def test_identifier_starts_with_digit(self):
         """Identifier starting with digit (invalid).
@@ -269,9 +252,7 @@ class TestParseIdentifierErrorPaths:
 
         result = parser._parse_identifier(cursor)
 
-        assert isinstance(result, Failure)
-        error = result.failure()
-        assert "identifier" in error.message.lower()
+        assert result is None
 
     def test_identifier_special_character(self):
         """Identifier starting with special character.
@@ -284,7 +265,7 @@ class TestParseIdentifierErrorPaths:
 
         result = parser._parse_identifier(cursor)
 
-        assert isinstance(result, Failure)
+        assert result is None
 
 
 class TestParseMessageErrorPaths:

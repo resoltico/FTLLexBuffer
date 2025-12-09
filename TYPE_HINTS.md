@@ -68,21 +68,19 @@ FTLLexBuffer uses `TypeIs` for runtime type narrowing:
 
 ```python
 from typing import TypeIs
-from ftllexbuffer import Message, Term, is_message, is_term
+from ftllexbuffer import Message, Term, parse_ftl
 
-# Using built-in type guards
-from ftllexbuffer import parse_ftl
-
+# Using built-in type guards (v0.9.0: static methods)
 ftl_source = "hello = World"
 resource = parse_ftl(ftl_source)
 
 for entry in resource.entries:
-    if is_message(entry):
+    if Message.guard(entry):
         # TypeIs narrows type to Message
         print(entry.id.name)  # Type checker knows entry is Message
         print(entry.value)    # Safe access to message-specific attributes
 
-    if is_term(entry):
+    if Term.guard(entry):
         # TypeIs narrows type to Term
         print(entry.id.name)  # entry is Term here
 ```
@@ -443,8 +441,6 @@ from ftllexbuffer import (
     VariableReference,
     FunctionReference,
     parse_ftl,
-    is_message,
-    is_term,
 )
 
 
@@ -717,13 +713,13 @@ def create_bundle(locale: str):
 ### DO: Use Type Guards for AST
 
 ```python
-from ftllexbuffer import parse_ftl, is_message, Message
+from ftllexbuffer import parse_ftl, Message
 
 resource = parse_ftl(ftl_source)
 
 for entry in resource.entries:
-    # ✅ Good - type guard provides narrowing
-    if is_message(entry):
+    # ✅ Good - type guard provides narrowing (v0.9.0: static method)
+    if Message.guard(entry):
         # entry is Message here
         print(entry.value)
 
@@ -731,7 +727,7 @@ for entry in resource.entries:
     if isinstance(entry, Message):
         # Type checker narrows to Message here too
         print(entry.value)
-    # Note: is_message() is preferred for FTLLexBuffer style consistency
+    # Note: Message.guard() is preferred for FTLLexBuffer style consistency
 ```
 
 ---
@@ -777,8 +773,8 @@ msg = resource.entries[0]
 # ❌ Type error - entry might not be Message
 print(msg.value)  # Error: entry could be Term, Comment, Junk
 
-# ✅ Fixed - use type guard
-if is_message(msg):
+# ✅ Fixed - use type guard (v0.9.0: static method)
+if Message.guard(msg):
     print(msg.value)  # Safe - type narrowed to Message
 ```
 
@@ -802,8 +798,8 @@ if is_message(msg):
 
 ---
 
-**Type Hints Guide Last Updated**: December 7, 2025
-**FTLLexBuffer Version**: 0.7.0
+**Type Hints Guide Last Updated**: December 9, 2025
+**FTLLexBuffer Version**: 0.9.0
 **Python Version**: 3.13+
 
 **See Also**:
