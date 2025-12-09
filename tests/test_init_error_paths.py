@@ -39,12 +39,16 @@ def test_importlib_metadata_import_error():
             if module_name in sys.modules:
                 del sys.modules[module_name]
 
-        # Create a mock that blocks importlib.metadata
+        # Create a mock that blocks importlib.metadata specifically
         def import_mock(name, *args, **kwargs):
-            if "metadata" in name or (
-                len(args) > 3 and args[3] and "metadata" in str(args[3])
-            ):
+            # Only block importlib.metadata, not other modules with "metadata" in name
+            if name in {"importlib.metadata", "importlib_metadata"}:
                 raise ImportError("Simulated importlib.metadata unavailable")
+            # Also check fromlist for "from importlib import metadata"
+            if name == "importlib" and len(args) > 2:
+                fromlist = args[2]
+                if isinstance(fromlist, tuple) and "metadata" in fromlist:
+                    raise ImportError("Simulated importlib.metadata unavailable")
             # For other imports, use the original loader
             return original_import(name, *args, **kwargs)
 
