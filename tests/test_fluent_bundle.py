@@ -420,7 +420,9 @@ class TestFluentBundleEdgeCases:
         assert errors == [], f"Unexpected errors: {errors}"
 
         # Even with weird args, should not crash
-        result, errors = bundle.format_pattern("msg", {"weird": object()})
+        result, errors = bundle.format_pattern(
+            "msg", {"weird": object()}  # type: ignore[dict-item]
+        )
         assert isinstance(result, str)
         assert errors == [], f"Unexpected errors: {errors}"
 

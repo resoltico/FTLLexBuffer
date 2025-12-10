@@ -2,7 +2,7 @@
 
 Complete reference documentation for FTLLexBuffer's public API.
 
-**Latest Version**: 0.9.0 | [Changelog](CHANGELOG.md)
+**Latest Version**: 0.10.0 | [Changelog](CHANGELOG.md)
 
 **Package**: `ftllexbuffer`
 **Python Version**: 3.13+
@@ -26,42 +26,37 @@ Complete reference documentation for FTLLexBuffer's public API.
 
 ## Importing from FTLLexBuffer
 
-All public APIs are available as **top-level imports** from the `ftllexbuffer` package.
+**v0.10.0 Breaking Change**: Root `ftllexbuffer` package now exports only **12 essential symbols**. Advanced features require explicit submodule imports.
 
-### Core API (Most Common)
+### Core API (Root Imports - v0.10.0)
+
+**Essential imports available from root** (only these 12 symbols):
 
 ```python
 from ftllexbuffer import (
-    # Message formatting
+    # Message formatting (2)
     FluentBundle,
     FluentLocalization,
-    # Resource loading
-    PathResourceLoader,
-    ResourceLoader,
-    # Type aliases for annotations
-    MessageId,
-    LocaleCode,
-    ResourceId,
-    FTLSource,
-    # Parsing and serialization
+    # Parsing and serialization (2)
     parse_ftl,
     serialize_ftl,
-    # Exceptions
+    # Exceptions (4)
     FluentError,
     FluentSyntaxError,
     FluentReferenceError,
     FluentResolutionError,
-    FluentCyclicReferenceError,
+    # Module metadata (4)
+    __version__,
+    __fluent_spec_version__,
+    __spec_url__,
+    __recommended_encoding__,
 )
 ```
 
-### AST Manipulation
+### AST Manipulation (Submodule: `ftllexbuffer.syntax.ast`)
 
 ```python
-from ftllexbuffer import (
-    # Parser
-    parse_ftl,
-    serialize_ftl,
+from ftllexbuffer.syntax.ast import (
     # AST entry types
     Resource,
     Message,
@@ -88,18 +83,25 @@ from ftllexbuffer import (
     NamedArgument,
     Span,
     Annotation,
-    # Visitor pattern
+)
+```
+
+### Visitor Pattern (Submodule: `ftllexbuffer.syntax.visitor`)
+
+```python
+from ftllexbuffer.syntax.visitor import (
     ASTVisitor,
     ASTTransformer,
 )
 ```
 
-### Introspection
+### Introspection (Submodule: `ftllexbuffer.introspection`)
 
 ```python
-from ftllexbuffer import (
+from ftllexbuffer.introspection import (
     introspect_message,
     extract_variables,
+    extract_references,
     MessageIntrospection,
     VariableInfo,
     FunctionCallInfo,
@@ -107,35 +109,81 @@ from ftllexbuffer import (
 )
 ```
 
-### Advanced
+### Resource Loading (Submodule: `ftllexbuffer.localization`)
 
 ```python
-from ftllexbuffer import (
-    FluentParserV1,          # Direct parser access
-    FUNCTION_REGISTRY,        # Global function registry
-    FunctionRegistry,         # Function registry class (for custom instances)
-    FunctionSignature,        # Function metadata dataclass (Added in v0.4.0)
-    ValidationResult,         # Validation result type
+from ftllexbuffer.localization import (
+    # Loaders
+    PathResourceLoader,
+    ResourceLoader,
+    # Type aliases
+    MessageId,
+    LocaleCode,
+    ResourceId,
+    FTLSource,
 )
 ```
 
-### Type Aliases
-
-Python 3.13 type aliases for user code annotations:
+### Diagnostics (Submodule: `ftllexbuffer.diagnostics`)
 
 ```python
-from ftllexbuffer import (
-    MessageId,    # Type alias for message identifiers (str)
-    LocaleCode,   # Type alias for locale codes (str)
-    ResourceId,   # Type alias for resource identifiers (str)
-    FTLSource,    # Type alias for FTL source strings (str)
+from ftllexbuffer.diagnostics import (
+    # All error types
+    FluentError,
+    FluentSyntaxError,
+    FluentReferenceError,
+    FluentResolutionError,
+    FluentCyclicReferenceError,
+)
+```
+
+```python
+from ftllexbuffer.diagnostics.validation import (
+    # Validation
+    ValidationResult,
+    ValidationError,
+    ValidationWarning,
+)
+```
+
+### Parsing (Submodule: `ftllexbuffer.parsing`)
+
+```python
+from ftllexbuffer.parsing import (
+    # Parse functions
+    parse_decimal,
+    parse_date,
+    parse_datetime,
+    parse_currency,
+)
+```
+
+```python
+from ftllexbuffer.parsing.guards import (
+    # Type guards
+    is_valid_decimal,
+    is_valid_date,
+    is_valid_datetime,
+    is_valid_currency,
+)
+```
+
+### Enumerations (Submodule: `ftllexbuffer.enums`)
+
+```python
+from ftllexbuffer.enums import (
+    CommentType,
+    VariableContext,
+    ReferenceKind,
+    FunctionCategory,
 )
 ```
 
 **Purpose**: These type aliases improve code readability and IDE autocomplete:
 
 ```python
-from ftllexbuffer import FluentBundle, MessageId, LocaleCode
+from ftllexbuffer import FluentBundle
+from ftllexbuffer.localization import MessageId, LocaleCode
 
 def load_message(bundle: FluentBundle, msg_id: MessageId) -> str:
     result, _ = bundle.format_value(msg_id)
@@ -2563,11 +2611,11 @@ vat = amount * Decimal("0.21")  # → Decimal('21.105') (exact!)
 ```python
 from decimal import Decimal
 from ftllexbuffer.parsing import parse_decimal
-from ftllexbuffer.parsing.guards import has_parse_errors, is_valid_decimal
+from ftllexbuffer.parsing.guards import is_valid_decimal
 
 # Financial precision - no float rounding errors
 result, errors = parse_decimal("100,50", "lv_LV")
-if not has_parse_errors(errors) and is_valid_decimal(result):
+if not errors and is_valid_decimal(result):
     vat = result * Decimal("0.21")  # → Decimal('21.105') - exact!
 
 # US format
@@ -2644,7 +2692,7 @@ Parse locale-aware date string to `date` object.
 
 ```python
 from ftllexbuffer.parsing import parse_date
-from ftllexbuffer.parsing.guards import has_parse_errors, is_valid_date
+from ftllexbuffer.parsing.guards import is_valid_date
 
 # US format (month-first)
 result, errors = parse_date("1/28/2025", "en_US")
@@ -2733,7 +2781,7 @@ Parse locale-aware datetime string to `datetime` object.
 ```python
 from datetime import timezone
 from ftllexbuffer.parsing import parse_datetime
-from ftllexbuffer.parsing.guards import has_parse_errors, is_valid_datetime
+from ftllexbuffer.parsing.guards import is_valid_datetime
 
 # Parse datetime
 result, errors = parse_datetime("1/28/2025 14:30", "en_US")
@@ -2818,7 +2866,7 @@ Parse locale-aware currency string to `(Decimal, currency_code)` tuple.
 
 ```python
 from ftllexbuffer.parsing import parse_currency
-from ftllexbuffer.parsing.guards import has_parse_errors, is_valid_currency
+from ftllexbuffer.parsing.guards import is_valid_currency
 
 # Parse EUR with symbol (unambiguous)
 result, errors = parse_currency("€100.50", "en_US")
@@ -2912,12 +2960,12 @@ All parsing functions follow the same error handling pattern:
 ```python
 from decimal import Decimal
 from ftllexbuffer.parsing import parse_decimal
-from ftllexbuffer.parsing.guards import has_parse_errors, is_valid_decimal
+from ftllexbuffer.parsing.guards import is_valid_decimal
 
 # v0.8.0: Check errors list instead of catching exceptions
 result, errors = parse_decimal(user_input, locale)
 
-if has_parse_errors(errors):
+if errors:
     # Handle errors - result is default value (Decimal("0"))
     show_error_to_user(f"Invalid amount: {errors[0]}")
     return
@@ -2939,7 +2987,7 @@ process_payment(result)
 - `parse_currency()` returns `None`
 
 **Type guards** (from `ftllexbuffer.parsing.guards`):
-- `has_parse_errors(errors)` - Check if error list is non-empty
+- Check errors directly: `if errors:` or `if not errors:` (v0.10.0: has_parse_errors removed)
 - `is_valid_decimal(value)` - Check Decimal is finite (not NaN/Infinity)
 - `is_valid_number(value)` - Check float is finite (not NaN/Infinity)
 - `is_valid_currency(value)` - Check currency tuple is not None and has finite amount
@@ -2956,7 +3004,7 @@ process_payment(result)
 from decimal import Decimal
 from ftllexbuffer import FluentBundle
 from ftllexbuffer.parsing import parse_decimal
-from ftllexbuffer.parsing.guards import has_parse_errors, is_valid_decimal
+from ftllexbuffer.parsing.guards import is_valid_decimal
 
 bundle = FluentBundle("lv_LV")
 bundle.add_resource("""
@@ -2969,7 +3017,7 @@ def process_invoice(user_input: str) -> dict | None:
     # Parse user input (v0.8.0 API)
     subtotal, errors = parse_decimal(user_input, "lv_LV")
 
-    if has_parse_errors(errors) or not is_valid_decimal(subtotal):
+    if errors or not is_valid_decimal(subtotal):
         return None  # Invalid input
 
     # Calculate VAT (financial precision)
@@ -3000,7 +3048,7 @@ result = process_invoice("1 234,56")
 ```python
 from decimal import Decimal
 from ftllexbuffer.parsing import parse_decimal
-from ftllexbuffer.parsing.guards import has_parse_errors, is_valid_decimal
+from ftllexbuffer.parsing.guards import is_valid_decimal
 
 def validate_amount_field(input_value: str, locale: str) -> tuple[Decimal | None, str | None]:
     """Validate and parse amount input field.
@@ -3017,7 +3065,7 @@ def validate_amount_field(input_value: str, locale: str) -> tuple[Decimal | None
 
     # Parse (v0.8.0 API)
     result, errors = parse_decimal(input_value, locale)
-    if has_parse_errors(errors):
+    if errors:
         return (None, f"Invalid amount format for {locale}")
 
     # Validate finite (not NaN/Infinity)
@@ -3047,7 +3095,7 @@ process_payment(amount)
 
 ```python
 from ftllexbuffer.parsing import parse_decimal, parse_date
-from ftllexbuffer.parsing.guards import has_parse_errors
+# Removed has_parse_errors - use `if errors:` or `if not errors:` directly
 
 def import_transactions_csv(csv_path: str, locale: str) -> tuple[list[dict], list[str]]:
     """Import financial transactions from CSV."""
@@ -3114,7 +3162,7 @@ parsed = babel_parse_decimal(user_input, locale="lv_LV")
 ```python
 from ftllexbuffer import FluentBundle
 from ftllexbuffer.parsing import parse_decimal
-from ftllexbuffer.parsing.guards import has_parse_errors
+# Removed has_parse_errors - use `if errors:` or `if not errors:` directly
 
 # Formatting: FTLLexBuffer
 bundle = FluentBundle("lv_LV")
@@ -3123,7 +3171,7 @@ formatted = bundle.format_value("price", {"amount": 1234.56})
 # Parsing: FTLLexBuffer (consistent API, v0.8.0+)
 user_input = "1 234,56"
 result, errors = parse_decimal(user_input, "lv_LV")  # Same locale format!
-if not has_parse_errors(errors):
+if not errors:
     parsed = result
 ```
 
@@ -3708,7 +3756,8 @@ bundle.add_resource('msg = { CUSTOM($text) }')
 **Solutions**:
 ```python
 # Use proper type annotations
-from ftllexbuffer import FluentBundle, MessageId
+from ftllexbuffer import FluentBundle
+from ftllexbuffer.localization import MessageId
 
 def format_message(bundle: FluentBundle, msg_id: MessageId) -> str:
     # mypy knows result is str, errors is list[FluentError]
@@ -3959,7 +4008,8 @@ Integrate FTLLexBuffer with Flask for web applications:
 
 ```python
 from flask import Flask, g, request
-from ftllexbuffer import FluentLocalization, PathResourceLoader
+from ftllexbuffer import FluentLocalization
+from ftllexbuffer.localization import PathResourceLoader
 
 app = Flask(__name__)
 
@@ -4003,7 +4053,8 @@ Use FTLLexBuffer in Django views:
 ```python
 # myapp/l10n.py
 from django.conf import settings
-from ftllexbuffer import FluentLocalization, PathResourceLoader
+from ftllexbuffer import FluentLocalization
+from ftllexbuffer.localization import PathResourceLoader
 
 _l10n_cache = {}
 
@@ -4147,8 +4198,8 @@ from fluent.runtime import FluentBundle, FluentLocalization, FluentResource
 from fluent.runtime.types import FluentError
 
 # FTLLexBuffer
-from ftllexbuffer import FluentBundle, FluentLocalization, Resource
-from ftllexbuffer import FluentError
+from ftllexbuffer import FluentBundle, FluentLocalization, FluentError
+from ftllexbuffer.syntax.ast import Resource
 ```
 
 ### API Compatibility Matrix
@@ -4228,7 +4279,8 @@ value, errors = bundle.format_pattern("hello", {"name": "World"})
    from fluent.syntax import ast
 
    # FTLLexBuffer
-   from ftllexbuffer import FluentBundle, Message, Term, Resource
+   from ftllexbuffer import FluentBundle
+   from ftllexbuffer.syntax.ast import Message, Term, Resource
    ```
 
 ### What Stays the Same
@@ -4339,7 +4391,8 @@ result, errors = l10n.format_value('payment-success')
 **Example - Disk-based resources**:
 
 ```python
-from ftllexbuffer import FluentLocalization, PathResourceLoader
+from ftllexbuffer import FluentLocalization
+from ftllexbuffer.localization import PathResourceLoader
 
 # Create loader pointing to locale directory structure
 loader = PathResourceLoader('locales/{locale}')
@@ -4359,7 +4412,8 @@ result, errors = l10n.format_value('welcome', {'name': 'Anna'})
 **Example - Enable caching for performance**:
 
 ```python
-from ftllexbuffer import FluentLocalization, PathResourceLoader
+from ftllexbuffer import FluentLocalization
+from ftllexbuffer.localization import PathResourceLoader
 
 # Enable format caching for 50x speedup on repeated calls
 loader = PathResourceLoader('locales/{locale}')
@@ -4636,7 +4690,7 @@ PathResourceLoader(base_path: str)
 **Example**:
 
 ```python
-from ftllexbuffer import PathResourceLoader
+from ftllexbuffer.localization import PathResourceLoader
 
 loader = PathResourceLoader("locales/{locale}")
 
@@ -5252,18 +5306,22 @@ print(serialize_ftl(renamed))
 
 Public AST node types available for inspection and manipulation.
 
-**Import**:
+**Import** (v0.10.0):
 
-All AST node types are available as **top-level imports**:
+AST node types require **submodule imports**:
 
 ```python
-# Top-level imports
-from ftllexbuffer import (
+# v0.10.0: Import from syntax.ast submodule
+from ftllexbuffer.syntax.ast import (
     Resource, Message, Term, Comment, Junk, Attribute,
     Pattern, TextElement, Placeable,
     VariableReference, MessageReference, TermReference, FunctionReference,
     SelectExpression, Variant, NumberLiteral, StringLiteral,
     Identifier, CallArguments, NamedArgument, Span, Annotation,
+)
+
+# Visitor pattern from syntax.visitor submodule
+from ftllexbuffer.syntax.visitor import (
     ASTVisitor, ASTTransformer,
 )
 
@@ -6670,8 +6728,8 @@ FTLLexBuffer is fully type-annotated and passes `mypy --strict`.
 **Import types**:
 
 ```python
-from ftllexbuffer import FluentBundle, ValidationResult, FluentError
-from ftllexbuffer import FluentBundle
+from ftllexbuffer import FluentBundle, FluentError
+from ftllexbuffer.diagnostics.validation import ValidationResult
 ```
 
 **Type hints for custom code**:
@@ -6767,7 +6825,8 @@ Cache is **fully cleared** on these operations:
 
 **Example 1: Web Application (High Performance)**
 ```python
-from ftllexbuffer import FluentLocalization, PathResourceLoader
+from ftllexbuffer import FluentLocalization
+from ftllexbuffer.localization import PathResourceLoader
 
 loader = PathResourceLoader('locales/{locale}')
 l10n = FluentLocalization(

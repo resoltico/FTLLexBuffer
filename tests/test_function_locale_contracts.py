@@ -25,7 +25,14 @@ import pytest
 
 from ftllexbuffer import FluentBundle
 from ftllexbuffer.runtime.functions import currency_format, datetime_format, number_format
-from ftllexbuffer.runtime.plural_rules import SUPPORTED_LOCALES
+
+# Test locale set - representative sample of supported locales
+# Babel supports 200+ locales; these are common ones for testing
+TEST_LOCALES: frozenset[str] = frozenset({
+    "en", "zh", "hi", "es", "fr", "ar", "bn", "pt", "ru", "ja",
+    "de", "jv", "ko", "vi", "te", "tr", "ta", "mr", "ur", "it",
+    "th", "gu", "pl", "uk", "kn", "or", "ml", "my", "pa", "lv",
+})
 
 
 class TestNumberLocaleContract:
@@ -35,7 +42,7 @@ class TestNumberLocaleContract:
     produce the same output as number_format(val, locale).
     """
 
-    @pytest.mark.parametrize("locale", SUPPORTED_LOCALES)
+    @pytest.mark.parametrize("locale", TEST_LOCALES)
     @pytest.mark.parametrize("value", [0, 1.5, 123.45, 1234567.89, -42])
     def test_number_basic_contract(self, locale: str, value: int | float) -> None:
         """NUMBER() respects bundle locale (contract test)."""
@@ -138,7 +145,7 @@ class TestDateTimeLocaleContract:
     produce the same output as datetime_format(dt, locale, date_style=...).
     """
 
-    @pytest.mark.parametrize("locale", SUPPORTED_LOCALES)
+    @pytest.mark.parametrize("locale", TEST_LOCALES)
     @pytest.mark.parametrize("date_style", ["short", "medium", "long", "full"])
     def test_datetime_locale_contract(self, locale: str, date_style: str) -> None:
         """DATETIME() respects bundle locale (contract test)."""

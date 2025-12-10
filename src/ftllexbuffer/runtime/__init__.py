@@ -6,9 +6,9 @@ Depends on syntax package for parsing.
 Python 3.13+.
 """
 
-from __future__ import annotations
+from ftllexbuffer.diagnostics import ValidationResult
 
-from .bundle import FluentBundle, ValidationResult
+from .bundle import FluentBundle
 from .function_bridge import FunctionRegistry
 from .functions import FUNCTION_REGISTRY, datetime_format, number_format
 from .plural_rules import select_plural_category

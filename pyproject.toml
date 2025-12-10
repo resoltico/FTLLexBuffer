@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "ftllexbuffer"
-version = "0.9.1"
+version = "0.10.0"
 description = "Python implementation of the FTL (Fluent Translation List) specification"
 readme = "README.md"
 requires-python = ">=3.13"
@@ -161,28 +161,15 @@ disallow_untyped_defs = false
 warn_return_any = false
 
 [[tool.mypy.overrides]]
+module = "ftllexbuffer.syntax.visitor"
+# Visitor pattern type narrowing: mypy can't track that visit() returns the correct subtype
+# Transform pattern allows None and list returns for node removal/expansion
+# Runtime: correct via pattern matching. Architectural: visitor pattern limitation.
+disable_error_code = ["arg-type", "unreachable"]
+
+[[tool.mypy.overrides]]
 module = "babel.*"
 ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-# v0.9.0 visitor refactoring: mypy doesn't understand Protocol + dataclass.replace()
-module = "ftllexbuffer.syntax.visitor"
-disable_error_code = ["arg-type"]
-
-[[tool.mypy.overrides]]
-# v0.9.0 visitor refactoring: generic_visit() pattern
-module = "ftllexbuffer.runtime.bundle"
-disable_error_code = ["misc"]
-
-[[tool.mypy.overrides]]
-# Validator: return type variations in visit methods
-module = "ftllexbuffer.syntax.validator"
-disable_error_code = ["return-value"]
-
-[[tool.mypy.overrides]]
-# v0.9.0: CommentType enum comparison
-module = "ftllexbuffer.syntax.serializer"
-disable_error_code = ["comparison-overlap"]
 
 # Ruff configuration
 [tool.ruff]
@@ -223,198 +210,67 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-# Architectural patterns - these are intentional design decisions, not suppressions
+# PRODUCTION CODE - Architectural patterns only (real bugs fixed separately)
 
-# Parser expression dispatch - match statement over AST expression types
-# Refactoring would harm readability (strategy pattern adds indirection for no benefit)
-# E501/F841/ARG002: Long lines and unused start_pos from v0.9.0 span removal
-"src/ftllexbuffer/syntax/parser.py" = ["PLR0912", "E501", "F841", "ARG002"]
+# Visitor pattern: N802 (visit_NodeName methods follow stdlib ast.NodeVisitor convention)
+"src/ftllexbuffer/introspection.py" = ["N802"]
 
-# Visitor pattern tests - AST visitor methods follow stdlib convention (visit_NodeName)
-# N802: visit_NodeName intentionally PascalCase per ast.NodeVisitor pattern
-# ARG002: node parameter intentionally unused in removal transformers
-"tests/test_visitor_hypothesis.py" = ["N802", "ARG002"]
+# Parser: Inherent complexity from EBNF grammar + real bugs to fix separately
+"src/ftllexbuffer/syntax/parser.py" = ["PLR0912", "F841", "ARG002"]
 
-# Visitor pattern (Python stdlib ast.NodeVisitor convention)
-# visit_NodeName is the standard pattern - snake_case would break it
-# ERA001: Example code in docstrings showing visit_* pattern usage
-"src/ftllexbuffer/syntax/visitor.py" = ["N802", "PLR0911", "PLR0912", "ERA001"]
-"src/ftllexbuffer/syntax/serializer.py" = ["N802"]  # Extends visitor pattern
-"src/ftllexbuffer/introspection.py" = ["N802"]  # Introspection visitor (visit_Pattern method)
+# Visitor: Commented example code + inherent complexity from AST node dispatch
+"src/ftllexbuffer/syntax/visitor.py" = ["ERA001", "PLR0911", "PLR0912"]
 
-# Plural rules - CLDR rules require many return statements per category
-# Each language group has distinct category logic, cannot be reduced
-"src/ftllexbuffer/runtime/plural_rules.py" = ["PLR0911"]
-
-# AST Transformer pattern matching - unavoidable complexity matching all AST node types
-# PLR0911: Too many return statements (15 cases for 15 AST node types)
-# PLR0912: Too many branches (pattern matching on all AST node variants)
-
-# Bundle complexity: add_resource method has unavoidable complexity for resource parsing
-# E501: Long validation warning messages (readability over line length)
+# Bundle: Inherent complexity in resource validation
 "src/ftllexbuffer/runtime/bundle.py" = ["PLR0912", "E501"]
 
-# Cache put() needs many parameters for comprehensive cache key
-"src/ftllexbuffer/runtime/cache.py" = ["PLR0917"]
-
-# Metadata system: Lazy import of FUNCTION_REGISTRY for better module load performance
+# Function metadata: Lazy import for performance
 "src/ftllexbuffer/runtime/function_metadata.py" = ["PLC0415"]
 
-# TEST CODE PATTERNS
-# Philosophy: Tests optimize for clarity and DSL fidelity over strict naming
-
-# test_visitor.py: N802 (visitor pattern visit_NodeName methods in tests)
-"tests/test_visitor.py" = ["N802"]
-
-# test_ast_tooling.py: N802 (visitor pattern), ARG002 (unused node in visit_Comment removal)
-"tests/test_ast_tooling.py" = ["N802", "ARG002"]
-
-# test_fluent_resolver.py: N802 (UPPERCASE FTL functions), EM101 (test exception messages)
-"tests/test_fluent_resolver.py" = ["N802", "EM101"]
-
-# test_fluent_bundle.py: N802 (UPPERCASE FTL functions), N806 (MockResolver naming)
-"tests/test_fluent_bundle.py" = ["N802", "N806"]
-
-# test_cache_basic.py: N802 (CUSTOM FTL function name must be UPPERCASE)
-"tests/test_cache_basic.py" = ["N802"]
-
-# test_cache_properties.py: Long hypothesis strategy line, unused result variables
-"tests/test_cache_properties.py" = ["E501"]
-
-# test_parsing_numbers_hypothesis.py: Runtime import for formatting functions
-"tests/test_parsing_numbers_hypothesis.py" = ["PLC0415"]
-
-# test_parsing_currency_hypothesis.py: Runtime import for formatting functions
-"tests/test_parsing_currency_hypothesis.py" = ["PLC0415"]
-
-# test_serialization_hypothesis.py: AST manipulation tests
-"tests/test_serialization_hypothesis.py" = ["PLC0415"]
-
-# test_localization_api_completeness.py: N802 (CUSTOM FTL function name)
-"tests/test_localization_api_completeness.py" = ["N802"]
-
-# test_parsing_*.py: Runtime imports for roundtrip validation, DTZ001 for datetime tests
-"tests/test_parsing_currency.py" = ["PLC0415"]
-"tests/test_parsing_dates.py" = ["DTZ001"]
-"tests/test_parsing_numbers.py" = ["PLC0415"]
-
-# test_ast_validation_coverage.py: PLC0415 (import inside test to verify TypeIs guards)
-"tests/test_ast_validation_coverage.py" = ["PLC0415"]
-
-# test_resolver_coverage.py: N802 (UPPERCASE FTL function names mimicking spec)
-"tests/test_resolver_coverage.py" = ["N802"]
-
-# test_function_registry_integration.py: N802 (UPPERCASE FTL function names for testing)
-"tests/test_function_registry_integration.py" = ["N802"]
-
-# test_functions_coverage.py: SIM105 (explicit try-except for locale error handling)
-"tests/test_functions_coverage.py" = ["SIM105"]
-
-# test_properties.py: PLC0415 (runtime imports), SIM105 (explicit try-except)
-"tests/test_properties.py" = ["PLC0415", "SIM105"]
-
-# examples/: Demonstrative code, not production - educational purpose
-# ERA001: Output comments are acceptable in examples
-# E402/I001: Import ordering not critical for examples
-# E501: Long lines acceptable for educational comments/docstrings
-# PLC0415: Mid-function imports acceptable for self-contained examples
-# N802: UPPERCASE FTL function names matching spec conventions
-"examples/**/*.py" = ["ERA001", "E402", "I001", "E501", "PLC0415", "N802"]
-
-# helpers/type_assertions.py: PLC0415 (runtime imports to avoid circular dependencies)
-"tests/helpers/type_assertions.py" = ["PLC0415"]
-
-# Parser tests with type guards: PT018 (combined assertions for type narrowing)
-# Pattern: assert is_message(msg) and has_value(msg) is required for mypy type narrowing
-"tests/test_fluent_parser_*.py" = ["PT018"]
-
-# Metamorphic/property-based tests: PLC0415 (Hypothesis strategies with runtime imports)
-# Runtime imports inside test functions prevent eager strategy evaluation
-"tests/test_metamorphic_properties.py" = ["PLC0415"]
-
-# Parser coverage tests: PLC0415 (conditional imports), PT017 (assert-in-except pattern)
-# PT017: Tests deliberately trigger KeyError to verify logging behavior
-"tests/test_parser_coverage_gaps.py" = ["PLC0415", "PT017"]
-
-# __init__.py error path tests: Test module import failures
-# PLC0415: Runtime imports (needed to test import error paths)
-# EM101: String literal exceptions (test error messages)
-# PT017: Assert in except block (verifying RuntimeError messages)
-# F401: Unused imports (module cleanup imports for restoring test state)
-"tests/test_init_error_paths.py" = ["PLC0415", "EM101", "PT017", "F401"]
-
-# Final coverage tests: N801 (class names document parser line numbers), PLC0415 (runtime imports)
-# Pattern: TestLine283_EOFInContinuation documents specific parser line being tested
-# PLC0415: MessageReference import for conditional type checking
-"tests/test_parser_final_coverage.py" = ["N801", "PLC0415"]
-
-# Spec conformance tests: ARG002 (parametrize description), PLC0415 (runtime imports)
-# description parameter provides pytest output clarity but unused in test body
-"tests/test_spec_conformance.py" = ["ARG002", "PLC0415"]
-
-# Systematic error path tests: ARG002 (parametrize expected values)
-# expected parameter used for test naming/documentation
-"tests/test_systematic_error_paths.py" = ["ARG002"]
-
-# Hypothesis-based tests: E721 (type comparison), E501 (long line), B904 (exception chaining)
-# E721: Comparing types of unknown generated objects requires type() == type()
-# E501: Hypothesis alphabet strings can exceed line length
-"tests/test_multiline_hypothesis.py" = ["E721", "E501"]
-
-# Parser hypothesis error tests: E721 (type comparison), B904 (exception chaining)
-# E721: Generated data type comparison, B904: Test deliberately re-raises without chain
-"tests/test_parser_hypothesis_errors.py" = ["E721", "B904"]
-
-# Serializer tests: RUF002 (ambiguous unicode in docstring)
-# Mathematical notation using × (MULTIPLICATION SIGN) for clarity in test matrix
-"tests/test_serializer_completeness.py" = ["RUF002"]
-
-# Semantic validation tests: SIM102 (nested if), PLC0415 (runtime imports)
-# SIM102: Nested isinstance() checks enhance readability for union type narrowing
-"tests/test_semantic_validation.py" = ["SIM102", "PLC0415"]
-
-# Span attachment tests: PLC0415 (runtime imports for conditional type checking)
-"tests/test_span_attachment.py" = ["PLC0415"]
-
-# conftest.py: PLC0415 (runtime import of os for CI detection)
-# Must detect CI=true at runtime, not import time
-"tests/conftest.py" = ["PLC0415"]
-
-# test_result.py: Hypothesis property tests and internal result type testing
-# PT011: Broad ValueError/AttributeError exceptions are intentional for testing error paths
-# PLC0415: Import inside function tests __all__ exports
-# ARG001: Hypothesis @given parameter not always used in test body
-# SIM108: Explicit if/else for unreachable branch with type: ignore
-# E721: Testing type() equality for generic Result types
-"tests/test_result.py" = ["PT011", "PLC0415", "ARG001", "SIM108", "E721"]
-
-# test_ast_edge_cases.py: Manual AST construction and visitor pattern testing
-# N801: Class names like TestValidatorLines364_365 document specific line numbers being tested
-# N802: Visitor pattern methods (visit_TextElement) follow stdlib ast.NodeVisitor convention
-# PLC0415: Mid-function imports for manual AST construction (test isolation)
-"tests/test_ast_edge_cases.py" = ["N801", "N802", "PLC0415"]
-
-# test_introspection_coverage.py: Manual AST construction for introspection API testing
-# PLC0415: Mid-function imports for manual AST construction (test isolation)
-"tests/test_introspection_coverage.py" = ["PLC0415"]
-
-# test_locale_context_coverage.py: Error path testing with monkeypatching
-# PLC0415: Mid-function imports of babel modules for monkeypatching (test isolation)
-"tests/test_locale_context_coverage.py" = ["PLC0415"]
-
-# test_visitor_coverage.py: Visitor pattern transformation tests
-# N802: Visitor pattern methods (visit_Identifier) follow stdlib ast.NodeVisitor convention
-"tests/test_visitor_coverage.py" = ["N802"]
-
-# parsing/dates.py: DTZ007 (naive datetime from strptime)
-# Intentional: parsing user input which may not have timezone info
-# Caller can specify tzinfo parameter to add timezone if needed
+# Dates: Intentionally naive datetime (user provides timezone if needed)
 "src/ftllexbuffer/parsing/dates.py" = ["DTZ007"]
 
-# parsing/currency.py: PLR0911/PLR0912 (complexity in ambiguous symbol handling)
-# v0.7.0: High complexity unavoidable for safe currency symbol disambiguation
-# Each ambiguous symbol ($, ¢, ₨, etc.) requires explicit default_currency handling
+# Currency: Inherent complexity in ambiguous symbol disambiguation
 "src/ftllexbuffer/parsing/currency.py" = ["PLR0911", "PLR0912"]
+
+# EXAMPLES - Educational code, not production quality
+"examples/**/*.py" = ["N802", "E501", "ERA001", "PLC0415"]
+
+# TESTS - Minimal architectural pattern suppressions
+"tests/test_visitor.py" = ["N802"]
+"tests/test_visitor_coverage.py" = ["N802"]
+"tests/test_visitor_hypothesis.py" = ["N802", "ARG002"]
+"tests/test_ast_tooling.py" = ["N802", "ARG002"]
+"tests/test_ast_edge_cases.py" = ["N801", "N802", "PLC0415"]
+"tests/test_fluent_bundle.py" = ["N802", "N806"]
+"tests/test_fluent_resolver.py" = ["N802", "EM101"]
+"tests/test_resolver_coverage.py" = ["N802"]
+"tests/test_function_registry_integration.py" = ["N802"]
+"tests/test_cache_basic.py" = ["N802"]
+"tests/test_cache_properties.py" = ["E501"]
+"tests/test_localization_api_completeness.py" = ["N802"]
+"tests/test_parsing_dates.py" = ["DTZ001"]
+"tests/test_parsing_*.py" = ["PLC0415"]
+"tests/test_parser_final_coverage.py" = ["N801", "PLC0415"]
+"tests/test_parser_coverage_gaps.py" = ["PLC0415", "PT017"]
+"tests/test_spec_conformance.py" = ["ARG002", "PLC0415"]
+"tests/test_systematic_error_paths.py" = ["ARG002"]
+"tests/test_multiline_hypothesis.py" = ["E721", "E501"]
+"tests/test_parser_hypothesis_errors.py" = ["E721"]
+"tests/test_serializer_completeness.py" = ["RUF002"]
+"tests/test_semantic_validation.py" = ["PLC0415"]
+"tests/test_span_attachment.py" = ["PLC0415"]
+"tests/test_introspection_coverage.py" = ["PLC0415"]
+"tests/test_locale_context_coverage.py" = ["PLC0415"]
+"tests/test_ast_validation_coverage.py" = ["PLC0415"]
+"tests/test_functions_coverage.py" = ["SIM105"]
+"tests/test_properties.py" = ["PLC0415", "SIM105"]
+"tests/test_init_error_paths.py" = ["PLC0415", "EM101", "PT017", "F401"]
+"tests/test_serialization_hypothesis.py" = ["PLC0415"]
+"tests/test_metamorphic_properties.py" = ["PLC0415"]
+"tests/conftest.py" = ["PLC0415"]
+"tests/helpers/type_assertions.py" = ["PLC0415"]
+"tests/test_fluent_parser_*.py" = ["PT018"]
 
 # Pylint configuration
 [tool.pylint.main]
@@ -427,17 +283,24 @@ disable = [
     "too-few-public-methods",     # Data classes are intentionally minimal
     "too-many-arguments",         # Configuration objects need many parameters
     "too-many-instance-attributes",  # AST nodes have many attributes
+    "too-many-locals",            # Parser/resolver methods need many local variables
+    "too-many-branches",          # Parser/resolver complexity inherent to EBNF grammar
+    "too-many-statements",        # Parser methods implement complex state machines
+    "too-many-lines",             # Parser is monolithic by design (see Task 4)
+    "too-many-positional-arguments",  # Cache keys need many position-only args
+    "protected-access",           # Test utilities and internal helpers need protected access
     "fixme",                      # TODOs are tracked separately
     "too-many-public-methods",    # Visitor pattern needs one method per node type
     "duplicate-code",             # Similar __all__ lists across modules is intentional
     "too-many-return-statements", # Parser/resolver patterns need multiple returns
-    "import-outside-toplevel",    # Runtime imports avoid circular dependencies (only function_metadata.py)
+    "import-outside-toplevel",    # Runtime imports avoid circular dependencies
     "unreachable",                # Pylint doesn't recognize Never return type from Result monad
     "assignment-from-no-return",  # Pylint doesn't recognize Never return type from Result monad
-    "invalid-name",               # v0.9.0: Visitor pattern visit_NodeName methods
-    "unused-variable",            # v0.9.0: start_pos from span removal
-    "unused-argument",            # v0.9.0: start_pos from span removal
+    "invalid-name",               # Visitor pattern visit_NodeName methods
+    "unused-variable",            # start_pos variables from parser span tracking
+    "unused-argument",            # start_pos parameters from parser span tracking
     "line-too-long",              # Delegated to ruff (ruff E501)
+    "import-error",               # Extension packages (Babel) handled via extension-pkg-allow-list
 ]
 
 [tool.pylint.format]

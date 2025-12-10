@@ -13,10 +13,10 @@ Key architectural decisions:
 Python 3.13+.
 """
 
-from __future__ import annotations
-
-from collections.abc import Generator, Iterable
+from collections.abc import Callable, Generator, Iterable, Mapping
 from dataclasses import dataclass
+from datetime import datetime
+from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
@@ -24,9 +24,12 @@ from .diagnostics.codes import Diagnostic, DiagnosticCode
 from .diagnostics.errors import FluentError
 from .runtime.bundle import FluentBundle
 
+# Type alias for Fluent-compatible values
+type FluentValue = str | int | float | bool | Decimal | datetime | None
+
 if TYPE_CHECKING:
+    from .diagnostics import ValidationResult
     from .introspection import MessageIntrospection
-    from .runtime.bundle import ValidationResult
 
 # Type aliases using Python 3.13 type keyword
 type MessageId = str
@@ -279,7 +282,6 @@ class FluentLocalization:
     def __repr__(self) -> str:
         """Return string representation for debugging.
 
-        v0.9.0: Added for better REPL and debugging experience.
 
         Returns:
             String representation showing locales and resource count
@@ -311,7 +313,7 @@ class FluentLocalization:
         bundle.add_resource(ftl_source)
 
     def format_value(
-        self, message_id: MessageId, args: dict[str, object] | None = None
+        self, message_id: MessageId, args: Mapping[str, FluentValue] | None = None
     ) -> tuple[str, list[FluentError]]:
         """Format message with fallback chain.
 
@@ -379,7 +381,7 @@ class FluentLocalization:
     def format_pattern(
         self,
         message_id: MessageId,
-        args: dict[str, object] | None = None,
+        args: Mapping[str, FluentValue] | None = None,
         *,
         attribute: str | None = None,
     ) -> tuple[str, list[FluentError]]:
@@ -424,7 +426,7 @@ class FluentLocalization:
         errors.append(FluentError(diagnostic))
         return (f"{{{message_id}}}", errors)
 
-    def add_function(self, name: str, func: object) -> None:
+    def add_function(self, name: str, func: Callable[..., str]) -> None:
         """Register custom function on all bundles.
 
         Convenience method to avoid manual bundle iteration.
@@ -446,7 +448,7 @@ class FluentLocalization:
         for bundle in self._bundles.values():
             bundle.add_function(name, func)
 
-    def introspect_message(self, message_id: MessageId) -> MessageIntrospection | None:
+    def introspect_message(self, message_id: MessageId) -> "MessageIntrospection | None":
         """Get message introspection from first bundle with message.
 
         Args:
@@ -487,7 +489,7 @@ class FluentLocalization:
         bundle = self._bundles[primary_locale]
         return bundle.get_babel_locale()
 
-    def validate_resource(self, ftl_source: FTLSource) -> ValidationResult:
+    def validate_resource(self, ftl_source: FTLSource) -> "ValidationResult":
         """Validate FTL resource without adding to bundles.
 
         Uses primary locale's bundle for validation.

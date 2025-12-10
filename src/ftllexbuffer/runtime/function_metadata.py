@@ -17,13 +17,24 @@ Design Goals:
 Python 3.13+. Zero external dependencies.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Literal
+from enum import Enum
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ftllexbuffer.runtime.function_bridge import FunctionRegistry
+
+
+class FunctionCategory(Enum):
+    """Category classification for Fluent functions."""
+
+    FORMATTING = "formatting"
+    TEXT = "text"
+    CUSTOM = "custom"
+
+    def __str__(self) -> str:
+        """Return enum value for serialization."""
+        return self.value
 
 
 @dataclass(frozen=True)
@@ -41,14 +52,14 @@ class FunctionMetadata:
         ...     python_name="number_format",
         ...     ftl_name="NUMBER",
         ...     requires_locale=True,
-        ...     category="formatting",
+        ...     category=FunctionCategory.FORMATTING,
         ... )
     """
 
     python_name: str
     ftl_name: str
     requires_locale: bool
-    category: Literal["formatting", "text", "custom"] = "formatting"
+    category: FunctionCategory = FunctionCategory.FORMATTING
 
 
 # Centralized metadata registry for built-in functions
@@ -58,19 +69,19 @@ BUILTIN_FUNCTIONS: dict[str, FunctionMetadata] = {
         python_name="number_format",
         ftl_name="NUMBER",
         requires_locale=True,
-        category="formatting",
+        category=FunctionCategory.FORMATTING,
     ),
     "DATETIME": FunctionMetadata(
         python_name="datetime_format",
         ftl_name="DATETIME",
         requires_locale=True,
-        category="formatting",
+        category=FunctionCategory.FORMATTING,
     ),
     "CURRENCY": FunctionMetadata(
         python_name="currency_format",
         ftl_name="CURRENCY",
         requires_locale=True,
-        category="formatting",
+        category=FunctionCategory.FORMATTING,
     ),
 }
 
@@ -134,7 +145,7 @@ def get_python_name(ftl_name: str) -> str | None:
     return metadata.python_name if metadata else None
 
 
-def should_inject_locale(func_name: str, function_registry: FunctionRegistry) -> bool:
+def should_inject_locale(func_name: str, function_registry: "FunctionRegistry") -> bool:
     """Check if locale should be injected for this function call.
 
     This is the CORRECT way to check locale injection, handling both
@@ -183,7 +194,7 @@ def should_inject_locale(func_name: str, function_registry: FunctionRegistry) ->
     # Compare: is the function in the bundle's registry the same as the global built-in?
     try:
         # Get function signatures from both registries
-        # pylint: disable=protected-access  # Need to compare callables to detect custom functions
+        # Need to compare callables to detect custom functions
         bundle_func = function_registry._functions.get(func_name)
         global_func = FUNCTION_REGISTRY._functions.get(func_name)
 

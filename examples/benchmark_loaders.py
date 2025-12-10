@@ -27,7 +27,8 @@ import time
 from pathlib import Path
 from typing import Any
 
-from ftllexbuffer import FluentLocalization, PathResourceLoader
+from ftllexbuffer import FluentLocalization
+from ftllexbuffer.localization import PathResourceLoader
 
 
 class BenchmarkTimer:

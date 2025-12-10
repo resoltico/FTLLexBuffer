@@ -33,7 +33,8 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
-from ftllexbuffer import FluentLocalization, PathResourceLoader
+from ftllexbuffer import FluentLocalization
+from ftllexbuffer.localization import PathResourceLoader
 
 
 def example_1_basic_fallback() -> None:

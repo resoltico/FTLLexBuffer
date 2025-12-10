@@ -17,7 +17,6 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from ftllexbuffer.parsing.guards import (
-    has_parse_errors,
     is_valid_currency,
     is_valid_date,
     is_valid_datetime,
@@ -41,34 +40,6 @@ currency_tuples = st.tuples(
     st.decimals(allow_nan=True, allow_infinity=True, places=2),
     st.from_regex(r"[A-Z]{3}", fullmatch=True),
 )
-
-
-# ============================================================================
-# PROPERTY TESTS - has_parse_errors
-# ============================================================================
-
-
-class TestHasParseErrorsGuard:
-    """Test has_parse_errors() helper function."""
-
-    def test_empty_list_returns_false(self) -> None:
-        """Empty error list returns False."""
-        from ftllexbuffer.diagnostics import FluentParseError  # noqa: PLC0415
-
-        errors: list[FluentParseError] = []
-        assert has_parse_errors(errors) is False
-
-    def test_non_empty_list_returns_true(self) -> None:
-        """Non-empty error list returns True."""
-        from ftllexbuffer.diagnostics import FluentParseError  # noqa: PLC0415
-
-        error = FluentParseError(
-            "Test error",
-            input_value="test",
-            locale_code="en_US",
-            parse_type="number",
-        )
-        assert has_parse_errors([error]) is True
 
 
 # ============================================================================
@@ -265,12 +236,12 @@ class TestTypeNarrowingIntegration:
     @settings(max_examples=100)
     def test_currency_type_narrowing(self, amount: Decimal, currency: str) -> None:
         """PROPERTY: Type guard correctly narrows currency result type."""
-        from ftllexbuffer.parsing import parse_currency  # noqa: PLC0415
+        from ftllexbuffer.parsing import parse_currency
 
         currency_str = f"{currency} {amount}"
         result, errors = parse_currency(currency_str, "en_US")
 
-        if not has_parse_errors(errors) and is_valid_currency(result):
+        if not errors and is_valid_currency(result):
             # After type narrowing, mypy knows result is tuple[Decimal, str]
             parsed_amount, parsed_currency = result
             assert isinstance(parsed_amount, Decimal)
@@ -285,12 +256,12 @@ class TestTypeNarrowingIntegration:
     @settings(max_examples=100)
     def test_date_type_narrowing(self, year: int, month: int, day: int) -> None:
         """PROPERTY: Type guard correctly narrows date result type."""
-        from ftllexbuffer.parsing import parse_date  # noqa: PLC0415
+        from ftllexbuffer.parsing import parse_date
 
         date_str = f"{year:04d}-{month:02d}-{day:02d}"
         result, errors = parse_date(date_str, "en_US")
 
-        if not has_parse_errors(errors) and is_valid_date(result):
+        if not errors and is_valid_date(result):
             # After type narrowing, mypy knows result is date
             assert isinstance(result, date)
             assert result.year == year
@@ -307,12 +278,12 @@ class TestTypeNarrowingIntegration:
         self, year: int, month: int, day: int, hour: int, minute: int
     ) -> None:
         """PROPERTY: Type guard correctly narrows datetime result type."""
-        from ftllexbuffer.parsing import parse_datetime  # noqa: PLC0415
+        from ftllexbuffer.parsing import parse_datetime
 
         datetime_str = f"{year:04d}-{month:02d}-{day:02d}T{hour:02d}:{minute:02d}:00"
         result, errors = parse_datetime(datetime_str, "en_US")
 
-        if not has_parse_errors(errors) and is_valid_datetime(result):
+        if not errors and is_valid_datetime(result):
             # After type narrowing, mypy knows result is datetime
             assert isinstance(result, datetime)
             assert result.year == year
@@ -328,13 +299,13 @@ class TestTypeNarrowingIntegration:
     @settings(max_examples=100)
     def test_number_type_narrowing(self, value: float) -> None:
         """PROPERTY: Type guard correctly narrows number result type."""
-        from ftllexbuffer.parsing import parse_number  # noqa: PLC0415
-        from ftllexbuffer.runtime.functions import number_format  # noqa: PLC0415
+        from ftllexbuffer.parsing import parse_number
+        from ftllexbuffer.runtime.functions import number_format
 
         formatted = number_format(value, "en_US")
         result, errors = parse_number(formatted, "en_US")
 
-        if not has_parse_errors(errors) and result is not None and is_valid_number(result):
+        if not errors and result is not None and is_valid_number(result):
             # After type narrowing, mypy knows result is float
             assert isinstance(result, float)
 
@@ -348,13 +319,13 @@ class TestTypeNarrowingIntegration:
     @settings(max_examples=100)
     def test_decimal_type_narrowing(self, value: Decimal) -> None:
         """PROPERTY: Type guard correctly narrows decimal result type."""
-        from ftllexbuffer.parsing import parse_decimal  # noqa: PLC0415
-        from ftllexbuffer.runtime.functions import number_format  # noqa: PLC0415
+        from ftllexbuffer.parsing import parse_decimal
+        from ftllexbuffer.runtime.functions import number_format
 
         formatted = number_format(float(value), "en_US", minimum_fraction_digits=2)
         result, errors = parse_decimal(formatted, "en_US")
 
-        if not has_parse_errors(errors) and result is not None and is_valid_decimal(result):
+        if not errors and result is not None and is_valid_decimal(result):
             # After type narrowing, mypy knows result is Decimal
             assert isinstance(result, Decimal)
             assert result.is_finite()

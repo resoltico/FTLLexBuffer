@@ -42,6 +42,7 @@ class CountingVisitor(ASTVisitor):
 
     def __init__(self) -> None:
         """Initialize counters."""
+        super().__init__()
         self.counts: dict[str, int] = {}
 
     def visit(self, node: Any) -> Any:
@@ -56,6 +57,7 @@ class CollectingVisitor(ASTVisitor):
 
     def __init__(self) -> None:
         """Initialize collection."""
+        super().__init__()
         self.identifiers: list[str] = []
 
     def visit_Identifier(self, node: Identifier) -> Any:

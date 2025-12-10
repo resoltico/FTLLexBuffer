@@ -24,7 +24,7 @@ class TestLocaleContextUnknownLocale:
     def test_unknown_locale_warns_on_init(self, caplog: pytest.LogCaptureFixture) -> None:
         """Unknown locale logs warning during initialization."""
         with caplog.at_level(logging.WARNING):
-            _ = LocaleContext("xx_INVALID")
+            _ = LocaleContext.create_or_raise("xx_INVALID")
 
         # Should log warning about unknown locale
         assert any("Unknown locale" in record.message for record in caplog.records)
@@ -33,7 +33,7 @@ class TestLocaleContextUnknownLocale:
     def test_unknown_locale_fallback_to_en_us(self, caplog: pytest.LogCaptureFixture) -> None:
         """Unknown locale falls back to en_US for formatting."""
         with caplog.at_level(logging.DEBUG):
-            ctx = LocaleContext("xx_NONEXISTENT")
+            ctx = LocaleContext.create_or_raise("xx_NONEXISTENT")
             # Access babel_locale to trigger fallback
             locale = ctx.babel_locale
 
@@ -45,7 +45,7 @@ class TestLocaleContextUnknownLocale:
     def test_completely_invalid_locale_string(self, caplog: pytest.LogCaptureFixture) -> None:
         """Completely malformed locale string triggers fallback."""
         with caplog.at_level(logging.DEBUG):
-            ctx = LocaleContext("!!!INVALID@@@")
+            ctx = LocaleContext.create_or_raise("!!!INVALID@@@")
             locale = ctx.babel_locale
 
         # Should still fallback gracefully
@@ -62,7 +62,7 @@ class TestLocaleContextUnknownLocale:
     def test_arbitrary_locale_never_crashes(self, locale_str: str) -> None:
         """Any locale string should create context without crashing (Hypothesis)."""
         # Should never raise, might warn/debug log
-        ctx = LocaleContext(locale_str)
+        ctx = LocaleContext.create_or_raise(locale_str)
 
         # Should be able to get babel_locale (might fallback)
         locale = ctx.babel_locale
@@ -78,7 +78,7 @@ class TestNumberFormattingErrorPaths:
 
     def test_format_number_with_invalid_pattern_params(self) -> None:
         """Invalid fraction digits should trigger error path (lines 175-176)."""
-        ctx = LocaleContext("en_US")
+        ctx = LocaleContext.create_or_raise("en_US")
 
         # This hits the error path but may not log depending on Babel behavior
         result = ctx.format_number(123.45, minimum_fraction_digits=-1)
@@ -92,7 +92,7 @@ class TestNumberFormattingErrorPaths:
         """ValueError in format_number hits lines 175-176."""
         from babel import numbers as babel_numbers
 
-        ctx = LocaleContext("en_US")
+        ctx = LocaleContext.create_or_raise("en_US")
 
         original_format_decimal = babel_numbers.format_decimal
 
@@ -124,7 +124,7 @@ class TestNumberFormattingErrorPaths:
     @settings(max_examples=30)
     def test_format_number_extreme_fraction_digits(self, fraction_digits: int) -> None:
         """Extreme fraction digit values should not crash (Hypothesis)."""
-        ctx = LocaleContext("en_US")
+        ctx = LocaleContext.create_or_raise("en_US")
 
         # Should handle gracefully even with extreme values
         result = ctx.format_number(
@@ -144,7 +144,7 @@ class TestDatetimeFormattingErrorPaths:
         """ValueError in format_datetime hits lines 257-258."""
         from babel import dates as babel_dates
 
-        ctx = LocaleContext("en_US")
+        ctx = LocaleContext.create_or_raise("en_US")
         dt = datetime(2025, 1, 1, tzinfo=UTC)
 
         original_format_date = babel_dates.format_date
@@ -167,7 +167,7 @@ class TestDatetimeFormattingErrorPaths:
 
     def test_format_datetime_with_invalid_iso_string(self) -> None:
         """Invalid ISO string should return error placeholder."""
-        ctx = LocaleContext("en_US")
+        ctx = LocaleContext.create_or_raise("en_US")
 
         result = ctx.format_datetime("not-a-valid-iso-string")
 
@@ -182,7 +182,7 @@ class TestDatetimeFormattingErrorPaths:
     @settings(max_examples=50)
     def test_format_datetime_arbitrary_strings(self, invalid_iso: str) -> None:
         """Arbitrary strings should return error placeholder (Hypothesis)."""
-        ctx = LocaleContext("en_US")
+        ctx = LocaleContext.create_or_raise("en_US")
 
         result = ctx.format_datetime(invalid_iso)
 
@@ -195,7 +195,7 @@ class TestCurrencyFormattingErrorPaths:
 
     def test_format_currency_invalid_currency_code(self, caplog: pytest.LogCaptureFixture) -> None:
         """Invalid currency code should trigger error path."""
-        ctx = LocaleContext("en_US")
+        ctx = LocaleContext.create_or_raise("en_US")
 
         with caplog.at_level(logging.DEBUG):
             result = ctx.format_currency(123.45, currency="INVALID")
@@ -211,7 +211,7 @@ class TestCurrencyFormattingErrorPaths:
         """TypeError in format_currency hits lines 348-349."""
         from babel import numbers as babel_numbers
 
-        ctx = LocaleContext("en_US")
+        ctx = LocaleContext.create_or_raise("en_US")
 
         original_format_currency = babel_numbers.format_currency
 
@@ -246,7 +246,7 @@ class TestCurrencyFormattingErrorPaths:
     @settings(max_examples=50)
     def test_format_currency_arbitrary_codes(self, currency_code: str) -> None:
         """Arbitrary currency codes should not crash (Hypothesis)."""
-        ctx = LocaleContext("en_US")
+        ctx = LocaleContext.create_or_raise("en_US")
 
         # Most will be invalid and trigger fallback, some might be valid
         result = ctx.format_currency(99.99, currency=currency_code)
@@ -270,7 +270,7 @@ class TestLocaleContextUnexpectedErrors:
         self, caplog: pytest.LogCaptureFixture, monkeypatch
     ) -> None:
         """Unexpected error in format_number should log warning and return str(value)."""
-        ctx = LocaleContext("en_US")
+        ctx = LocaleContext.create_or_raise("en_US")
 
         # Monkey-patch babel_numbers.format_decimal to raise unexpected error
         from babel import numbers as babel_numbers
@@ -302,7 +302,7 @@ class TestLocaleContextUnexpectedErrors:
         self, caplog: pytest.LogCaptureFixture, monkeypatch
     ) -> None:
         """Unexpected error in format_datetime should log warning and return ISO string."""
-        ctx = LocaleContext("en_US")
+        ctx = LocaleContext.create_or_raise("en_US")
         dt = datetime(2025, 1, 1, tzinfo=UTC)
 
         from babel import dates as babel_dates
@@ -333,7 +333,7 @@ class TestLocaleContextUnexpectedErrors:
         self, caplog: pytest.LogCaptureFixture, monkeypatch
     ) -> None:
         """Unexpected error in format_currency should log warning and return fallback."""
-        ctx = LocaleContext("en_US")
+        ctx = LocaleContext.create_or_raise("en_US")
 
         from babel import numbers as babel_numbers
 

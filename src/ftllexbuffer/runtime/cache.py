@@ -23,16 +23,19 @@ Thread Safety:
 Python 3.13+.
 """
 
-from __future__ import annotations
-
 from collections import OrderedDict
+from collections.abc import Mapping
+from datetime import datetime
+from decimal import Decimal
 from threading import RLock
-from typing import Any
 
 from ftllexbuffer.diagnostics import FluentError
 
+# Type alias for Fluent values (matches resolver.FluentValue)
+type _FluentValue = str | int | float | bool | Decimal | datetime | None
+
 # Internal type alias for cache keys (prefixed with _ per naming convention)
-type _CacheKey = tuple[str, tuple[tuple[str, Any], ...], str | None, str]
+type _CacheKey = tuple[str, tuple[tuple[str, _FluentValue], ...], str | None, str]
 
 # Internal type alias for cache values (prefixed with _ per naming convention)
 type _CacheValue = tuple[str, list[FluentError]]
@@ -67,18 +70,17 @@ class FormatCache:
         self._lock = RLock()  # Reentrant lock for safety
         self._hits = 0
         self._misses = 0
-        self._unhashable_skips = 0  # v0.8.0: Track unhashable args skips
+        self._unhashable_skips = 0
 
     def get(
         self,
         message_id: str,
-        args: dict[str, Any] | None,
+        args: Mapping[str, _FluentValue] | None,
         attribute: str | None,
         locale_code: str,
     ) -> _CacheValue | None:
         """Get cached result if exists.
 
-        v0.8.0: Gracefully handles unhashable args by returning None (cache miss).
         Thread-safe. Returns None on cache miss.
 
         Args:
@@ -92,7 +94,6 @@ class FormatCache:
         """
         key = self._make_key(message_id, args, attribute, locale_code)
 
-        # v0.8.0: Handle unhashable args gracefully - treat as cache miss
         if key is None:
             with self._lock:
                 self._unhashable_skips += 1
@@ -109,17 +110,16 @@ class FormatCache:
             self._misses += 1
             return None
 
-    def put(  # pylint: disable=too-many-positional-arguments
+    def put(
         self,
         message_id: str,
-        args: dict[str, Any] | None,
+        args: Mapping[str, _FluentValue] | None,
         attribute: str | None,
         locale_code: str,
         result: _CacheValue,
     ) -> None:
         """Store result in cache.
 
-        v0.8.0: Gracefully handles unhashable args by skipping cache storage.
         Thread-safe. Evicts LRU entry if cache is full.
 
         Args:
@@ -131,7 +131,6 @@ class FormatCache:
         """
         key = self._make_key(message_id, args, attribute, locale_code)
 
-        # v0.8.0: Handle unhashable args gracefully - skip cache storage
         if key is None:
             with self._lock:
                 self._unhashable_skips += 1
@@ -163,7 +162,6 @@ class FormatCache:
     def get_stats(self) -> dict[str, int]:
         """Get cache statistics.
 
-        v0.8.0: Added unhashable_skips metric.
         Thread-safe. Returns current metrics.
 
         Returns:
@@ -185,13 +183,12 @@ class FormatCache:
     @staticmethod
     def _make_key(
         message_id: str,
-        args: dict[str, Any] | None,
+        args: Mapping[str, _FluentValue] | None,
         attribute: str | None,
         locale_code: str,
     ) -> _CacheKey | None:
         """Create immutable cache key from arguments.
 
-        v0.8.0: Returns None for unhashable args instead of raising TypeError.
         Dicts are converted to sorted tuples. Verifies all values are hashable.
 
         Args:
@@ -205,12 +202,11 @@ class FormatCache:
         """
         # Convert args dict to sorted tuple of tuples
         if args is None:
-            args_tuple: tuple[tuple[str, Any], ...] = ()
+            args_tuple: tuple[tuple[str, _FluentValue], ...] = ()
         else:
             try:
                 # Sort by key for consistent hashing
                 args_tuple = tuple(sorted(args.items()))
-                # v0.8.0: Verify all values are hashable
                 hash(args_tuple)
             except TypeError:
                 # Args contain unhashable values (lists, dicts, etc.)
@@ -256,7 +252,6 @@ class FormatCache:
     def unhashable_skips(self) -> int:
         """Number of operations skipped due to unhashable args.
 
-        v0.8.0: New property for monitoring unhashable args handling.
         Thread-safe.
         """
         with self._lock:

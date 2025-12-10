@@ -100,7 +100,8 @@ result, errors = bundle.format_pattern("message-id")
 ### Loading from Directory Structure
 
 ```python
-from ftllexbuffer import FluentLocalization, PathResourceLoader
+from ftllexbuffer import FluentLocalization
+from ftllexbuffer.localization import PathResourceLoader
 
 # Directory structure:
 #   locales/en/main.ftl
@@ -529,7 +530,8 @@ for func_name in bundle._function_registry:
 ## Type Annotations
 
 ```python
-from ftllexbuffer import FluentBundle, MessageId, LocaleCode, FTLSource
+from ftllexbuffer import FluentBundle
+from ftllexbuffer.localization import MessageId, LocaleCode, FTLSource
 
 def format_message(bundle: FluentBundle, msg_id: MessageId) -> str:
     """Format message with error logging."""
@@ -735,5 +737,5 @@ print(f"Fluent Specification {__fluent_spec_version__}")
 ---
 
 **Quick Reference Last Updated**: December 9, 2025
-**FTLLexBuffer Version**: 0.9.0
+**FTLLexBuffer Version**: 0.10.0
 **Python Requirement**: 3.13+

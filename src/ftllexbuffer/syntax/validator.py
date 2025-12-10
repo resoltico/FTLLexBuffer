@@ -12,11 +12,7 @@ References:
   (message attributes cannot be parameterized, only terms can)
 """
 
-from __future__ import annotations
-
-from dataclasses import dataclass
-from typing import TYPE_CHECKING
-
+from ftllexbuffer.diagnostics import ValidationResult
 from ftllexbuffer.syntax.ast import (
     Annotation,
     Attribute,
@@ -43,10 +39,6 @@ from ftllexbuffer.syntax.ast import (
     TextElement,
     VariableReference,
 )
-
-if TYPE_CHECKING:
-    pass
-
 
 # ============================================================================
 # VALIDATION ERROR CODES
@@ -77,34 +69,6 @@ ERROR_CODES = {
 
 
 # ============================================================================
-# VALIDATION RESULT
-# ============================================================================
-
-
-@dataclass(frozen=True, slots=True)
-class ValidationResult:
-    """Result of semantic validation.
-
-    Attributes:
-        is_valid: True if resource passes all validation checks
-        annotations: List of validation errors (empty if valid)
-    """
-
-    is_valid: bool
-    annotations: tuple[Annotation, ...]
-
-    @staticmethod
-    def valid() -> ValidationResult:
-        """Create a valid result with no errors."""
-        return ValidationResult(is_valid=True, annotations=())
-
-    @staticmethod
-    def invalid(annotations: tuple[Annotation, ...]) -> ValidationResult:
-        """Create an invalid result with errors."""
-        return ValidationResult(is_valid=False, annotations=annotations)
-
-
-# ============================================================================
 # SEMANTIC VALIDATOR
 # ============================================================================
 
@@ -114,6 +78,9 @@ class SemanticValidator:
 
     Per Fluent spec valid.md, validates that well-formed AST is semantically correct.
 
+    Thread-safe validator with no mutable instance state.
+    All validation state is local to the validate() call.
+
     Usage:
         validator = SemanticValidator()
         result = validator.validate(resource)
@@ -122,12 +89,11 @@ class SemanticValidator:
                 print(f"{annotation.code}: {annotation.message}")
     """
 
-    def __init__(self) -> None:
-        """Initialize validator."""
-        self.errors: list[Annotation] = []
-
     def validate(self, resource: Resource) -> ValidationResult:
         """Validate a parsed resource.
+
+        Pure function - builds error list locally without mutating instance state.
+        Thread-safe and reusable.
 
         Args:
             resource: Parsed FTL resource
@@ -135,25 +101,25 @@ class SemanticValidator:
         Returns:
             ValidationResult with errors (if any)
         """
-        self.errors = []
+        errors: list[Annotation] = []
 
         for entry in resource.entries:
-            self._validate_entry(entry)
+            self._validate_entry(entry, errors)
 
-        if self.errors:
-            return ValidationResult.invalid(tuple(self.errors))
-        return ValidationResult.valid()
+        return ValidationResult.from_annotations(tuple(errors))
 
+    @staticmethod
     def _add_error(
-        self,
+        errors: list[Annotation],
         code: str,
         message: str | None = None,
         span: Span | None = None,
         **arguments: str,
     ) -> None:
-        """Add a validation error.
+        """Add a validation error to the errors list.
 
         Args:
+            errors: Error list to append to
             code: Error code (e.g., "E0001")
             message: Optional custom message (uses default from ERROR_CODES if None)
             span: Optional source position
@@ -162,7 +128,7 @@ class SemanticValidator:
         if message is None:
             message = ERROR_CODES.get(code, "Unknown validation error")
 
-        self.errors.append(
+        errors.append(
             Annotation(
                 code=code,
                 message=message,
@@ -175,19 +141,19 @@ class SemanticValidator:
     # ENTRY VALIDATION
     # ========================================================================
 
-    def _validate_entry(self, entry: Entry) -> None:
+    def _validate_entry(self, entry: Entry, errors: list[Annotation]) -> None:
         """Validate top-level entry using structural pattern matching."""
         match entry:
             case Message():
-                self._validate_message(entry)
+                self._validate_message(entry, errors)
             case Term():
-                self._validate_term(entry)
+                self._validate_term(entry, errors)
             case Comment():
                 pass  # Comments don't need validation
             case Junk():
                 pass  # Junk already represents invalid syntax
 
-    def _validate_message(self, message: Message) -> None:
+    def _validate_message(self, message: Message, errors: list[Annotation]) -> None:
         """Validate message entry.
 
         Per spec:
@@ -196,13 +162,13 @@ class SemanticValidator:
         """
         # Validate value pattern
         if message.value:
-            self._validate_pattern(message.value, context="message")
+            self._validate_pattern(message.value, errors, context="message")
 
         # Validate attributes
         for attr in message.attributes:
-            self._validate_attribute(attr, parent_type="message")
+            self._validate_attribute(attr, errors, parent_type="message")
 
-    def _validate_term(self, term: Term) -> None:
+    def _validate_term(self, term: Term, errors: list[Annotation]) -> None:
         """Validate term entry.
 
         Per spec:
@@ -212,6 +178,7 @@ class SemanticValidator:
         # Terms must have a value (enforced by AST, but check anyway)
         if not term.value:
             self._add_error(
+                errors,
                 "E0004",
                 span=term.span,
                 term_id=term.id.name,
@@ -219,50 +186,75 @@ class SemanticValidator:
             return  # Cannot validate further without a value
 
         # Validate value pattern
-        self._validate_pattern(term.value, context="term")
+        self._validate_pattern(term.value, errors, context="term")
 
         # Validate attributes
         for attr in term.attributes:
-            self._validate_attribute(attr, parent_type="term")
+            self._validate_attribute(attr, errors, parent_type="term")
 
-    def _validate_attribute(self, attribute: Attribute, parent_type: str) -> None:
+    def _validate_attribute(
+        self,
+        attribute: Attribute,
+        errors: list[Annotation],
+        parent_type: str,
+    ) -> None:
         """Validate message or term attribute.
 
         Per spec:
         - Message attributes cannot be parameterized
         - Term attributes can be parameterized
         """
-        self._validate_pattern(attribute.value, context=f"{parent_type}_attribute")
+        self._validate_pattern(attribute.value, errors, context=f"{parent_type}_attribute")
 
     # ========================================================================
     # PATTERN VALIDATION
     # ========================================================================
 
-    def _validate_pattern(self, pattern: Pattern, context: str) -> None:
+    def _validate_pattern(
+        self,
+        pattern: Pattern,
+        errors: list[Annotation],
+        context: str,
+    ) -> None:
         """Validate pattern elements."""
         for element in pattern.elements:
-            self._validate_pattern_element(element, context)
+            self._validate_pattern_element(element, errors, context)
 
-    def _validate_pattern_element(self, element: PatternElement, context: str) -> None:
+    def _validate_pattern_element(
+        self,
+        element: PatternElement,
+        errors: list[Annotation],
+        context: str,
+    ) -> None:
         """Validate pattern element using structural pattern matching."""
         match element:
             case TextElement():
                 pass  # Text elements don't need validation
             case Placeable():
-                self._validate_expression(element.expression, context)
+                self._validate_expression(element.expression, errors, context)
 
     # ========================================================================
     # EXPRESSION VALIDATION
     # ========================================================================
 
-    def _validate_expression(self, expr: Expression, context: str) -> None:
+    def _validate_expression(
+        self,
+        expr: Expression,
+        errors: list[Annotation],
+        context: str,
+    ) -> None:
         """Validate expression (select or inline)."""
         if isinstance(expr, SelectExpression):
-            self._validate_select_expression(expr)
+            self._validate_select_expression(expr, errors)
         else:
-            self._validate_inline_expression(expr, context)
+            self._validate_inline_expression(expr, errors, context)
 
-    def _validate_inline_expression(self, expr: InlineExpression, context: str) -> None:
+    def _validate_inline_expression(
+        self,
+        expr: InlineExpression,
+        errors: list[Annotation],
+        context: str,
+    ) -> None:
         """Validate inline expression using structural pattern matching."""
         match expr:
             case StringLiteral():
@@ -272,15 +264,20 @@ class SemanticValidator:
             case VariableReference():
                 pass  # Variable references always valid
             case MessageReference():
-                self._validate_message_reference(expr, context)
+                self._validate_message_reference(expr, errors, context)
             case TermReference():
-                self._validate_term_reference(expr)
+                self._validate_term_reference(expr, errors)
             case FunctionReference():
-                self._validate_function_reference(expr)
+                self._validate_function_reference(expr, errors)
             case Placeable():
-                self._validate_expression(expr.expression, context)
+                self._validate_expression(expr.expression, errors, context)
 
-    def _validate_message_reference(self, ref: MessageReference, context: str) -> None:
+    def _validate_message_reference(
+        self,
+        ref: MessageReference,
+        errors: list[Annotation],
+        context: str,
+    ) -> None:
         """Validate message reference.
 
         Per spec:
@@ -291,7 +288,11 @@ class SemanticValidator:
         # This is enforced by grammar (MessageReference has no arguments field)
         # But we document it here for completeness
 
-    def _validate_term_reference(self, ref: TermReference) -> None:
+    def _validate_term_reference(
+        self,
+        ref: TermReference,
+        errors: list[Annotation],
+    ) -> None:
         """Validate term reference.
 
         Per spec:
@@ -299,18 +300,26 @@ class SemanticValidator:
         - Term.attribute can also be called with arguments
         """
         if ref.arguments:
-            self._validate_call_arguments(ref.arguments)
+            self._validate_call_arguments(ref.arguments, errors)
 
-    def _validate_function_reference(self, ref: FunctionReference) -> None:
+    def _validate_function_reference(
+        self,
+        ref: FunctionReference,
+        errors: list[Annotation],
+    ) -> None:
         """Validate function reference.
 
         Per spec:
         - Function names must be uppercase (already validated by parser)
         - Call arguments must be valid
         """
-        self._validate_call_arguments(ref.arguments)
+        self._validate_call_arguments(ref.arguments, errors)
 
-    def _validate_call_arguments(self, args: CallArguments) -> None:
+    def _validate_call_arguments(
+        self,
+        args: CallArguments,
+        errors: list[Annotation],
+    ) -> None:
         """Validate function/term call arguments.
 
         Per spec:
@@ -329,6 +338,7 @@ class SemanticValidator:
             name = named_arg.name.name
             if name in seen_names:
                 self._add_error(
+                    errors,
                     "E0010",
                     argument_name=name,
                 )
@@ -336,16 +346,20 @@ class SemanticValidator:
 
         # Validate each argument expression
         for pos_arg in args.positional:
-            self._validate_inline_expression(pos_arg, context="call_argument")
+            self._validate_inline_expression(pos_arg, errors, context="call_argument")
 
         for named_arg in args.named:
-            self._validate_inline_expression(named_arg.value, context="call_argument")
+            self._validate_inline_expression(named_arg.value, errors, context="call_argument")
 
     # ========================================================================
     # SELECT EXPRESSION VALIDATION
     # ========================================================================
 
-    def _validate_select_expression(self, select: SelectExpression) -> None:
+    def _validate_select_expression(
+        self,
+        select: SelectExpression,
+        errors: list[Annotation],
+    ) -> None:
         """Validate select expression.
 
         Per spec:
@@ -354,17 +368,18 @@ class SemanticValidator:
         - Variant keys must be unique
         """
         # Validate selector
-        self._validate_inline_expression(select.selector, context="select_selector")
+        self._validate_inline_expression(select.selector, errors, context="select_selector")
 
         # Check: must have at least one variant
         if not select.variants:
-            self._add_error("E0006")
+            self._add_error(errors, "E0006")
             return
 
         # Check: exactly one default variant
         default_count = sum(1 for v in select.variants if v.default)
         if default_count != 1:
             self._add_error(
+                errors,
                 "E0005",
                 message=(
                     f"Select expression must have exactly one default variant, "
@@ -378,13 +393,14 @@ class SemanticValidator:
             key_str = self._variant_key_to_string(variant.key)
             if key_str in seen_keys:
                 self._add_error(
+                    errors,
                     "E0007",
                     variant_key=key_str,
                 )
             seen_keys.add(key_str)
 
             # Validate variant value pattern
-            self._validate_pattern(variant.value, context="select_variant")
+            self._validate_pattern(variant.value, errors, context="select_variant")
 
     @staticmethod
     def _variant_key_to_string(key: Identifier | NumberLiteral) -> str:
@@ -392,7 +408,7 @@ class SemanticValidator:
         if isinstance(key, Identifier):
             return key.name
         # key must be NumberLiteral at this point
-        return key.value
+        return str(key.value)
 
 
 # ============================================================================

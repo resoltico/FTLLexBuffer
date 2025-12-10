@@ -8,21 +8,21 @@ Converts AST nodes to FTL source code. Useful for:
 Python 3.13+.
 """
 
-from __future__ import annotations
-
-from typing import Any
-
 from ftllexbuffer.enums import CommentType
 
 from .ast import (
     Attribute,
+    CallArguments,
     Comment,
+    Expression,
     FunctionReference,
     Identifier,
     Junk,
     Message,
     MessageReference,
+    NamedArgument,
     NumberLiteral,
+    Pattern,
     Placeable,
     Resource,
     SelectExpression,
@@ -38,6 +38,9 @@ from .visitor import ASTVisitor
 class FluentSerializer(ASTVisitor):
     """Converts AST back to FTL source string.
 
+    Thread-safe serializer with no mutable instance state.
+    All serialization state is local to the serialize() call.
+
     Usage:
         >>> from ftllexbuffer.syntax import parse, FluentSerializer
         >>> ast = parse("hello = Hello, world!")
@@ -47,12 +50,11 @@ class FluentSerializer(ASTVisitor):
         hello = Hello, world!
     """
 
-    def __init__(self) -> None:
-        """Initialize serializer."""
-        self._output: list[str] = []
-
     def serialize(self, resource: Resource) -> str:
         """Serialize Resource to FTL string.
+
+        Pure function - builds output locally without mutating instance state.
+        Thread-safe and reusable.
 
         Args:
             resource: Resource AST node
@@ -60,165 +62,186 @@ class FluentSerializer(ASTVisitor):
         Returns:
             FTL source code
         """
-        self._output = []
-        self.visit(resource)
-        return "".join(self._output)
+        output: list[str] = []
+        self._serialize_resource(resource, output)
+        return "".join(output)
 
-    def visit_Resource(self, node: Resource) -> None:
-        """Serialize Resource."""
+    def _serialize_resource(self, node: Resource, output: list[str]) -> None:
+        """Serialize Resource to output list."""
         for i, entry in enumerate(node.entries):
             if i > 0:
-                self._output.append("\n")
-            self.visit(entry)
+                output.append("\n")
+            self._serialize_entry(entry, output)
 
-    def visit_Message(self, node: Message) -> None:
+    def _serialize_entry(
+        self,
+        entry: Message | Term | Comment | Junk,
+        output: list[str],
+    ) -> None:
+        """Serialize a top-level entry."""
+        match entry:
+            case Message():
+                self._serialize_message(entry, output)
+            case Term():
+                self._serialize_term(entry, output)
+            case Comment():
+                self._serialize_comment(entry, output)
+            case Junk():
+                self._serialize_junk(entry, output)
+
+    def _serialize_message(self, node: Message, output: list[str]) -> None:
         """Serialize Message."""
         # Comment if present
         if node.comment:
-            self.visit(node.comment)
-            self._output.append("\n")
+            self._serialize_comment(node.comment, output)
+            output.append("\n")
 
         # Message ID
-        self._output.append(node.id.name)
+        output.append(node.id.name)
 
         # Value
         if node.value:
-            self._output.append(" = ")
-            self._visit_pattern(node.value)
+            output.append(" = ")
+            self._serialize_pattern(node.value, output)
 
         # Attributes
         for attr in node.attributes:
-            self._output.append("\n    ")
-            self.visit(attr)
+            output.append("\n    ")
+            self._serialize_attribute(attr, output)
 
-        self._output.append("\n")
+        output.append("\n")
 
-    def visit_Term(self, node: Term) -> None:
+    def _serialize_term(self, node: Term, output: list[str]) -> None:
         """Serialize Term."""
         # Comment if present
         if node.comment:
-            self.visit(node.comment)
-            self._output.append("\n")
+            self._serialize_comment(node.comment, output)
+            output.append("\n")
 
         # Term ID (with leading -)
-        self._output.append(f"-{node.id.name} = ")
+        output.append(f"-{node.id.name} = ")
 
         # Value
-        self._visit_pattern(node.value)
+        self._serialize_pattern(node.value, output)
 
         # Attributes
         for attr in node.attributes:
-            self._output.append("\n    ")
-            self.visit(attr)
+            output.append("\n    ")
+            self._serialize_attribute(attr, output)
 
-        self._output.append("\n")
+        output.append("\n")
 
-    def visit_Attribute(self, node: Attribute) -> None:
+    def _serialize_attribute(self, node: Attribute, output: list[str]) -> None:
         """Serialize Attribute."""
-        self._output.append(f".{node.id.name} = ")
-        self._visit_pattern(node.value)
+        output.append(f".{node.id.name} = ")
+        self._serialize_pattern(node.value, output)
 
-    def visit_Comment(self, node: Comment) -> None:
+    def _serialize_comment(self, node: Comment, output: list[str]) -> None:
         """Serialize Comment."""
-        if node.type == CommentType.COMMENT:
+        if node.type is CommentType.COMMENT:
             prefix = "#"
-        elif node.type == CommentType.GROUP:
+        elif node.type is CommentType.GROUP:
             prefix = "##"
         else:  # CommentType.RESOURCE
             prefix = "###"
 
         lines = node.content.split("\n")
         for line in lines:
-            self._output.append(f"{prefix} {line}\n")
+            output.append(f"{prefix} {line}\n")
 
-    def visit_Junk(self, node: Junk) -> None:
+    def _serialize_junk(self, node: Junk, output: list[str]) -> None:
         """Serialize Junk (keep as-is)."""
-        self._output.append(node.content)
-        self._output.append("\n")
+        output.append(node.content)
+        output.append("\n")
 
-    def _visit_pattern(self, pattern: Any) -> None:
-        """Visit Pattern elements."""
+    def _serialize_pattern(self, pattern: Pattern, output: list[str]) -> None:
+        """Serialize Pattern elements."""
         for element in pattern.elements:
             if isinstance(element, TextElement):
-                self._output.append(element.value)
+                output.append(element.value)
             elif isinstance(element, Placeable):
-                self._output.append("{ ")
-                self._visit_expression(element.expression)
-                self._output.append(" }")
+                output.append("{ ")
+                self._serialize_expression(element.expression, output)
+                output.append(" }")
 
-    def _visit_expression(self, expr: Any) -> None:
-        """Visit Expression nodes using structural pattern matching."""
+    def _serialize_expression(self, expr: Expression, output: list[str]) -> None:
+        """Serialize Expression nodes using structural pattern matching."""
         match expr:
             case StringLiteral():
                 # Escape special characters
                 escaped = expr.value.replace("\\", "\\\\").replace('"', '\\"')
-                self._output.append(f'"{escaped}"')
+                output.append(f'"{escaped}"')
 
             case NumberLiteral():
-                self._output.append(expr.raw)
+                output.append(expr.raw)
 
             case VariableReference():
-                self._output.append(f"${expr.id.name}")
+                output.append(f"${expr.id.name}")
 
             case MessageReference():
-                self._output.append(expr.id.name)
+                output.append(expr.id.name)
                 if expr.attribute:
-                    self._output.append(f".{expr.attribute.name}")
+                    output.append(f".{expr.attribute.name}")
 
             case TermReference():
-                self._output.append(f"-{expr.id.name}")
+                output.append(f"-{expr.id.name}")
                 if expr.attribute:
-                    self._output.append(f".{expr.attribute.name}")
+                    output.append(f".{expr.attribute.name}")
                 if expr.arguments:
-                    self._visit_call_arguments(expr.arguments)
+                    self._serialize_call_arguments(expr.arguments, output)
 
             case FunctionReference():
-                self._output.append(expr.id.name)
-                self._visit_call_arguments(expr.arguments)
+                output.append(expr.id.name)
+                self._serialize_call_arguments(expr.arguments, output)
 
             case SelectExpression():
-                self._visit_select_expression(expr)
+                self._serialize_select_expression(expr, output)
 
-    def _visit_call_arguments(self, args: Any) -> None:
-        """Visit CallArguments."""
-        self._output.append("(")
+    def _serialize_call_arguments(self, args: CallArguments, output: list[str]) -> None:
+        """Serialize CallArguments."""
+        output.append("(")
 
         # Positional arguments
         for i, arg in enumerate(args.positional):
             if i > 0:
-                self._output.append(", ")
-            self._visit_expression(arg)
+                output.append(", ")
+            self._serialize_expression(arg, output)
 
         # Named arguments
-        for i, arg in enumerate(args.named):
+        named_arg: NamedArgument
+        for i, named_arg in enumerate(args.named):
             if i > 0 or args.positional:
-                self._output.append(", ")
-            self._output.append(f"{arg.name.name}: ")
-            self._visit_expression(arg.value)
+                output.append(", ")
+            output.append(f"{named_arg.name.name}: ")
+            self._serialize_expression(named_arg.value, output)
 
-        self._output.append(")")
+        output.append(")")
 
-    def _visit_select_expression(self, expr: SelectExpression) -> None:
-        """Visit SelectExpression."""
-        self._visit_expression(expr.selector)
-        self._output.append(" ->")
+    def _serialize_select_expression(
+        self,
+        expr: SelectExpression,
+        output: list[str],
+    ) -> None:
+        """Serialize SelectExpression."""
+        self._serialize_expression(expr.selector, output)
+        output.append(" ->")
 
         for variant in expr.variants:
-            self._output.append("\n   ")
+            output.append("\n   ")
             if variant.default:
-                self._output.append("*")
-            self._output.append("[")
+                output.append("*")
+            output.append("[")
 
             # Variant key (Identifier or NumberLiteral)
             if isinstance(variant.key, Identifier):
-                self._output.append(variant.key.name)
+                output.append(variant.key.name)
             else:  # NumberLiteral
-                self._output.append(variant.key.raw)
+                output.append(variant.key.raw)
 
-            self._output.append("] ")
-            self._visit_pattern(variant.value)
+            output.append("] ")
+            self._serialize_pattern(variant.value, output)
 
-        self._output.append("\n")
+        output.append("\n")
 
 
 def serialize(resource: Resource) -> str:

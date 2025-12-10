@@ -44,15 +44,6 @@ msg = { $count ->
         # Should be valid (or parser created Junk)
         assert isinstance(result.is_valid, bool)
 
-    def test_validator_init_resets_errors(self):
-        """Kills: error list initialization mutations.
-
-        Validator should start with empty error list.
-        """
-        validator = SemanticValidator()
-        assert hasattr(validator, "errors")
-        assert isinstance(validator.errors, list)
-
     def test_validator_multiple_validations(self):
         """Kills: error accumulation mutations.
 
@@ -85,7 +76,7 @@ class TestValidationResultBoundaries:
 
         valid() factory should create valid result.
         """
-        from ftllexbuffer.syntax.validator import ValidationResult  # noqa: PLC0415
+        from ftllexbuffer.diagnostics import ValidationResult  # noqa: PLC0415
 
         result = ValidationResult.valid()
         assert result.is_valid is True
@@ -96,8 +87,8 @@ class TestValidationResultBoundaries:
 
         invalid() factory should create invalid result.
         """
+        from ftllexbuffer.diagnostics import ValidationResult  # noqa: PLC0415
         from ftllexbuffer.syntax.ast import Annotation, Span  # noqa: PLC0415
-        from ftllexbuffer.syntax.validator import ValidationResult  # noqa: PLC0415
 
         annotation = Annotation(
             code="E0001",
@@ -105,7 +96,7 @@ class TestValidationResultBoundaries:
             span=Span(start=0, end=1),
         )
 
-        result = ValidationResult.invalid((annotation,))
+        result = ValidationResult.invalid(annotations=(annotation,))
         assert result.is_valid is False
         assert len(result.annotations) == 1
 
@@ -114,7 +105,7 @@ class TestValidationResultBoundaries:
 
         Empty annotations should be allowed.
         """
-        from ftllexbuffer.syntax.validator import ValidationResult  # noqa: PLC0415
+        from ftllexbuffer.diagnostics import ValidationResult  # noqa: PLC0415
 
         result = ValidationResult.valid()
         assert len(result.annotations) == 0
@@ -124,8 +115,8 @@ class TestValidationResultBoundaries:
 
         Single annotation should work.
         """
+        from ftllexbuffer.diagnostics import ValidationResult  # noqa: PLC0415
         from ftllexbuffer.syntax.ast import Annotation, Span  # noqa: PLC0415
-        from ftllexbuffer.syntax.validator import ValidationResult  # noqa: PLC0415
 
         annotation = Annotation(
             code="E0001",
@@ -133,7 +124,7 @@ class TestValidationResultBoundaries:
             span=Span(start=0, end=1),
         )
 
-        result = ValidationResult.invalid((annotation,))
+        result = ValidationResult.invalid(annotations=(annotation,))
         assert len(result.annotations) == 1
 
 
@@ -315,8 +306,8 @@ class TestValidationAnnotationHandling:
 
         Annotations should be stored as tuples (immutable).
         """
+        from ftllexbuffer.diagnostics import ValidationResult  # noqa: PLC0415
         from ftllexbuffer.syntax.ast import Annotation, Span  # noqa: PLC0415
-        from ftllexbuffer.syntax.validator import ValidationResult  # noqa: PLC0415
 
         annotation = Annotation(
             code="E0001",
@@ -324,7 +315,7 @@ class TestValidationAnnotationHandling:
             span=Span(start=0, end=1),
         )
 
-        result = ValidationResult.invalid((annotation,))
+        result = ValidationResult.invalid(annotations=(annotation,))
         assert isinstance(result.annotations, tuple)
 
     def test_multiple_annotations_preserved(self):
@@ -332,13 +323,13 @@ class TestValidationAnnotationHandling:
 
         Multiple annotations should all be preserved.
         """
+        from ftllexbuffer.diagnostics import ValidationResult  # noqa: PLC0415
         from ftllexbuffer.syntax.ast import Annotation, Span  # noqa: PLC0415
-        from ftllexbuffer.syntax.validator import ValidationResult  # noqa: PLC0415
 
         ann1 = Annotation(code="E0001", message="Error 1", span=Span(start=0, end=1))
         ann2 = Annotation(code="E0002", message="Error 2", span=Span(start=2, end=3))
 
-        result = ValidationResult.invalid((ann1, ann2))
+        result = ValidationResult.invalid(annotations=(ann1, ann2))
         assert len(result.annotations) == 2
 
 
@@ -347,14 +338,6 @@ class TestValidatorInternalStateBoundaries:
 
     Targets mutations in internal state management.
     """
-
-    def test_validator_errors_list_type(self):
-        """Kills: errors list type mutations.
-
-        Validator errors should be a list.
-        """
-        validator = SemanticValidator()
-        assert isinstance(validator.errors, list)
 
     def test_validator_errors_reset_on_validate(self):
         """Kills: error reset mutations.

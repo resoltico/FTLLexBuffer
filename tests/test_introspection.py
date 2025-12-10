@@ -8,9 +8,9 @@ from __future__ import annotations
 
 import pytest
 
-from ftllexbuffer import FluentBundle, extract_variables, introspect_message
+from ftllexbuffer import FluentBundle
 from ftllexbuffer.enums import ReferenceKind, VariableContext
-from ftllexbuffer.introspection import VariableInfo
+from ftllexbuffer.introspection import VariableInfo, extract_variables, introspect_message
 from ftllexbuffer.syntax.parser import FluentParserV1
 
 

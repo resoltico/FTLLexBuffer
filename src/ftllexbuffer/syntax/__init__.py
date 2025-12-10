@@ -6,8 +6,6 @@ Separate from runtime to enable tooling (linters, formatters, IDE plugins).
 Python 3.13+.
 """
 
-from __future__ import annotations
-
 from .ast import (
     Annotation,
     Attribute,

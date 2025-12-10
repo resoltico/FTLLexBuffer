@@ -1,15 +1,20 @@
 """Tests for FluentPluralRules - CLDR plural category selection.
 
-Tests Unicode CLDR plural rules for 30 supported locales.
+Tests Unicode CLDR plural rules for 30 test locales.
 Comprehensive coverage of all plural categories across language families.
 
 Reference: https://www.unicode.org/cldr/charts/47/supplemental/language_plural_rules.html
 """
 
-from ftllexbuffer.runtime.plural_rules import (
-    SUPPORTED_LOCALES,
-    select_plural_category,
-)
+from ftllexbuffer.runtime.plural_rules import select_plural_category
+
+# Test locale set - representative sample of supported locales
+# Babel supports 200+ locales; these are common ones for testing
+TEST_LOCALES: frozenset[str] = frozenset({
+    "en", "zh", "hi", "es", "fr", "ar", "bn", "pt", "ru", "ja",
+    "de", "jv", "ko", "vi", "te", "tr", "ta", "mr", "ur", "it",
+    "th", "gu", "pl", "uk", "kn", "or", "ml", "my", "pa", "lv",
+})
 
 
 class TestSelectPluralCategory:
@@ -520,20 +525,20 @@ class TestRomanceManyLanguages:
 
 
 class TestSupportedLocales:
-    """Test the SUPPORTED_LOCALES constant."""
+    """Test the TEST_LOCALES constant."""
 
     def test_supported_locales_count(self) -> None:
-        """30 locales are supported."""
-        assert len(SUPPORTED_LOCALES) == 30
+        """30 test locales are defined."""
+        assert len(TEST_LOCALES) == 30
 
     def test_all_top_30_languages_supported(self) -> None:
-        """All top 30 languages by speakers are in SUPPORTED_LOCALES."""
+        """All top 30 languages by speakers are in TEST_LOCALES."""
         expected = {
             "en", "zh", "hi", "es", "fr", "ar", "bn", "pt", "ru", "ja",
             "de", "jv", "ko", "vi", "te", "tr", "ta", "mr", "ur", "it",
             "th", "gu", "pl", "uk", "kn", "or", "ml", "my", "pa", "lv",
         }
-        assert expected == SUPPORTED_LOCALES
+        assert expected == TEST_LOCALES
 
 
 class TestPluralRulesIntegration:
@@ -572,7 +577,7 @@ class TestPluralRulesIntegration:
             assert select_plural_category(n, "pl") == "many", f"Failed for {n}"
 
     def test_all_locales_handle_fractions_consistently(self) -> None:
-        """All locales handle fractional numbers without crashing."""
-        for locale in SUPPORTED_LOCALES:
+        """All test locales handle fractional numbers without crashing."""
+        for locale in TEST_LOCALES:
             result = select_plural_category(1.5, locale)
             assert result in {"zero", "one", "two", "few", "many", "other"}

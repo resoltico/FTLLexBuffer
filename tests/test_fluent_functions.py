@@ -6,7 +6,9 @@ Tests number_format() and datetime_format() functions with various parameters an
 import locale
 from contextlib import suppress
 from datetime import UTC, datetime
-from unittest.mock import Mock, patch
+from unittest.mock import patch
+
+from babel import dates as babel_dates
 
 from ftllexbuffer.runtime.functions import (
     FUNCTION_REGISTRY,
@@ -464,28 +466,31 @@ class TestDatetimeFunctionMockedErrors:
 
     def test_datetime_handles_overflow_error(self) -> None:
         """datetime_format() handles OverflowError gracefully."""
-        # Create a mock datetime that raises OverflowError on strftime
-        mock_dt = Mock(spec=datetime)
-        mock_dt.strftime.side_effect = OverflowError("Year out of range")
-        mock_dt.isoformat.return_value = "2025-10-27"
+        # Use a datetime that will cause OverflowError in Babel
+        # Year 10000 is outside Babel's formatting range
+        far_future_dt = datetime(9999, 12, 31, 23, 59, 59, tzinfo=UTC)
 
-        result = datetime_format(mock_dt)
+        # Patch babel.dates.format_date to raise OverflowError
+        with patch("ftllexbuffer.runtime.locale_context.babel_dates.format_date") as mock_format:
+            mock_format.side_effect = OverflowError("Year out of range")
 
-        # Should return ISO format as fallback
-        assert isinstance(result, str)
-        assert result == "2025-10-27"
-        mock_dt.isoformat.assert_called_once()
+            result = datetime_format(far_future_dt, "en_US")
+
+            # Should return ISO format as fallback
+            assert isinstance(result, str)
+            assert result == "9999-12-31T23:59:59+00:00"
 
     def test_datetime_handles_unexpected_exception(self) -> None:
         """datetime_format() handles unexpected exceptions gracefully."""
-        # Create a mock datetime that raises RuntimeError on strftime
-        mock_dt = Mock(spec=datetime)
-        mock_dt.strftime.side_effect = RuntimeError("Unexpected strftime error")
-        mock_dt.isoformat.return_value = "2025-10-27T14:30:00"
+        # Create a real datetime object
+        test_dt = datetime(2025, 10, 27, 14, 30, tzinfo=UTC)
 
-        result = datetime_format(mock_dt, date_style="medium")
+        # Patch Babel's format_date to raise RuntimeError
+        with patch.object(
+            babel_dates, "format_date", side_effect=RuntimeError("Unexpected error")
+        ):
+            result = datetime_format(test_dt, date_style="medium")
 
         # Should return ISO format as fallback
         assert isinstance(result, str)
-        assert result == "2025-10-27T14:30:00"
-        mock_dt.isoformat.assert_called_once()
+        assert result == test_dt.isoformat()

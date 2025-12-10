@@ -2,7 +2,6 @@
 
 Provides plural category selection for all locales using Babel's CLDR data.
 
-v0.9.0: Refactored to use Babel's CLDR plural rules instead of hardcoded rules.
 This eliminates 300+ lines of manual rule implementation and supports all CLDR locales.
 
 Python 3.13+. Depends on Babel for CLDR data.
@@ -10,10 +9,10 @@ Python 3.13+. Depends on Babel for CLDR data.
 Reference: https://www.unicode.org/cldr/charts/47/supplemental/language_plural_rules.html
 """
 
-from __future__ import annotations
-
 from babel import Locale
 from babel.core import UnknownLocaleError
+
+from ftllexbuffer.locale_utils import normalize_locale
 
 
 def select_plural_category(n: int | float, locale: str) -> str:
@@ -53,9 +52,7 @@ def select_plural_category(n: int | float, locale: str) -> str:
     """
     try:
         # Parse locale (supports both en_US and en-US formats)
-        # Normalize to underscore format first since Babel prefers that
-        normalized_locale = locale.replace("-", "_")
-        locale_obj = Locale.parse(normalized_locale, sep="_")
+        locale_obj = Locale.parse(normalize_locale(locale), sep="_")
     except (UnknownLocaleError, ValueError):
         # Fallback for unknown/invalid locales
         # Most common pattern: n == 1 → "one", else → "other"
@@ -67,43 +64,3 @@ def select_plural_category(n: int | float, locale: str) -> str:
 
     # Apply CLDR plural rule
     return plural_rule(n)
-
-
-# Exported for backward compatibility and testing
-# Note: Babel supports 200+ locales, this is just a subset of common ones
-SUPPORTED_LOCALES: frozenset[str] = frozenset(
-    {
-        # Top 30 most spoken languages (original set)
-        "en",
-        "zh",
-        "hi",
-        "es",
-        "fr",
-        "ar",
-        "bn",
-        "pt",
-        "ru",
-        "ja",
-        "de",
-        "jv",
-        "ko",
-        "vi",
-        "te",
-        "tr",
-        "ta",
-        "mr",
-        "ur",
-        "it",
-        "th",
-        "gu",
-        "pl",
-        "uk",
-        "kn",
-        "or",
-        "ml",
-        "my",
-        "pa",
-        "lv",
-        # Note: Babel supports 200+ additional locales beyond this list
-    }
-)

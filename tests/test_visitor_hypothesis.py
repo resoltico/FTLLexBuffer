@@ -56,6 +56,7 @@ class CountingVisitor(ASTVisitor):
 
     def __init__(self) -> None:
         """Initialize counter."""
+        super().__init__()
         self.count = 0
         self.node_types: set[str] = set()
 
@@ -71,6 +72,7 @@ class TypeCollectorVisitor(ASTVisitor):
 
     def __init__(self) -> None:
         """Initialize collector."""
+        super().__init__()
         self.types: list[str] = []
 
     def visit(self, node: Any) -> Any:
@@ -96,6 +98,7 @@ class RenameVariablesTransformer(ASTTransformer):
 
     def __init__(self, mapping: dict[str, str]) -> None:
         """Initialize with variable mapping."""
+        super().__init__()
         self.mapping = mapping
 
     def visit_VariableReference(self, node: VariableReference) -> VariableReference:
@@ -495,6 +498,7 @@ class TestVisitorDispatch:
 
             def __init__(self) -> None:
                 """Initialize tracker."""
+                super().__init__()
                 self.methods_called: set[str] = set()
 
             def visit(self, node: Any) -> Any:

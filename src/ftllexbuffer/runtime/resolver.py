@@ -4,9 +4,9 @@ Resolves patterns by walking AST, interpolating variables, evaluating selectors.
 Python 3.13+. Zero external dependencies.
 """
 
-from __future__ import annotations
-
-from typing import Any
+from collections.abc import Mapping
+from datetime import datetime
+from decimal import Decimal
 
 from ftllexbuffer.diagnostics import (
     ErrorTemplate,
@@ -19,6 +19,7 @@ from ftllexbuffer.runtime.function_bridge import FunctionRegistry
 from ftllexbuffer.runtime.function_metadata import should_inject_locale
 from ftllexbuffer.runtime.plural_rules import select_plural_category
 from ftllexbuffer.syntax import (
+    Expression,
     FunctionReference,
     Identifier,
     Message,
@@ -34,6 +35,9 @@ from ftllexbuffer.syntax import (
     VariableReference,
 )
 
+# Type alias for user-provided argument values
+type FluentValue = str | int | float | bool | Decimal | datetime | None
+
 
 class FluentResolver:
     """Resolves Fluent messages to strings.
@@ -43,7 +47,6 @@ class FluentResolver:
     - Returns (result, errors) tuples
     - Provides readable fallbacks per Fluent specification
 
-    v0.9.0: Added __slots__ for memory efficiency.
     """
 
     __slots__ = (
@@ -85,7 +88,7 @@ class FluentResolver:
     def resolve_message(
         self,
         message: Message,
-        args: dict[str, Any] | None = None,
+        args: Mapping[str, FluentValue] | None = None,
         attribute: str | None = None,
     ) -> tuple[str, list[FluentError]]:
         """Resolve message to final string with error collection.
@@ -144,7 +147,7 @@ class FluentResolver:
         finally:
             self._resolution_stack.pop()
 
-    def _resolve_pattern(self, pattern: Pattern, args: dict[str, Any]) -> str:
+    def _resolve_pattern(self, pattern: Pattern, args: Mapping[str, FluentValue]) -> str:
         """Resolve pattern by walking elements."""
         result = ""
 
@@ -175,7 +178,9 @@ class FluentResolver:
 
         return result
 
-    def _resolve_expression(self, expr: Any, args: dict[str, Any]) -> Any:  # noqa: PLR0911
+    def _resolve_expression(  # noqa: PLR0911  # Complex dispatch logic expected
+        self, expr: Expression, args: Mapping[str, FluentValue]
+    ) -> FluentValue:
         """Resolve expression to value.
 
         Uses pattern matching (PEP 636) to reduce complexity.
@@ -204,14 +209,18 @@ class FluentResolver:
             case _:
                 raise FluentResolutionError(ErrorTemplate.unknown_expression(type(expr).__name__))
 
-    def _resolve_variable_reference(self, expr: VariableReference, args: dict[str, Any]) -> Any:
+    def _resolve_variable_reference(
+        self, expr: VariableReference, args: Mapping[str, FluentValue]
+    ) -> FluentValue:
         """Resolve variable reference from args."""
         var_name = expr.id.name
         if var_name not in args:
             raise FluentReferenceError(ErrorTemplate.variable_not_provided(var_name))
         return args[var_name]
 
-    def _resolve_message_reference(self, expr: MessageReference, args: dict[str, Any]) -> Any:
+    def _resolve_message_reference(
+        self, expr: MessageReference, args: Mapping[str, FluentValue]
+    ) -> str:
         """Resolve message reference."""
         msg_id = expr.id.name
         if msg_id not in self.messages:
@@ -228,7 +237,9 @@ class FluentResolver:
         self.errors.extend(nested_errors)
         return result
 
-    def _resolve_term_reference(self, expr: TermReference, args: dict[str, Any]) -> str:
+    def _resolve_term_reference(
+        self, expr: TermReference, args: Mapping[str, FluentValue]
+    ) -> str:
         """Resolve term reference."""
         term_id = expr.id.name
         if term_id not in self.terms:
@@ -248,7 +259,9 @@ class FluentResolver:
 
         return self._resolve_pattern(pattern, args)
 
-    def _resolve_select_expression(self, expr: SelectExpression, args: dict[str, Any]) -> str:
+    def _resolve_select_expression(
+        self, expr: SelectExpression, args: Mapping[str, FluentValue]
+    ) -> str:
         """Resolve select expression by matching variant."""
         # Evaluate selector
         selector_value = self._resolve_expression(expr.selector, args)
@@ -295,7 +308,9 @@ class FluentResolver:
         # Resolve matched variant pattern
         return self._resolve_pattern(matched_variant.value, args)
 
-    def _resolve_function_call(self, func_ref: FunctionReference, args: dict[str, Any]) -> Any:
+    def _resolve_function_call(
+        self, func_ref: FunctionReference, args: Mapping[str, FluentValue]
+    ) -> str | int | float:
         """Resolve function call.
 
         Uses FunctionRegistry to handle camelCase → snake_case parameter conversion.
@@ -304,12 +319,12 @@ class FluentResolver:
         func_name = func_ref.id.name
 
         # Evaluate positional arguments
-        positional_values = [
+        positional_values: list[FluentValue] = [
             self._resolve_expression(arg, args) for arg in func_ref.arguments.positional
         ]
 
         # Evaluate named arguments (camelCase from FTL)
-        named_values = {
+        named_values: dict[str, FluentValue] = {
             arg.name.name: self._resolve_expression(arg.value, args)
             for arg in func_ref.arguments.named
         }
@@ -332,7 +347,7 @@ class FluentResolver:
             named_values,
         )
 
-    def _format_value(self, value: Any) -> str:
+    def _format_value(self, value: FluentValue | str | int | float) -> str:
         """Format value to string."""
         if isinstance(value, str):
             return value
@@ -345,7 +360,7 @@ class FluentResolver:
             return ""
         return str(value)
 
-    def _get_fallback_for_placeable(self, expr: Any) -> str:
+    def _get_fallback_for_placeable(self, expr: Expression) -> str:
         """Get readable fallback for failed placeable per Fluent spec.
 
         Per Fluent specification, when a placeable fails to resolve,

@@ -1,11 +1,8 @@
 """Enumerations for FTLLexBuffer type-safe constants.
 
-v0.9.0: Replaces magic strings with proper enums for type safety and IDE support.
 
 Python 3.13+.
 """
-
-from __future__ import annotations
 
 from enum import Enum
 
@@ -13,7 +10,6 @@ from enum import Enum
 class CommentType(Enum):
     """Type of FTL comment.
 
-    v0.9.0: Replaces str literals in Comment.type.
     """
 
     COMMENT = "comment"
@@ -33,7 +29,6 @@ class CommentType(Enum):
 class VariableContext(Enum):
     """Context where a variable reference appears.
 
-    v0.9.0: Replaces str literals in VariableInfo.context.
     """
 
     PATTERN = "pattern"
@@ -56,7 +51,6 @@ class VariableContext(Enum):
 class ReferenceKind(Enum):
     """Kind of reference (message or term).
 
-    v0.9.0: Replaces str literals in ReferenceInfo.kind.
     """
 
     MESSAGE = "message"

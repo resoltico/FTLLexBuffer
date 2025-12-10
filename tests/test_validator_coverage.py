@@ -11,8 +11,9 @@ from __future__ import annotations
 from hypothesis import given
 from hypothesis import strategies as st
 
+from ftllexbuffer.diagnostics import ValidationResult
 from ftllexbuffer.syntax.parser import FluentParserV1
-from ftllexbuffer.syntax.validator import ValidationResult, validate
+from ftllexbuffer.syntax.validator import validate
 
 # ============================================================================
 # COVERAGE TARGET: Line 187->exit (Junk Entry)

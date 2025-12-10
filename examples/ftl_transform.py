@@ -20,8 +20,8 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from ftllexbuffer import (
-    ASTTransformer,
+from ftllexbuffer import parse_ftl, serialize_ftl
+from ftllexbuffer.syntax.ast import (
     Comment,
     Identifier,
     Message,
@@ -29,9 +29,8 @@ from ftllexbuffer import (
     Resource,
     TextElement,
     VariableReference,
-    parse_ftl,
-    serialize_ftl,
 )
+from ftllexbuffer.syntax.visitor import ASTTransformer
 
 
 class RemoveCommentsTransformer(ASTTransformer):

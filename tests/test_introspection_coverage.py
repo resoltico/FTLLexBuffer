@@ -9,8 +9,8 @@ import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from ftllexbuffer import introspect_message, parse_ftl
-from ftllexbuffer.introspection import extract_variables
+from ftllexbuffer import parse_ftl
+from ftllexbuffer.introspection import extract_variables, introspect_message
 from ftllexbuffer.syntax.ast import Junk, Message
 
 

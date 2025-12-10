@@ -16,8 +16,6 @@ Pattern Reference:
     - F# FParsec
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass, field
 
 from ftllexbuffer.diagnostics import ErrorTemplate
@@ -123,7 +121,7 @@ class Cursor:
             return None
         return self.source[target_pos]
 
-    def advance(self, count: int = 1) -> Cursor:
+    def advance(self, count: int = 1) -> "Cursor":
         """Return new cursor advanced by count positions.
 
         Args:
@@ -193,6 +191,94 @@ class Cursor:
             >>> text = start_cursor.slice_to(cursor.pos)
         """
         return self.source[self.pos : end_pos]
+
+    def skip_spaces(self) -> "Cursor":
+        """Skip space characters (U+0020 only).
+
+        Returns:
+            New cursor advanced past all consecutive space characters
+
+        Note:
+            Only skips ASCII space (U+0020), not tabs or newlines.
+            This matches Fluent parser specification for inline whitespace.
+
+        Example:
+            >>> cursor = Cursor("   hello", 0)
+            >>> new_cursor = cursor.skip_spaces()
+            >>> new_cursor.pos
+            3
+            >>> new_cursor.current
+            'h'
+
+            >>> cursor = Cursor("hello", 0)
+            >>> new_cursor = cursor.skip_spaces()
+            >>> new_cursor.pos  # No spaces to skip
+            0
+        """
+        c = self
+        while not c.is_eof and c.current == " ":
+            c = c.advance()
+        return c
+
+    def skip_whitespace(self) -> "Cursor":
+        """Skip whitespace characters (space, newline, carriage return).
+
+        Returns:
+            New cursor advanced past all consecutive whitespace characters
+
+        Note:
+            Skips space (U+0020), newline (U+000A), and carriage return (U+000D).
+            This matches Fluent parser specification for general whitespace.
+
+        Example:
+            >>> cursor = Cursor("  \\n\\r  hello", 0)
+            >>> new_cursor = cursor.skip_whitespace()
+            >>> new_cursor.pos
+            6
+            >>> new_cursor.current
+            'h'
+
+            >>> cursor = Cursor("hello", 0)
+            >>> new_cursor = cursor.skip_whitespace()
+            >>> new_cursor.pos  # No whitespace to skip
+            0
+        """
+        c = self
+        while not c.is_eof and c.current in (" ", "\n", "\r"):
+            c = c.advance()
+        return c
+
+    def expect(self, char: str) -> "Cursor | None":
+        """Consume character if it matches expected, return None otherwise.
+
+        Args:
+            char: Expected character (single character string)
+
+        Returns:
+            New cursor advanced by 1 if current character matches,
+            None if no match or at EOF
+
+        Note:
+            This is useful for optional character consumption.
+            For required characters, use current property with explicit check.
+
+        Example:
+            >>> cursor = Cursor("hello", 0)
+            >>> new_cursor = cursor.expect('h')
+            >>> new_cursor.pos if new_cursor else None
+            1
+
+            >>> cursor = Cursor("hello", 0)
+            >>> cursor.expect('x')  # No match
+            None
+
+            >>> eof_cursor = Cursor("hi", 2)
+            >>> eof_cursor.expect('h')  # At EOF
+            None
+        """
+        if not self.is_eof and self.current == char:
+            return self.advance()
+        return None
 
     def compute_line_col(self) -> tuple[int, int]:
         """Compute line and column for current position.

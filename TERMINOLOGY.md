@@ -65,7 +65,8 @@ This document establishes the standard terminology used throughout FTLLexBuffer'
 
 **Code Example**:
 ```python
-from ftllexbuffer import parse_ftl, Resource
+from ftllexbuffer import parse_ftl
+from ftllexbuffer.syntax.ast import Resource
 
 # Correct: Clear context
 resource_ast: Resource = parse_ftl(ftl_source)  # Resource AST node
@@ -102,7 +103,8 @@ resource = parse_ftl(ftl_source)  # Is this AST, source, or loader?
 
 **Code Example**:
 ```python
-from ftllexbuffer import FluentBundle, FTLSource
+from ftllexbuffer import FluentBundle
+from ftllexbuffer.localization import FTLSource
 
 # Correct: Clear naming
 ftl_source: FTLSource = """
@@ -141,7 +143,7 @@ bundle.add_resource(resource)
 
 **Code Example**:
 ```python
-from ftllexbuffer import PathResourceLoader, ResourceLoader
+from ftllexbuffer.localization import PathResourceLoader, ResourceLoader
 
 # Correct: Clear naming
 loader: ResourceLoader = PathResourceLoader("locales/{locale}")
@@ -318,7 +320,8 @@ Some methods use "resource" in their name - context determines meaning:
 
 2. **Type annotations clarify intent**:
    ```python
-   from ftllexbuffer import Resource, FTLSource, ResourceLoader
+   from ftllexbuffer.syntax.ast import Resource
+   from ftllexbuffer.localization import FTLSource, ResourceLoader
 
    def process_ftl(ftl_source: FTLSource) -> Resource:
        resource_ast: Resource = parse_ftl(ftl_source)
@@ -424,7 +427,7 @@ Complete alphabetical reference:
 ---
 
 **Terminology Guide Last Updated**: December 9, 2025
-**FTLLexBuffer Version**: 0.9.0
+**FTLLexBuffer Version**: 0.10.0
 
 **See Also**:
 - [README.md - Terminology Section](README.md#terminology)

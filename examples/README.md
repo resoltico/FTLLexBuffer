@@ -33,7 +33,7 @@ l10n = FluentLocalization(['lv', 'en'])
 ### Resource Loading
 
 ```python
-from ftllexbuffer import PathResourceLoader, ResourceLoader
+from ftllexbuffer.localization import PathResourceLoader, ResourceLoader
 
 # File system loader
 loader = PathResourceLoader("locales/{locale}")

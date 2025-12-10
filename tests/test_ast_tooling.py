@@ -106,6 +106,7 @@ class TestASTVisitorPattern:
         """Visitor can count messages."""
         class CountMessagesVisitor(ASTVisitor):
             def __init__(self) -> None:
+                super().__init__()
                 self.count = 0
 
             def visit_Message(self, node: Message) -> None:
@@ -127,6 +128,7 @@ welcome = Welcome!
         """Visitor can collect all message IDs."""
         class CollectIDsVisitor(ASTVisitor):
             def __init__(self) -> None:
+                super().__init__()
                 self.ids: list[str] = []
 
             def visit_Message(self, node: Message) -> None:
@@ -148,6 +150,7 @@ third = Third
         """Visitor can find all variable references."""
         class FindVariablesVisitor(ASTVisitor):
             def __init__(self) -> None:
+                super().__init__()
                 self.variables: set[str] = set()
 
             def visit_VariableReference(self, node: VariableReference) -> None:
@@ -302,6 +305,7 @@ goodbye = Goodbye, { $unknown_var }!
         # Step 2: Create visitor to find undefined variables
         class FindUnknownVarsVisitor(ASTVisitor):
             def __init__(self) -> None:
+                super().__init__()
                 self.undefined_vars: list[str] = []
 
             def visit_VariableReference(self, node: VariableReference) -> None:

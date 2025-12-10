@@ -4,8 +4,6 @@ Centralized error message templates for testable, consistent error messages.
 Python 3.13+. Zero external dependencies.
 """
 
-from __future__ import annotations
-
 from .codes import Diagnostic, DiagnosticCode
 
 

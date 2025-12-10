@@ -9,12 +9,9 @@ AST visitor pattern. See: https://docs.python.org/3/library/ast.html#ast.NodeVis
 
 Python 3.13+.
 """
-# pylint: disable=invalid-name  # visit_NodeName is stdlib convention
 
-from __future__ import annotations
-
+from collections.abc import Callable
 from dataclasses import fields, replace
-from typing import TYPE_CHECKING
 
 from .ast import (
     ASTNode,
@@ -34,9 +31,6 @@ from .ast import (
     Variant,
 )
 
-if TYPE_CHECKING:
-    pass
-
 
 class ASTVisitor:
     """Base visitor for traversing Fluent AST.
@@ -44,6 +38,8 @@ class ASTVisitor:
     Follows stdlib ast.NodeVisitor convention: generic_visit() automatically
     traverses all child nodes. Override visit_NodeType methods to add custom
     behavior.
+
+    Uses dispatch table for performance (avoids string formatting + getattr).
 
     Use this to create:
     - Validators
@@ -55,6 +51,7 @@ class ASTVisitor:
     Example:
         >>> class CountMessagesVisitor(ASTVisitor):
         ...     def __init__(self):
+        ...         super().__init__()
         ...         self.count = 0
         ...
         ...     def visit_Message(self, node: Message) -> ASTNode:
@@ -66,8 +63,15 @@ class ASTVisitor:
         >>> print(visitor.count)
     """
 
+    def __init__(self) -> None:
+        """Initialize visitor with dispatch cache."""
+        self._dispatch_cache: dict[type[ASTNode], Callable[[ASTNode], ASTNode]] = {}
+
     def visit(self, node: ASTNode) -> ASTNode:
-        """Visit a node (dispatcher).
+        """Visit a node (dispatcher with cached method lookup).
+
+        Uses dispatch cache to avoid repeated getattr + string formatting.
+        Significantly faster than dynamic method name lookup on every call.
 
         Args:
             node: AST node to visit
@@ -75,8 +79,17 @@ class ASTVisitor:
         Returns:
             Result of visiting the node
         """
-        method_name = f"visit_{type(node).__name__}"
-        method = getattr(self, method_name, self.generic_visit)
+        node_type = type(node)
+
+        # Check cache first
+        if node_type in self._dispatch_cache:
+            method = self._dispatch_cache[node_type]
+        else:
+            # Build method name and cache the lookup result
+            method_name = f"visit_{node_type.__name__}"
+            method = getattr(self, method_name, self.generic_visit)
+            self._dispatch_cache[node_type] = method
+
         return method(node)
 
     def generic_visit(self, node: ASTNode) -> ASTNode:
@@ -143,6 +156,7 @@ class ASTTransformer(ASTVisitor):
     Example - Rename all variables:
         >>> class RenameVariablesTransformer(ASTTransformer):
         ...     def __init__(self, mapping: dict[str, str]):
+        ...         super().__init__()
         ...         self.mapping = mapping
         ...
         ...     def visit_VariableReference(self, node: VariableReference) -> VariableReference:

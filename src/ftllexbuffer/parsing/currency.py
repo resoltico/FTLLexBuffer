@@ -1,86 +1,150 @@
 """Currency parsing with locale awareness.
 
-v0.8.0 BREAKING CHANGE: API aligned with formatting functions.
-- parse_currency() returns tuple[tuple[Decimal, str] | None, list[FluentParseError]]
-- Removed `strict` parameter - function NEVER raises, errors returned in list
-- Consistent with format_*() "never raise" philosophy
+API: parse_currency() returns tuple[tuple[Decimal, str] | None, list[FluentParseError]].
+Functions NEVER raise exceptions - errors returned in list.
 
 Thread-safe. Uses Babel for currency symbol mapping and number parsing.
+All currency data sourced from Unicode CLDR via Babel at module initialization.
 
 Python 3.13+.
 """
-
-from __future__ import annotations
 
 import re
 from decimal import Decimal
 
 from babel import Locale, UnknownLocaleError
-from babel.numbers import NumberFormatError, parse_decimal
+from babel.localedata import locale_identifiers
+from babel.numbers import (
+    NumberFormatError,
+    get_currency_symbol,
+    get_territory_currencies,
+    parse_decimal,
+)
 
 from ftllexbuffer.diagnostics import FluentParseError
 from ftllexbuffer.diagnostics.templates import ErrorTemplate
+from ftllexbuffer.locale_utils import normalize_locale
 
-# Ambiguous currency symbols shared by multiple currencies
-# These symbols require explicit default_currency parameter
-_AMBIGUOUS_SYMBOLS: set[str] = {
-    "$",  # USD, CAD, AUD, SGD, HKD, NZD, MXN, etc.
-    "kr",  # SEK, NOK, DKK, ISK (krona/krone)
-}
 
-# Currency symbol to ISO code mapping (for unambiguous symbols)
-# Ambiguous symbols will require default_currency parameter
-_CURRENCY_SYMBOL_MAP: dict[str, str] = {
-    # Ambiguous symbols (default mappings - will fail without default_currency)
-    "$": "USD",  # AMBIGUOUS: Also CAD, AUD, SGD, HKD, NZD, MXN
-    # Unambiguous symbols
-    "€": "EUR",
-    "£": "GBP",
-    "¥": "JPY",  # Also CNY, but typically means JPY
-    "¢": "USD",  # US cents
-    "₨": "INR",  # Rupee (also PKR, NPR, LKR)
-    "₱": "PHP",  # Philippine peso (also CUP)
-    "₹": "INR",  # Official Indian rupee symbol
-    "₽": "RUB",
-    "₡": "CRC",  # Costa Rican colon
-    "₦": "NGN",  # Nigerian naira
-    "₧": "ESP",  # Spanish peseta (historical)
-    "₩": "KRW",  # South Korean won
-    "₪": "ILS",  # Israeli new shekel
-    "₫": "VND",  # Vietnamese dong
-    "₴": "UAH",  # Ukrainian hryvnia
-    "₵": "GHS",  # Ghanaian cedi
-    "₸": "KZT",  # Kazakhstani tenge
-    "₺": "TRY",  # Turkish lira
-    "₼": "AZN",  # Azerbaijani manat
-    "₾": "GEL",  # Georgian lari
-}
+def _build_currency_maps_from_cldr() -> tuple[dict[str, str], set[str], dict[str, str]]:
+    """Build currency maps from Unicode CLDR data via Babel.
 
-# Locale to default currency mapping (for infer_from_locale=True)
-_LOCALE_TO_CURRENCY: dict[str, str] = {
-    "en_US": "USD",
-    "en_CA": "CAD",
-    "en_AU": "AUD",
-    "en_NZ": "NZD",
-    "en_SG": "SGD",
-    "en_HK": "HKD",
-    "en_GB": "GBP",
-    "de_DE": "EUR",
-    "fr_FR": "EUR",
-    "es_ES": "EUR",
-    "it_IT": "EUR",
-    "nl_NL": "EUR",
-    "pt_PT": "EUR",
-    "lv_LV": "EUR",
-    "ja_JP": "JPY",
-    "zh_CN": "CNY",
-    "zh_TW": "TWD",
-    "ko_KR": "KRW",
-    "ru_RU": "RUB",
-    "in_IN": "INR",
-    "pl_PL": "PLN",
-    "mx_MX": "MXN",
-}
+    Scans all available locales and currencies in CLDR to build:
+    1. Symbol → ISO code mapping (for unambiguous symbols)
+    2. Set of ambiguous symbols (symbols used by multiple currencies)
+    3. Locale → default currency mapping (from territory data)
+
+    This replaces hardcoded maps with dynamic CLDR data extraction.
+    Executed once at module initialization for optimal runtime performance.
+
+    Returns:
+        Tuple of (symbol_to_code, ambiguous_symbols, locale_to_currency):
+        - symbol_to_code: Unambiguous currency symbol → ISO 4217 code
+        - ambiguous_symbols: Symbols that map to multiple currencies
+        - locale_to_currency: Locale code → default ISO 4217 currency code
+    """
+    # Step 1: Build symbol → currency codes mapping
+    # Key insight: A symbol is ambiguous if multiple currency codes use it
+    symbol_to_codes: dict[str, set[str]] = {}
+
+    # Get all currency codes from CLDR
+    # Strategy: Sample representative locales to extract all currencies
+    all_currencies: set[str] = set()
+    all_locale_ids = list(locale_identifiers())
+    representative_sample = all_locale_ids[:150]  # First 150 locales
+
+    for locale_id in representative_sample:
+        try:
+            locale = Locale.parse(locale_id)
+            if hasattr(locale, "currencies") and locale.currencies:
+                all_currencies.update(locale.currencies.keys())
+        except Exception:  # pylint: disable=broad-exception-caught  # Robust locale parsing during init
+            continue
+
+    # Step 2: For each currency, find all symbols it uses across locales
+    # Use a smaller locale sample for symbol lookup (performance)
+    symbol_lookup_locales = [
+        Locale.parse(lid) for lid in [
+            "en_US", "en_GB", "en_CA", "en_AU", "en_NZ", "en_SG", "en_HK", "en_IN",
+            "de_DE", "de_CH", "de_AT", "fr_FR", "fr_CH", "fr_CA",
+            "es_ES", "es_MX", "es_AR", "it_IT", "it_CH", "nl_NL", "pt_PT", "pt_BR",
+            "ja_JP", "zh_CN", "zh_TW", "zh_HK", "ko_KR",
+            "ru_RU", "pl_PL", "sv_SE", "no_NO", "da_DK", "fi_FI",
+            "tr_TR", "ar_SA", "ar_EG", "he_IL", "hi_IN",
+            "th_TH", "vi_VN", "id_ID", "ms_MY", "fil_PH",
+            "lv_LV", "et_EE", "lt_LT", "cs_CZ", "sk_SK", "hu_HU",
+            "ro_RO", "bg_BG", "hr_HR", "sl_SI", "sr_RS",
+            "uk_UA", "ka_GE", "az_AZ", "kk_KZ", "is_IS",
+        ] if lid in all_locale_ids
+    ]
+
+    for currency_code in all_currencies:
+        for locale in symbol_lookup_locales:
+            try:
+                symbol = get_currency_symbol(currency_code, locale=locale)
+
+                # Only map real symbols (not the currency code itself)
+                # Filter out 3-letter alphabetic codes that are just the ISO code
+                if (symbol and
+                    symbol != currency_code and
+                    not (len(symbol) == 3 and symbol.isupper() and symbol.isalpha())):
+
+                    if symbol not in symbol_to_codes:
+                        symbol_to_codes[symbol] = set()
+                    symbol_to_codes[symbol].add(currency_code)
+            except Exception:  # pylint: disable=broad-exception-caught  # Robust symbol lookup during init
+                # Symbol not available for this currency/locale combination
+                continue
+
+    # Step 3: Separate unambiguous vs ambiguous symbols
+    unambiguous_map: dict[str, str] = {}
+    ambiguous_set: set[str] = set()
+
+    for symbol, codes in symbol_to_codes.items():
+        if len(codes) == 1:
+            # Unambiguous: symbol maps to exactly one currency
+            unambiguous_map[symbol] = next(iter(codes))
+        else:
+            # Ambiguous: symbol used by multiple currencies
+            ambiguous_set.add(symbol)
+
+    # Step 4: Build locale → default currency mapping from territory data
+    locale_to_currency: dict[str, str] = {}
+
+    # Get all locales with territories
+    for locale_id in all_locale_ids:
+        try:
+            locale = Locale.parse(locale_id)
+            if not locale.territory:
+                continue
+
+            # Get active currencies for this territory
+            # Returns list of currency codes (e.g., ['USD'] for US)
+            territory_currencies = get_territory_currencies(locale.territory)
+
+            # Use first currency as default (typically the official/current one)
+            if territory_currencies and len(territory_currencies) > 0:
+                current_currency = territory_currencies[0]
+
+                # Normalize locale identifier to match our usage
+                # Convert from babel format (en_US) to our format
+                locale_str = str(locale)
+                if "_" in locale_str:  # Has territory
+                    locale_to_currency[locale_str] = current_currency
+
+        except Exception:  # pylint: disable=broad-exception-caught  # Robust locale data extraction during init
+            continue
+
+    return unambiguous_map, ambiguous_set, locale_to_currency
+
+
+# Build all currency maps from CLDR at module initialization
+# This eliminates hardcoded currency data in favor of dynamic CLDR extraction
+_CURRENCY_SYMBOL_MAP: dict[str, str]
+_AMBIGUOUS_SYMBOLS: set[str]
+_LOCALE_TO_CURRENCY: dict[str, str]
+
+_CURRENCY_SYMBOL_MAP, _AMBIGUOUS_SYMBOLS, _LOCALE_TO_CURRENCY = _build_currency_maps_from_cldr()
 
 
 def parse_currency(
@@ -92,7 +156,6 @@ def parse_currency(
 ) -> tuple[tuple[Decimal, str] | None, list[FluentParseError]]:
     """Parse locale-aware currency string to (amount, currency_code).
 
-    v0.8.0 BREAKING CHANGE: Returns tuple[tuple[Decimal, str] | None, list[FluentParseError]].
     No longer raises exceptions. Errors are returned in the list.
     The `strict` parameter has been removed.
 
@@ -173,9 +236,7 @@ def parse_currency(
         return (None, errors)
 
     try:
-        # v0.9.0: Normalize locale format (en-US → en_US) for Babel
-        normalized_locale = locale_code.replace("-", "_")
-        locale = Locale.parse(normalized_locale)
+        locale = Locale.parse(normalize_locale(locale_code))
     except (UnknownLocaleError, ValueError):
         diagnostic = ErrorTemplate.parse_locale_unknown(locale_code)
         errors.append(

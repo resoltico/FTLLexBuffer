@@ -1,6 +1,5 @@
 """Date and datetime parsing functions with locale awareness.
 
-v0.8.0 BREAKING CHANGE: API aligned with formatting functions.
 - parse_date() returns tuple[date | None, list[FluentParseError]]
 - parse_datetime() returns tuple[datetime | None, list[FluentParseError]]
 - Removed `strict` parameter - functions NEVER raise, errors returned in list
@@ -12,14 +11,13 @@ Thread-safe. Uses Python 3.13 stdlib + Babel CLDR patterns.
 Python 3.13+.
 """
 
-from __future__ import annotations
-
 from datetime import date, datetime, timezone
 
 from babel import Locale, UnknownLocaleError
 
 from ftllexbuffer.diagnostics import FluentParseError
 from ftllexbuffer.diagnostics.templates import ErrorTemplate
+from ftllexbuffer.locale_utils import normalize_locale
 
 
 def parse_date(
@@ -28,7 +26,6 @@ def parse_date(
 ) -> tuple[date | None, list[FluentParseError]]:
     """Parse locale-aware date string to date object.
 
-    v0.8.0 BREAKING CHANGE: Returns tuple[date | None, list[FluentParseError]].
     No longer raises exceptions. Errors are returned in the list.
     The `strict` parameter has been removed.
 
@@ -131,7 +128,6 @@ def parse_datetime(
 ) -> tuple[datetime | None, list[FluentParseError]]:
     """Parse locale-aware datetime string to datetime object.
 
-    v0.8.0 BREAKING CHANGE: Returns tuple[datetime | None, list[FluentParseError]].
     No longer raises exceptions. Errors are returned in the list.
     The `strict` parameter has been removed.
 
@@ -246,9 +242,7 @@ def _get_date_patterns(locale_code: str) -> list[str]:
         Empty list if locale parsing fails
     """
     try:
-        # Parse locale (convert BCP-47 to POSIX: en-US -> en_US)
-        normalized = locale_code.replace("-", "_")
-        locale = Locale.parse(normalized)
+        locale = Locale.parse(normalize_locale(locale_code))
 
         # Get CLDR date patterns
         patterns = []
@@ -282,9 +276,7 @@ def _get_datetime_patterns(locale_code: str) -> list[str]:
         Empty list if locale parsing fails
     """
     try:
-        # Parse locale (convert BCP-47 to POSIX: en-US -> en_US)
-        normalized = locale_code.replace("-", "_")
-        locale = Locale.parse(normalized)
+        locale = Locale.parse(normalize_locale(locale_code))
 
         # Get CLDR datetime patterns
         patterns = []
@@ -319,7 +311,7 @@ def _get_datetime_patterns(locale_code: str) -> list[str]:
 
 
 # ==============================================================================
-# TOKEN-BASED BABEL-TO-STRPTIME CONVERTER (v0.8.0 - replaces regex approach)
+# TOKEN-BASED BABEL-TO-STRPTIME CONVERTER
 # ==============================================================================
 
 # Token mapping: Babel CLDR pattern -> Python strptime directive
@@ -359,7 +351,6 @@ _BABEL_TOKEN_MAP: dict[str, str] = {
 def _tokenize_babel_pattern(pattern: str) -> list[str]:
     """Tokenize Babel CLDR pattern into individual tokens.
 
-    v0.8.0: Token-based approach replaces regex word boundary approach.
     This correctly handles patterns like "d.MM.yyyy" where "d" is adjacent
     to punctuation without word boundaries.
 
@@ -408,7 +399,6 @@ def _tokenize_babel_pattern(pattern: str) -> list[str]:
 def _babel_to_strptime(babel_pattern: str) -> str:
     """Convert Babel CLDR pattern to Python strptime format.
 
-    v0.8.0: Token-based converter replaces regex approach.
     Fixes edge cases with word boundaries in patterns like "d.MM.yyyy".
 
     Babel uses Unicode CLDR date pattern syntax, Python uses strptime directives.

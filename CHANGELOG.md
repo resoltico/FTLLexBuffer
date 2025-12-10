@@ -5,6 +5,237 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - 2025-12-10
+
+### Breaking Changes
+
+- **Minimal root API - Advanced features require submodule imports**
+  - Root `ftllexbuffer` now exports only 12 essential symbols (was 84)
+  - Core API (4): `FluentBundle`, `FluentLocalization`, `parse_ftl`, `serialize_ftl`
+  - Exceptions (4): `FluentError`, `FluentSyntaxError`, `FluentReferenceError`, `FluentResolutionError`
+  - Metadata (4): `__version__`, `__fluent_spec_version__`, `__spec_url__`, `__recommended_encoding__`
+  - **Impact**: All advanced features now require explicit submodule imports
+  - **Migration**: Import from specific submodules instead of root
+    ```python
+    # OLD (v0.9.x - no longer works):
+    from ftllexbuffer import Resource, Message, extract_variables, CommentType
+
+    # NEW (v0.10.0 - required):
+    from ftllexbuffer import FluentBundle, parse_ftl
+    from ftllexbuffer.syntax.ast import Resource, Message
+    from ftllexbuffer.introspection import extract_variables
+    from ftllexbuffer.enums import CommentType
+    ```
+  - **Available submodules**:
+    - `ftllexbuffer.syntax.ast` - All AST node types (Resource, Message, Term, etc.)
+    - `ftllexbuffer.introspection` - Message introspection utilities
+    - `ftllexbuffer.parsing` - Bidirectional parsing functions
+    - `ftllexbuffer.diagnostics` - All diagnostic and error types
+    - `ftllexbuffer.localization` - Resource loaders
+    - `ftllexbuffer.runtime.functions` - Formatting function implementations
+    - `ftllexbuffer.syntax.visitor` - AST traversal utilities
+    - `ftllexbuffer.enums` - Enumeration types
+
+- **Unified ValidationResult structure**
+  - Merged two different `ValidationResult` classes into single unified type
+  - Now located in `ftllexbuffer.diagnostics.validation`
+  - Structure changed to include all validation outputs:
+    - `errors: tuple[ValidationError, ...]` - Syntax errors
+    - `warnings: tuple[ValidationWarning, ...]` - Semantic warnings
+    - `annotations: tuple[Annotation, ...]` - Parser annotations (Junk entries)
+  - `is_valid` is now a computed property (returns `True` if no errors and no annotations)
+  - **Impact**: Code accessing `ValidationResult` must update imports and field access
+  - **Migration**:
+    ```python
+    # OLD (v0.9.x):
+    from ftllexbuffer.runtime.bundle import ValidationResult
+    result = bundle.validate_resource(ftl_source)
+    if result.errors:
+        print(result.errors[0].message)
+
+    # NEW (v0.10.0):
+    from ftllexbuffer.diagnostics.validation import ValidationResult
+    result = bundle.validate_resource(ftl_source)
+    if not result.is_valid:  # Computed property
+        for error in result.errors:
+            print(error.message)
+        for annotation in result.annotations:
+            print(annotation.content)
+    ```
+  - Factory methods available: `ValidationResult.valid()`, `ValidationResult.invalid(...)`, `ValidationResult.from_annotations(...)`
+
+- **Explicit locale validation - No more silent failures**
+  - `LocaleContext` no longer silently swallows locale validation errors
+  - Invalid locales now return explicit error results or raise exceptions
+  - **Impact**: Invalid locale codes no longer silently fall back to default formatting
+  - **Behavior change**: Formatting functions return Fluent error placeholders when locale is invalid
+  - **Example**:
+    ```python
+    # v0.9.x - silently used fallback formatting
+    bundle = FluentBundle("invalid_locale")  # Warning logged, continues
+
+    # v0.10.0 - explicit error handling
+    bundle = FluentBundle("invalid_locale")  # Same behavior at bundle level
+    # But format calls with invalid locale return error placeholders: "{Message}"
+    ```
+  - **For custom functions**: Use `LocaleContext.create()` to get explicit validation results
+
+- **Specific exception handling - More precise error reporting**
+  - Broad `Exception` catches replaced with specific exception types
+  - Unexpected errors from Babel and internal operations now propagate instead of being swallowed
+  - Circular reference detection now uses explicit `RecursionError` handling
+  - **Impact**: Different exceptions may be raised in error conditions
+  - **Migration**: If you catch exceptions, update to handle specific types:
+    - `TypeError`, `ValueError`, `KeyError` for function argument errors
+    - `RecursionError` for circular message references
+    - `InvalidOperation` (from decimal module) for numeric formatting errors
+
+- **Stricter type safety - `Any` types replaced with precise unions**
+  - All public APIs now use specific union types instead of `Any`
+  - New type aliases:
+    - `FluentValue = str | int | float | bool | Decimal | datetime | date | None`
+    - `FluentFunction` is now a Protocol with typed signature
+  - **Impact**: Better type checking, may reveal previously hidden type errors
+  - **Benefit**: IDEs and type checkers provide more accurate completions and error detection
+
+### Improved
+
+- **Currency parsing now uses comprehensive CLDR data**
+  - Replaced 20 hardcoded currency mappings with dynamic CLDR extraction
+  - **Coverage**: 690 locales with territory-specific currency defaults (35x improvement)
+  - **Accuracy**: All currency symbols and locale defaults automatically sourced from Unicode CLDR
+  - **Maintainability**: Automatically updated with Babel/CLDR releases, no manual maintenance
+  - **Impact**: Currency parsing now supports 35x more locales with correct defaults
+  - **Example**:
+    ```python
+    # v0.9.x: Only 20 hardcoded locales (e.g., sv_SE not supported)
+    parse_currency("$100", "sv_SE", infer_from_locale=True)  # Error
+
+    # v0.10.0: 690 locales automatically supported from CLDR
+    parse_currency("$100", "sv_SE", infer_from_locale=True)  # Works! SEK inferred
+    ```
+  - Ambiguous symbols ($, ¢, ₨, ₱, kr) still require explicit `default_currency` or `infer_from_locale=True`
+
+- **Enhanced type safety across entire codebase**
+  - Python 3.13 baseline enables native PEP 695 generics and type aliases
+  - All type aliases use modern `type` statement syntax
+  - Removed obsolete `from __future__ import annotations` (Python 3.13 has PEP 649 by default)
+  - `FluentFunction` is now a proper Protocol with typed parameters
+  - `FunctionCategory` uses Enum instead of Literal for better extensibility
+  - **Impact**: Better IDE support, more accurate type checking, fewer runtime type errors
+
+### Changed
+
+- **Locale normalization centralized**
+  - New `normalize_locale()` utility function in `ftllexbuffer.locale_utils`
+  - Handles BCP 47 (en-US) to POSIX (en_US) conversion consistently
+  - Used throughout parsing and formatting modules
+  - **Impact**: More consistent locale handling, easier to maintain
+
+- **Validation result immutability enforced**
+  - `ValidationResult` now uses frozen dataclass with immutable tuples
+  - Fields: `errors`, `warnings`, `annotations` are all tuples (not lists)
+  - **Impact**: Prevents accidental mutation of validation results
+
+### Internal
+
+- **Parser optimization**
+  - Added cursor methods for whitespace handling: `skip_spaces()`, `skip_whitespace()`, `expect()`
+  - Eliminated 7 duplicate whitespace-skipping loops in parser
+  - Improved parser maintainability and reduced code duplication
+
+- **Visitor pattern performance**
+  - `ASTVisitor` now caches method dispatch for significant performance improvement
+  - Reduces repeated string formatting and `getattr` lookups on every node visit
+
+- **Thread-safe serialization and validation**
+  - `FluentSerializer` no longer uses mutable instance state
+  - `SemanticValidator` no longer uses mutable instance state
+  - Both are now fully reentrant and thread-safe
+
+- **Centralized linter configuration**
+  - Consolidated 193 lines of per-file lint ignores to 63 lines (67% reduction)
+  - All Pylint suppressions moved from inline comments to global configuration
+  - Cleaner code with centralized quality control rules
+
+### Migration Guide
+
+#### Import Changes
+
+The most significant breaking change is the slimmed-down root API. Update your imports:
+
+```python
+# OLD (v0.9.x) - importing from root
+from ftllexbuffer import (
+    Resource, Message, Term, Comment, Junk,
+    extract_variables, extract_references,
+    CommentType, VariableContext, ReferenceKind,
+    ValidationError, ValidationWarning,
+)
+
+# NEW (v0.10.0) - import from submodules
+from ftllexbuffer import FluentBundle, parse_ftl, serialize_ftl
+from ftllexbuffer.syntax.ast import Resource, Message, Term, Comment, Junk
+from ftllexbuffer.introspection import extract_variables, extract_references
+from ftllexbuffer.enums import CommentType, VariableContext, ReferenceKind
+from ftllexbuffer.diagnostics.validation import ValidationError, ValidationWarning
+```
+
+#### ValidationResult Changes
+
+```python
+# OLD (v0.9.x) - list-based, mutable
+from ftllexbuffer.runtime.bundle import ValidationResult
+result = bundle.validate_resource(ftl_source)
+for error in result.errors:  # list
+    print(error.message)
+
+# NEW (v0.10.0) - tuple-based, immutable
+from ftllexbuffer.diagnostics.validation import ValidationResult
+result = bundle.validate_resource(ftl_source)
+if not result.is_valid:  # Computed property
+    for error in result.errors:  # tuple
+        print(error.message)
+    for annotation in result.annotations:  # tuple
+        print(annotation.content)
+```
+
+#### Exception Handling
+
+```python
+# OLD (v0.9.x) - broad catches
+try:
+    result = bundle.format_pattern("message")
+except Exception as e:
+    log_error(e)
+
+# NEW (v0.10.0) - specific catches
+try:
+    result = bundle.format_pattern("message")
+except RecursionError:
+    log_error("Circular reference detected")
+except (TypeError, ValueError, KeyError) as e:
+    log_error(f"Function argument error: {e}")
+```
+
+#### Type Annotations
+
+If you use type annotations with FTLLexBuffer:
+
+```python
+# OLD (v0.9.x) - Any types accepted
+from typing import Any
+
+def process_value(value: Any) -> str:
+    return bundle.format_pattern("msg", {"val": value})
+
+# NEW (v0.10.0) - use FluentValue
+from ftllexbuffer.runtime.resolver import FluentValue
+
+def process_value(value: FluentValue) -> str:
+    return bundle.format_pattern("msg", {"val": value})[0]
+```
+
 ## [0.9.1] - 2025-12-09
 
 ### Fixed

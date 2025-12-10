@@ -15,6 +15,7 @@ from hypothesis import strategies as st
 from ftllexbuffer.runtime.function_bridge import FunctionRegistry
 from ftllexbuffer.runtime.function_metadata import (
     BUILTIN_FUNCTIONS,
+    FunctionCategory,
     FunctionMetadata,
     get_python_name,
     is_builtin_function,
@@ -204,7 +205,7 @@ class TestFunctionMetadataIntegration:
             assert metadata.ftl_name == func_name
             assert metadata.python_name.endswith("_format")
             assert metadata.requires_locale is True
-            assert metadata.category == "formatting"
+            assert metadata.category == FunctionCategory.FORMATTING
 
     def test_should_inject_locale_with_built_in_registry(self) -> None:
         """should_inject_locale works with built-in registry."""
@@ -233,7 +234,7 @@ class TestFunctionMetadataStructure:
             python_name="test_func",
             ftl_name="TEST",
             requires_locale=True,
-            category="formatting",
+            category=FunctionCategory.FORMATTING,
         )
 
         with pytest.raises(AttributeError):
@@ -247,7 +248,7 @@ class TestFunctionMetadataStructure:
             requires_locale=False,
         )
 
-        assert metadata.category == "formatting"
+        assert metadata.category == FunctionCategory.FORMATTING
 
     def test_builtin_functions_dict_structure(self) -> None:
         """BUILTIN_FUNCTIONS dict has correct structure."""

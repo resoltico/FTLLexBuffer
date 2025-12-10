@@ -16,7 +16,14 @@ from hypothesis import strategies as st
 
 from ftllexbuffer import FluentBundle
 from ftllexbuffer.runtime.locale_context import LocaleContext
-from ftllexbuffer.runtime.plural_rules import SUPPORTED_LOCALES
+
+# Test locale set - representative sample of supported locales
+# Babel supports 200+ locales; these are common ones for testing
+TEST_LOCALES: frozenset[str] = frozenset({
+    "en", "zh", "hi", "es", "fr", "ar", "bn", "pt", "ru", "ja",
+    "de", "jv", "ko", "vi", "te", "tr", "ta", "mr", "ur", "it",
+    "th", "gu", "pl", "uk", "kn", "or", "ml", "my", "pa", "lv",
+})
 
 # All 30 supported locales with expected characteristics
 LOCALE_TEST_DATA = {
@@ -61,24 +68,24 @@ LOCALE_TEST_DATA = {
 class TestLocaleContextAllLocales:
     """Test LocaleContext works with all 30 supported locales."""
 
-    @pytest.mark.parametrize("locale_code", sorted(SUPPORTED_LOCALES))
+    @pytest.mark.parametrize("locale_code", sorted(TEST_LOCALES))
     def test_locale_context_creation(self, locale_code: str) -> None:
         """LocaleContext can be created for all 30 locales."""
-        ctx = LocaleContext(locale_code)
+        ctx = LocaleContext.create_or_raise(locale_code)
         assert ctx.locale_code == locale_code
 
-    @pytest.mark.parametrize("locale_code", sorted(SUPPORTED_LOCALES))
+    @pytest.mark.parametrize("locale_code", sorted(TEST_LOCALES))
     def test_babel_locale_property(self, locale_code: str) -> None:
         """babel_locale property returns valid Babel Locale for all 30 locales."""
-        ctx = LocaleContext(locale_code)
+        ctx = LocaleContext.create_or_raise(locale_code)
         babel_loc = ctx.babel_locale
         # Should have language code
         assert babel_loc.language == locale_code
 
-    @pytest.mark.parametrize("locale_code", sorted(SUPPORTED_LOCALES))
+    @pytest.mark.parametrize("locale_code", sorted(TEST_LOCALES))
     def test_format_number_basic(self, locale_code: str) -> None:
         """format_number() works for all 30 locales with basic number."""
-        ctx = LocaleContext(locale_code)
+        ctx = LocaleContext.create_or_raise(locale_code)
         result = ctx.format_number(1234.56)
         # Should return a string containing the digits
         assert isinstance(result, str)
@@ -87,28 +94,28 @@ class TestLocaleContextAllLocales:
         assert "3" in result or "\u0663" in result
         assert "4" in result or "\u0664" in result
 
-    @pytest.mark.parametrize("locale_code", sorted(SUPPORTED_LOCALES))
+    @pytest.mark.parametrize("locale_code", sorted(TEST_LOCALES))
     def test_format_number_with_grouping(self, locale_code: str) -> None:
         """format_number() applies locale-specific grouping for all 30 locales."""
-        ctx = LocaleContext(locale_code)
+        ctx = LocaleContext.create_or_raise(locale_code)
         result = ctx.format_number(1234567, use_grouping=True)
         # Should be longer than plain digits due to separators
         assert isinstance(result, str)
         assert len(result) >= 7  # At least 7 digits
 
-    @pytest.mark.parametrize("locale_code", sorted(SUPPORTED_LOCALES))
+    @pytest.mark.parametrize("locale_code", sorted(TEST_LOCALES))
     def test_format_datetime_basic(self, locale_code: str) -> None:
         """format_datetime() works for all 30 locales."""
-        ctx = LocaleContext(locale_code)
+        ctx = LocaleContext.create_or_raise(locale_code)
         dt = datetime(2025, 10, 27, 14, 30, 0, tzinfo=UTC)
         result = ctx.format_datetime(dt, date_style="medium")
         assert isinstance(result, str)
         assert len(result) > 0
 
-    @pytest.mark.parametrize("locale_code", sorted(SUPPORTED_LOCALES))
+    @pytest.mark.parametrize("locale_code", sorted(TEST_LOCALES))
     def test_format_datetime_all_styles(self, locale_code: str) -> None:
         """format_datetime() works with all date styles for all 30 locales."""
-        ctx = LocaleContext(locale_code)
+        ctx = LocaleContext.create_or_raise(locale_code)
         dt = datetime(2025, 10, 27, tzinfo=UTC)
         for style in ["short", "medium", "long", "full"]:
             result = ctx.format_datetime(dt, date_style=style)  # type: ignore
@@ -119,13 +126,13 @@ class TestLocaleContextAllLocales:
 class TestFluentBundleAllLocales:
     """Test FluentBundle works with all 30 supported locales."""
 
-    @pytest.mark.parametrize("locale_code", sorted(SUPPORTED_LOCALES))
+    @pytest.mark.parametrize("locale_code", sorted(TEST_LOCALES))
     def test_bundle_creation(self, locale_code: str) -> None:
         """FluentBundle can be created for all 30 locales."""
         bundle = FluentBundle(locale_code)
         assert bundle.locale.startswith(locale_code.split("_")[0])
 
-    @pytest.mark.parametrize("locale_code", sorted(SUPPORTED_LOCALES))
+    @pytest.mark.parametrize("locale_code", sorted(TEST_LOCALES))
     def test_bundle_number_function(self, locale_code: str) -> None:
         """NUMBER function works in FluentBundle for all 30 locales."""
         bundle = FluentBundle(locale_code)
@@ -135,7 +142,7 @@ class TestFluentBundleAllLocales:
         # Should contain formatted number (not error)
         assert "{ERROR" not in result
 
-    @pytest.mark.parametrize("locale_code", sorted(SUPPORTED_LOCALES))
+    @pytest.mark.parametrize("locale_code", sorted(TEST_LOCALES))
     def test_bundle_number_with_params(self, locale_code: str) -> None:
         """NUMBER function with parameters works for all 30 locales."""
         bundle = FluentBundle(locale_code)
@@ -146,7 +153,7 @@ class TestFluentBundleAllLocales:
         assert isinstance(result, str)
         assert "{ERROR" not in result
 
-    @pytest.mark.parametrize("locale_code", sorted(SUPPORTED_LOCALES))
+    @pytest.mark.parametrize("locale_code", sorted(TEST_LOCALES))
     def test_bundle_datetime_function(self, locale_code: str) -> None:
         """DATETIME function works in FluentBundle for all 30 locales."""
         bundle = FluentBundle(locale_code)
@@ -156,7 +163,7 @@ class TestFluentBundleAllLocales:
         assert isinstance(result, str)
         assert "{ERROR" not in result
 
-    @pytest.mark.parametrize("locale_code", sorted(SUPPORTED_LOCALES))
+    @pytest.mark.parametrize("locale_code", sorted(TEST_LOCALES))
     def test_bundle_currency_function(self, locale_code: str) -> None:
         """CURRENCY function works in FluentBundle for all 30 locales."""
         bundle = FluentBundle(locale_code)
@@ -167,7 +174,7 @@ class TestFluentBundleAllLocales:
         # Should contain currency symbol or code
         assert "€" in result or "EUR" in result or "123" in result
 
-    @pytest.mark.parametrize("locale_code", sorted(SUPPORTED_LOCALES))
+    @pytest.mark.parametrize("locale_code", sorted(TEST_LOCALES))
     def test_bundle_currency_with_params(self, locale_code: str) -> None:
         """CURRENCY function with parameters works for all 30 locales."""
         bundle = FluentBundle(locale_code)
@@ -179,7 +186,7 @@ class TestFluentBundleAllLocales:
         assert "{ERROR" not in result
         assert "USD" in result  # Code display should show USD
 
-    @pytest.mark.parametrize("locale_code", sorted(SUPPORTED_LOCALES))
+    @pytest.mark.parametrize("locale_code", sorted(TEST_LOCALES))
     def test_bundle_plural_selection(self, locale_code: str) -> None:
         """Plural selection works for all 30 locales."""
         bundle = FluentBundle(locale_code)
@@ -203,7 +210,7 @@ class TestLocaleSpecificFormatting:
 
     def test_german_number_separators(self) -> None:
         """German uses period for thousands, comma for decimal."""
-        ctx = LocaleContext("de")
+        ctx = LocaleContext.create_or_raise("de")
         result = ctx.format_number(1234.56, use_grouping=True)
         # German: 1.234,56
         assert "," in result  # Decimal comma
@@ -211,14 +218,14 @@ class TestLocaleSpecificFormatting:
 
     def test_french_number_separators(self) -> None:
         """French uses narrow no-break space for thousands, comma for decimal."""
-        ctx = LocaleContext("fr")
+        ctx = LocaleContext.create_or_raise("fr")
         result = ctx.format_number(1234.56, use_grouping=True)
         # French: 1 234,56 (with special space)
         assert "," in result  # Decimal comma
 
     def test_english_number_separators(self) -> None:
         """English uses comma for thousands, period for decimal."""
-        ctx = LocaleContext("en")
+        ctx = LocaleContext.create_or_raise("en")
         result = ctx.format_number(1234.56, use_grouping=True)
         # English: 1,234.56
         assert "," in result  # Thousand comma
@@ -226,14 +233,14 @@ class TestLocaleSpecificFormatting:
 
     def test_russian_number_separators(self) -> None:
         """Russian uses space for thousands, comma for decimal."""
-        ctx = LocaleContext("ru")
+        ctx = LocaleContext.create_or_raise("ru")
         result = ctx.format_number(1234.56, use_grouping=True)
         # Russian: 1 234,56 (with no-break space)
         assert "," in result  # Decimal comma
 
     def test_arabic_uses_arabic_indic_numerals(self) -> None:
         """Arabic locale may use Arabic-Indic numerals."""
-        ctx = LocaleContext("ar")
+        ctx = LocaleContext.create_or_raise("ar")
         result = ctx.format_number(1234.56, use_grouping=True)
         # Arabic may use Arabic-Indic numerals or Western numerals depending on Babel
         assert isinstance(result, str)
@@ -241,28 +248,28 @@ class TestLocaleSpecificFormatting:
 
     def test_latvian_number_format(self) -> None:
         """Latvian uses space for thousands, comma for decimal."""
-        ctx = LocaleContext("lv")
+        ctx = LocaleContext.create_or_raise("lv")
         result = ctx.format_number(1234.56, use_grouping=True)
         # Latvian: 1 234,56
         assert "," in result  # Decimal comma
 
     def test_chinese_number_format(self) -> None:
         """Chinese uses comma for thousands, period for decimal."""
-        ctx = LocaleContext("zh")
+        ctx = LocaleContext.create_or_raise("zh")
         result = ctx.format_number(1234.56, use_grouping=True)
         # Chinese: 1,234.56
         assert isinstance(result, str)
 
     def test_currency_eur_us(self) -> None:
         """EUR in en_US: symbol before."""
-        ctx = LocaleContext("en-US")
+        ctx = LocaleContext.create_or_raise("en-US")
         result = ctx.format_currency(123.45, currency="EUR")
         assert "€" in result or "EUR" in result
         assert "123" in result
 
     def test_currency_eur_lv(self) -> None:
         """EUR in lv_LV: symbol after with space."""
-        ctx = LocaleContext("lv-LV")
+        ctx = LocaleContext.create_or_raise("lv-LV")
         result = ctx.format_currency(123.45, currency="EUR")
         assert "€" in result or "EUR" in result
         assert "123" in result
@@ -270,7 +277,7 @@ class TestLocaleSpecificFormatting:
 
     def test_currency_jpy_zero_decimals(self) -> None:
         """JPY has 0 decimal places."""
-        ctx = LocaleContext("ja-JP")
+        ctx = LocaleContext.create_or_raise("ja-JP")
         result = ctx.format_currency(12345, currency="JPY")
         # Accept halfwidth yen (\xa5 ¥), fullwidth yen (\uffe5 ￥), or JPY code
         assert "\xa5" in result or "\uffe5" in result or "JPY" in result
@@ -280,7 +287,7 @@ class TestLocaleSpecificFormatting:
 
     def test_currency_bhd_three_decimals(self) -> None:
         """BHD has 3 decimal places."""
-        ctx = LocaleContext("ar-BH")
+        ctx = LocaleContext.create_or_raise("ar-BH")
         result = ctx.format_currency(123.456, currency="BHD")
         assert "123" in result
         assert "456" in result  # 3 decimals
@@ -290,18 +297,18 @@ class TestHypothesisLocaleFormatting:
     """Property-based tests for locale formatting."""
 
     @given(
-        locale=st.sampled_from(sorted(SUPPORTED_LOCALES)),
+        locale=st.sampled_from(sorted(TEST_LOCALES)),
         number=st.floats(min_value=-1e12, max_value=1e12, allow_nan=False, allow_infinity=False),
     )
     @settings(max_examples=200)
     def test_number_format_never_crashes(self, locale: str, number: float) -> None:
         """format_number() never crashes for any locale and number."""
-        ctx = LocaleContext(locale)
+        ctx = LocaleContext.create_or_raise(locale)
         result = ctx.format_number(number)
         assert isinstance(result, str)
 
     @given(
-        locale=st.sampled_from(sorted(SUPPORTED_LOCALES)),
+        locale=st.sampled_from(sorted(TEST_LOCALES)),
         year=st.integers(min_value=1900, max_value=2100),
         month=st.integers(min_value=1, max_value=12),
         day=st.integers(min_value=1, max_value=28),  # Safe day range
@@ -311,13 +318,13 @@ class TestHypothesisLocaleFormatting:
         self, locale: str, year: int, month: int, day: int
     ) -> None:
         """format_datetime() never crashes for any locale and date."""
-        ctx = LocaleContext(locale)
+        ctx = LocaleContext.create_or_raise(locale)
         dt = datetime(year, month, day, tzinfo=UTC)
         result = ctx.format_datetime(dt)
         assert isinstance(result, str)
 
     @given(
-        locale=st.sampled_from(sorted(SUPPORTED_LOCALES)),
+        locale=st.sampled_from(sorted(TEST_LOCALES)),
         amount=st.floats(min_value=-1e9, max_value=1e9, allow_nan=False, allow_infinity=False),
         currency=st.sampled_from(["USD", "EUR", "GBP", "JPY", "CHF"]),
     )
@@ -326,12 +333,12 @@ class TestHypothesisLocaleFormatting:
         self, locale: str, amount: float, currency: str
     ) -> None:
         """format_currency() never crashes for any locale, amount, and currency."""
-        ctx = LocaleContext(locale)
+        ctx = LocaleContext.create_or_raise(locale)
         result = ctx.format_currency(amount, currency=currency)
         assert isinstance(result, str)
 
     @given(
-        locale=st.sampled_from(sorted(SUPPORTED_LOCALES)),
+        locale=st.sampled_from(sorted(TEST_LOCALES)),
         count=st.integers(min_value=0, max_value=1000),
     )
     @settings(max_examples=200)
@@ -356,37 +363,37 @@ items = { $count ->
 class TestEdgeCases:
     """Test edge cases for locale formatting."""
 
-    @pytest.mark.parametrize("locale_code", sorted(SUPPORTED_LOCALES))
+    @pytest.mark.parametrize("locale_code", sorted(TEST_LOCALES))
     def test_zero_formatting(self, locale_code: str) -> None:
         """Zero formats correctly in all locales."""
-        ctx = LocaleContext(locale_code)
+        ctx = LocaleContext.create_or_raise(locale_code)
         result = ctx.format_number(0)
         assert isinstance(result, str)
         # Should contain zero digit (Latin or Arabic-Indic)
         assert "0" in result or "\u0660" in result
 
-    @pytest.mark.parametrize("locale_code", sorted(SUPPORTED_LOCALES))
+    @pytest.mark.parametrize("locale_code", sorted(TEST_LOCALES))
     def test_negative_number_formatting(self, locale_code: str) -> None:
         """Negative numbers format correctly in all locales."""
-        ctx = LocaleContext(locale_code)
+        ctx = LocaleContext.create_or_raise(locale_code)
         result = ctx.format_number(-123.45)
         assert isinstance(result, str)
         # Should contain negative sign (hyphen-minus or Unicode minus sign)
         assert "-" in result or "\u2212" in result
 
-    @pytest.mark.parametrize("locale_code", sorted(SUPPORTED_LOCALES))
+    @pytest.mark.parametrize("locale_code", sorted(TEST_LOCALES))
     def test_large_number_formatting(self, locale_code: str) -> None:
         """Large numbers format correctly in all locales."""
-        ctx = LocaleContext(locale_code)
+        ctx = LocaleContext.create_or_raise(locale_code)
         result = ctx.format_number(1234567890, use_grouping=True)
         assert isinstance(result, str)
         # Should be reasonably formatted
         assert len(result) >= 10  # Digits plus separators
 
-    @pytest.mark.parametrize("locale_code", sorted(SUPPORTED_LOCALES))
+    @pytest.mark.parametrize("locale_code", sorted(TEST_LOCALES))
     def test_fraction_only_number(self, locale_code: str) -> None:
         """Fractional numbers format correctly in all locales."""
-        ctx = LocaleContext(locale_code)
+        ctx = LocaleContext.create_or_raise(locale_code)
         result = ctx.format_number(0.123, minimum_fraction_digits=3)
         assert isinstance(result, str)
         assert "0" in result or "\u0660" in result
@@ -413,7 +420,7 @@ class TestRTLLocales:
 
     def test_arabic_datetime_format(self) -> None:
         """Arabic datetime formatting works."""
-        ctx = LocaleContext("ar")
+        ctx = LocaleContext.create_or_raise("ar")
         dt = datetime(2025, 10, 27, tzinfo=UTC)
         result = ctx.format_datetime(dt, date_style="long")
         assert isinstance(result, str)

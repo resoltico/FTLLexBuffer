@@ -3,26 +3,27 @@
 Python 3.13+. Minimal external dependencies (returns, Babel).
 """
 
-from __future__ import annotations
-
 import logging
-from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from collections.abc import Callable, Mapping
+from typing import TYPE_CHECKING
 
 from ftllexbuffer.diagnostics import (
     Diagnostic,
     DiagnosticCode,
     ErrorTemplate,
+    FluentCyclicReferenceError,
     FluentError,
     FluentReferenceError,
-    FluentResolutionError,
     FluentSyntaxError,
+    ValidationError,
+    ValidationResult,
+    ValidationWarning,
 )
 from ftllexbuffer.introspection import extract_variables, introspect_message
 from ftllexbuffer.runtime.cache import FormatCache
 from ftllexbuffer.runtime.functions import FUNCTION_REGISTRY
 from ftllexbuffer.runtime.locale_context import LocaleContext
-from ftllexbuffer.runtime.resolver import FluentResolver
+from ftllexbuffer.runtime.resolver import FluentResolver, FluentValue
 from ftllexbuffer.syntax import Junk, Message, Term
 from ftllexbuffer.syntax.ast import MessageReference, TermReference
 from ftllexbuffer.syntax.parser import FluentParserV1
@@ -39,125 +40,21 @@ class _ReferenceExtractor(ASTVisitor):
 
     def __init__(self) -> None:
         """Initialize reference collector."""
+        super().__init__()
         self.message_refs: set[str] = set()
         self.term_refs: set[str] = set()
 
-    def visit_MessageReference(self, node: MessageReference) -> None:  # noqa: N802
+    def visit_MessageReference(self, node: MessageReference) -> MessageReference:  # noqa: N802
         """Collect message reference."""
         self.message_refs.add(node.id.name)
-        # v0.9.0: No need to call super() - generic_visit handles traversal automatically
         self.generic_visit(node)
+        return node
 
-    def visit_TermReference(self, node: TermReference) -> None:  # noqa: N802
+    def visit_TermReference(self, node: TermReference) -> TermReference:  # noqa: N802
         """Collect term reference."""
         self.term_refs.add(node.id.name)
-        # v0.9.0: No need to call super() - generic_visit handles traversal automatically
         self.generic_visit(node)
-
-
-@dataclass(frozen=True, slots=True)
-class ValidationError:
-    """Structured syntax error from FTL validation.
-
-    v0.9.0: Replaces list[Junk] for better separation of concerns.
-
-    Attributes:
-        code: Error code (e.g., "parse-error", "malformed-entry")
-        message: Human-readable error message
-        content: The unparseable FTL content
-        line: Line number where error occurred (1-indexed, optional)
-        column: Column number where error occurred (1-indexed, optional)
-    """
-
-    code: str
-    message: str
-    content: str
-    line: int | None = None
-    column: int | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class ValidationWarning:
-    """Structured semantic warning from FTL validation.
-
-    v0.9.0: Replaces list[str] for better structure and error codes.
-
-    Attributes:
-        code: Warning code (e.g., "duplicate-id", "undefined-reference")
-        message: Human-readable warning message
-        context: Additional context (e.g., the duplicate ID name)
-    """
-
-    code: str
-    message: str
-    context: str | None = None
-
-
-@dataclass
-class ValidationResult:
-    """Result of FTL validation.
-
-    v0.9.0: errors and warnings now use structured types instead of Junk/str.
-
-    Returned by FluentBundle.validate_resource() to provide feedback
-    about FTL source code before adding it to the bundle.
-
-    Performs two levels of validation:
-    - Syntax validation (errors): Parse failures, malformed FTL
-    - Semantic validation (warnings): Duplicate IDs, messages without values,
-      undefined references, circular dependencies
-
-    Attributes:
-        errors: List of structured validation errors
-        warnings: List of structured validation warnings
-
-    Example:
-        >>> bundle = FluentBundle("en")
-        >>> result = bundle.validate_resource("hello = Hello")
-        >>> result.is_valid
-        True
-        >>> result.error_count
-        0
-        >>> result.warning_count
-        0
-        >>>
-        >>> # Duplicate IDs trigger warnings
-        >>> result = bundle.validate_resource("msg = A\\nmsg = B")
-        >>> result.is_valid
-        True  # No syntax errors
-        >>> result.warning_count
-        1  # Semantic warning about duplicate
-    """
-
-    errors: list[ValidationError]
-    warnings: list[ValidationWarning]
-
-    @property
-    def is_valid(self) -> bool:
-        """Check if validation passed (no errors).
-
-        Returns:
-            True if no errors found
-        """
-        return len(self.errors) == 0
-
-    @property
-    def error_count(self) -> int:
-        """Get number of errors found.
-
-        Returns:
-            Count of syntax errors
-        """
-        return len(self.errors)
-
-    @property
-    def warning_count(self) -> int:
-        """Get number of warnings found.
-
-        Returns:
-            Count of warnings
-        """
-        return len(self.warnings)
+        return node
 
 
 class FluentBundle:
@@ -166,7 +63,6 @@ class FluentBundle:
     Main public API for Fluent localization. Aligned with Mozilla python-fluent
     error handling that returns (result, errors) tuples.
 
-    v0.9.0: Added __slots__ for memory efficiency.
 
     Examples:
         >>> bundle = FluentBundle("lv_LV")
@@ -302,7 +198,6 @@ class FluentBundle:
     def __repr__(self) -> str:
         """Return string representation for debugging.
 
-        v0.9.0: Added for better REPL and debugging experience.
 
         Returns:
             String representation showing locale and loaded messages count
@@ -346,8 +241,12 @@ class FluentBundle:
             - bundle.locale: The original locale code passed to FluentBundle
             - LocaleContext.babel_locale: The underlying Babel Locale object
         """
-        ctx = LocaleContext(self._locale)
-        return str(ctx.babel_locale)
+        match LocaleContext.create(self._locale):
+            case LocaleContext() as ctx:
+                return str(ctx.babel_locale)
+            case error:
+                logger.warning("Failed to get babel locale: %s", error)
+                return f"<invalid: {self._locale}>"
 
     @staticmethod
     def _detect_circular_references(
@@ -439,7 +338,7 @@ class FluentBundle:
                             )
                         )
 
-    def add_resource(  # pylint: disable=too-many-branches
+    def add_resource(
         self, source: str, *, source_path: str | None = None
     ) -> None:
         """Add FTL resource to bundle.
@@ -514,7 +413,6 @@ class FluentBundle:
                 logger.error("Failed to parse resource: %s", e)
             raise
 
-    # pylint: disable-next=too-many-locals,too-many-branches
     def validate_resource(self, source: str) -> ValidationResult:
         """Validate FTL resource without adding to bundle.
 
@@ -683,7 +581,9 @@ class FluentBundle:
 
             logger.debug("Validated resource: %d errors, %d warnings", len(errors), len(warnings))
 
-            return ValidationResult(errors=errors, warnings=warnings)
+            return ValidationResult(
+                errors=tuple(errors), warnings=tuple(warnings), annotations=()
+            )
 
         except FluentSyntaxError as e:
             # Critical parse error - return as single error
@@ -694,12 +594,12 @@ class FluentBundle:
                 message=str(e),
                 content=str(e),
             )
-            return ValidationResult(errors=[error], warnings=[])
+            return ValidationResult(errors=(error,), warnings=(), annotations=())
 
     def format_pattern(
         self,
         message_id: str,
-        args: dict[str, Any] | None = None,
+        args: Mapping[str, FluentValue] | None = None,
         *,
         attribute: str | None = None,
     ) -> tuple[str, list[FluentError]]:
@@ -795,17 +695,25 @@ class FluentBundle:
 
             return (result, errors)
 
-        except Exception as e:  # pylint: disable=broad-exception-caught
-            # Unexpected: catch-all for truly unexpected errors
-            # (resolver should handle everything, but be defensive)
-            logger.error("Unexpected error resolving '%s': %s", message_id, e, exc_info=True)
-            # Wrap in FluentResolutionError to maintain type safety
-            resolution_error = FluentResolutionError(f"Unexpected error: {e}")
-            # Don't cache unexpected errors
-            return (f"{{{message_id}}}", [resolution_error])
+        except RecursionError:
+            # Circular reference detected (message/term references form a cycle)
+            # This is a known error type that can occur with malformed FTL resources
+            logger.error("Circular reference detected in message '%s'", message_id)
+            error = FluentCyclicReferenceError(f"Circular reference in {message_id}")
+            # Don't cache circular reference errors
+            return (f"{{{message_id}}}", [error])
+
+        except (KeyError, AttributeError, RuntimeError) as e:
+            # Resolver raised unexpected error (missing variable, invalid attribute, etc.)
+            # Treat as resolution error and return fallback
+            logger.error("Resolution error for '%s': %s", message_id, e)
+            from ftllexbuffer.diagnostics import FluentResolutionError  # noqa: PLC0415
+
+            error_obj = FluentResolutionError(f"Resolution failed: {e}")
+            return (f"{{{message_id}}}", [error_obj])
 
     def format_value(
-        self, message_id: str, args: dict[str, Any] | None = None
+        self, message_id: str, args: dict[str, FluentValue] | None = None
     ) -> tuple[str, list[FluentError]]:
         """Format message to string (alias for format_pattern without attribute access).
 
@@ -913,7 +821,7 @@ class FluentBundle:
             for message_id in self.get_message_ids()
         }
 
-    def introspect_message(self, message_id: str) -> MessageIntrospection:
+    def introspect_message(self, message_id: str) -> "MessageIntrospection":
         """Get complete introspection data for a message.
 
         Returns comprehensive metadata about variables, functions, and references
@@ -940,12 +848,12 @@ class FluentBundle:
 
         return introspect_message(self._messages[message_id])
 
-    def add_function(self, name: str, func: Any) -> None:
+    def add_function(self, name: str, func: Callable[..., str]) -> None:
         """Add custom function to bundle.
 
         Args:
             name: Function name (UPPERCASE by convention)
-            func: Callable function
+            func: Callable function that returns a string
 
         Example:
             >>> def CUSTOM(value):

@@ -1,33 +1,26 @@
 """FTLLexBuffer - Best-in-class Python implementation of FTL (Fluent Template Language).
 
 Production-ready FTL parser with 100% test coverage, type safety, and battle-tested reliability.
-Supports multilingual applications with English, Latvian, German, and Polish locales.
+Supports multilingual applications with comprehensive locale support.
 
-Public API - Core:
+Essential Public API:
     FluentBundle - Single-locale message formatting
     FluentLocalization - Multi-locale orchestration with fallback chains
-    PathResourceLoader - Disk-based resource loader
-    ResourceLoader - Protocol for custom resource loaders
     parse_ftl - Parse FTL source to AST
     serialize_ftl - Serialize AST to FTL source
 
-Public API - Exceptions:
-    FluentError - Base exception
-    FluentSyntaxError - Parse error
-    FluentReferenceError - Unknown message/term
-    FluentResolutionError - Runtime error
-    FluentCyclicReferenceError - Circular reference
+    FluentError - Base exception class
+    FluentSyntaxError - Parse errors
+    FluentReferenceError - Unknown message/term references
+    FluentResolutionError - Runtime resolution errors
 
-Public API - AST Manipulation:
-    Resource, Message, Term, Comment, Junk - AST entry types
-    Pattern, TextElement, Placeable - Pattern elements
-    VariableReference, MessageReference, FunctionReference - Expression types
-    ASTVisitor, ASTTransformer - Visitor pattern for AST traversal
-
-Public API - Advanced:
-    FluentParserV1 - Direct parser access
-    FUNCTION_REGISTRY - Global function registry
-    MessageIntrospection - Message metadata extraction
+Advanced Features (via submodules):
+    ftllexbuffer.syntax.ast - All AST node types (Resource, Message, Term, Pattern, etc.)
+    ftllexbuffer.introspection - Message introspection and variable extraction
+    ftllexbuffer.parsing - Bidirectional parsing (parse_number, parse_date, parse_currency, etc.)
+    ftllexbuffer.diagnostics - All error types and validation results
+    ftllexbuffer.localization - Resource loaders and type aliases
+    ftllexbuffer.runtime.functions - Formatting functions (number_format, datetime_format, etc.)
 
 Example - Single locale:
     >>> from ftllexbuffer import FluentBundle
@@ -58,83 +51,27 @@ Example - Multi-locale fallback:
     ('Sveiki!', [])
     >>> l10n.format_value('goodbye')  # Falls back to English
     ('Goodbye!', [])
+
+Example - AST manipulation:
+    >>> from ftllexbuffer import parse_ftl
+    >>> from ftllexbuffer.syntax.ast import Resource, Message
+    >>>
+    >>> resource = parse_ftl('hello = World')
+    >>> assert isinstance(resource, Resource)
+    >>> assert isinstance(resource.entries[0], Message)
 """
 
-from __future__ import annotations
-
+# Essential Public API - Minimal exports for clean namespace
 from .diagnostics import (
-    FluentCyclicReferenceError,
     FluentError,
-    FluentParseError,
     FluentReferenceError,
     FluentResolutionError,
     FluentSyntaxError,
 )
-from .enums import CommentType, ReferenceKind, VariableContext
-from .introspection import (
-    FunctionCallInfo,
-    MessageIntrospection,
-    ReferenceInfo,
-    VariableInfo,
-    extract_variables,
-    introspect_message,
-)
-from .localization import (
-    FluentLocalization,
-    FTLSource,
-    LocaleCode,
-    MessageId,
-    PathResourceLoader,
-    ResourceId,
-    ResourceLoader,
-)
-
-# Parsing API - Bi-directional localization (v0.8.0 - tuple return types)
-from .parsing import (
-    has_parse_errors,
-    parse_currency,
-    parse_date,
-    parse_datetime,
-    parse_decimal,
-    parse_number,
-)
+from .localization import FluentLocalization
 from .runtime import FluentBundle
-from .runtime.bundle import ValidationError, ValidationResult, ValidationWarning
-from .runtime.function_bridge import FunctionRegistry, FunctionSignature
-from .runtime.functions import (
-    FUNCTION_REGISTRY,
-    currency_format,
-    datetime_format,
-    number_format,
-)
 from .syntax import parse as parse_ftl
 from .syntax import serialize as serialize_ftl
-from .syntax.ast import (
-    Annotation,
-    Attribute,
-    CallArguments,
-    Comment,
-    FunctionReference,
-    Identifier,
-    Junk,
-    Message,
-    MessageReference,
-    NamedArgument,
-    NumberLiteral,
-    Pattern,
-    Placeable,
-    Resource,
-    SelectExpression,
-    Span,
-    StringLiteral,
-    Term,
-    TermReference,
-    TextElement,
-    VariableReference,
-    Variant,
-)
-from .syntax.parser import FluentParserV1
-from .syntax.visitor import ASTTransformer, ASTVisitor
 
 # Version information - Auto-populated from package metadata
 # SINGLE SOURCE OF TRUTH: pyproject.toml [project] version
@@ -159,90 +96,22 @@ __spec_url__ = "https://github.com/projectfluent/fluent/blob/master/spec/fluent.
 # Encoding requirements per Fluent spec recommendations.md
 __recommended_encoding__ = "UTF-8"  # Per spec: "The recommended encoding for Fluent files is UTF-8"
 
-# ruff: noqa: RUF022 - __all__ organized by category for readability, not alphabetically
+# Essential Public API - Reduced from 84 to 8 exports
+# Advanced features available via explicit submodule imports
 __all__ = [
-    # Core API - Message formatting
+    # Core API
     "FluentBundle",
-    "FluentLocalization",
-    "ValidationResult",
-    "ValidationError",
-    "ValidationWarning",
-    # Resource loading
-    "PathResourceLoader",
-    "ResourceLoader",
-    # Type aliases for user code annotations
-    "MessageId",
-    "LocaleCode",
-    "ResourceId",
-    "FTLSource",
-    # Enums - v0.9.0 type-safe constants
-    "CommentType",
-    "VariableContext",
-    "ReferenceKind",
-    # Parsing and serialization
-    "FluentParserV1",
-    "parse_ftl",
-    "serialize_ftl",
     # Exception hierarchy
     "FluentError",
-    "FluentParseError",
-    "FluentSyntaxError",
+    "FluentLocalization",
     "FluentReferenceError",
     "FluentResolutionError",
-    "FluentCyclicReferenceError",
-    # Introspection
-    "MessageIntrospection",
-    "VariableInfo",
-    "FunctionCallInfo",
-    "ReferenceInfo",
-    "extract_variables",
-    "introspect_message",
-    # Advanced - Function registry and formatting
-    "FunctionRegistry",
-    "FunctionSignature",
-    "FUNCTION_REGISTRY",
-    "number_format",
-    "datetime_format",
-    "currency_format",
-    # Parsing API - Bi-directional (v0.8.0 - tuple return types)
-    "has_parse_errors",
-    "parse_number",
-    "parse_decimal",
-    "parse_date",
-    "parse_datetime",
-    "parse_currency",
-    # AST - Core entry types
-    "Resource",
-    "Message",
-    "Term",
-    "Attribute",
-    "Comment",
-    "Junk",
-    # AST - Pattern elements
-    "Pattern",
-    "TextElement",
-    "Placeable",
-    # AST - Expression types
-    "VariableReference",
-    "MessageReference",
-    "TermReference",
-    "FunctionReference",
-    "SelectExpression",
-    "Variant",
-    "NumberLiteral",
-    "StringLiteral",
-    # AST - Support types
-    "Identifier",
-    "CallArguments",
-    "NamedArgument",
-    "Span",
-    "Annotation",
-    # AST - Visitor pattern
-    "ASTVisitor",
-    "ASTTransformer",
-    # Module constants
-    "__version__",
+    "FluentSyntaxError",
     "__fluent_spec_version__",
-    "__spec_url__",
     "__recommended_encoding__",
+    "__spec_url__",
+    # Module metadata
+    "__version__",
+    "parse_ftl",
+    "serialize_ftl",
 ]

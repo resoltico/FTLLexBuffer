@@ -4,8 +4,6 @@ Defines error codes, source spans, and diagnostic messages.
 Python 3.13+. Zero external dependencies.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from enum import Enum
 from typing import Literal

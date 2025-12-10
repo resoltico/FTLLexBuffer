@@ -27,11 +27,6 @@ v0.9.0 Breaking Change:
     more Pythonic, and uses only stdlib types.
 """
 
-# Pylint suppression: Monolithic parser module by design
-# pylint: disable=too-many-lines
-
-from __future__ import annotations
-
 import logging
 
 from ftllexbuffer.enums import CommentType
@@ -70,7 +65,6 @@ logger = logging.getLogger(__name__)
 class FluentParserV1:
     """Fluent FTL parser using immutable cursor pattern.
 
-    v0.9.0: Added __slots__ for memory efficiency.
     """
 
     __slots__ = ()
@@ -136,7 +130,6 @@ class FluentParserV1:
                 cursor = message_parse.cursor
             else:
                 # Parse error - create Junk entry and continue (robustness principle)
-                # v0.9.0: Detailed error info removed with Result monad elimination
                 # Junk creation still preserves robustness
                 junk_start = cursor.pos
 
@@ -148,7 +141,6 @@ class FluentParserV1:
                 junk_content = cursor.source[junk_start : cursor.pos]
                 junk_span = Span(start=junk_start, end=cursor.pos)
 
-                # v0.9.0: Create generic annotation (detailed error info removed with Result monad)
                 annotation = Annotation(
                     code="E0099",  # Generic parse error code
                     message="Parse error",
@@ -199,8 +191,7 @@ class FluentParserV1:
             saved_cursor = cursor
 
             # Skip leading spaces on THIS line only (not newlines)
-            while not cursor.is_eof and cursor.current == " ":
-                cursor = cursor.advance()
+            cursor = cursor.skip_spaces()
 
             if cursor.is_eof:
                 break
@@ -267,7 +258,6 @@ class FluentParserV1:
     def _parse_number_value(num_str: str) -> int | float:
         """Parse number string to int or float.
 
-        v0.9.0: Helper for NumberLiteral construction.
 
         Args:
             num_str: Number string from _parse_number
@@ -347,9 +337,7 @@ class FluentParserV1:
         Design:
             Immutable cursor ensures termination (same proof as _skip_blank).
         """
-        while not cursor.is_eof and cursor.current == " ":
-            cursor = cursor.advance()  # Always makes progress
-        return cursor
+        return cursor.skip_spaces()  # Always makes progress
 
     def _skip_blank(self, cursor: Cursor) -> Cursor:
         """Skip blank (spaces and line endings, per FTL spec).
@@ -375,9 +363,7 @@ class FluentParserV1:
         Design:
             Immutable cursor ensures termination.
         """
-        while not cursor.is_eof and cursor.current in (" ", "\n", "\r"):
-            cursor = cursor.advance()  # Always makes progress
-        return cursor
+        return cursor.skip_whitespace()  # Always makes progress
 
     def _is_indented_continuation(self, cursor: Cursor) -> bool:
         """Check if the next line is an indented pattern continuation.
@@ -751,7 +737,6 @@ class FluentParserV1:
 
         pattern_parse = pattern_result
 
-        # v0.9.0: Variant no longer has span (only top-level entries have spans)
         # Don't skip trailing whitespace - let select expression parser handle it
         variant = Variant(key=variant_key, value=pattern_parse.value, default=is_default)
         return ParseResult(variant, pattern_parse.cursor)
@@ -816,7 +801,6 @@ class FluentParserV1:
         if default_count > 1:
             return None  # "Select expression must have exactly one default variant, found multiple"
 
-        # v0.9.0: SelectExpression no longer has span (only top-level entries have spans)
         select_expr = SelectExpression(selector=selector, variants=tuple(variants))
         return ParseResult(select_expr, cursor)
 
@@ -1042,7 +1026,7 @@ class FluentParserV1:
         func_ref = FunctionReference(id=Identifier(func_name), arguments=args_parse.value)
         return ParseResult(func_ref, cursor)
 
-    def _parse_inline_expression(  # noqa: PLR0911, PLR0915  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
+    def _parse_inline_expression(  # noqa: PLR0911, PLR0915
         self, cursor: Cursor
     ) -> ParseResult[
         VariableReference
@@ -1321,8 +1305,7 @@ class FluentParserV1:
                     if not cursor.is_eof and cursor.current == "\n":
                         cursor = cursor.advance()  # Handle \r\n
                     # Skip leading spaces (continuation indent)
-                    while not cursor.is_eof and cursor.current == " ":
-                        cursor = cursor.advance()
+                    cursor = cursor.skip_spaces()
                     # Add a space to represent the line break in the pattern value
                     if elements and not isinstance(elements[-1], Placeable):
                         # Append space to previous text element
@@ -1504,8 +1487,7 @@ class FluentParserV1:
             # blank allows spaces and newlines, but NOT tabs
             saved_cursor = cursor
             # Skip leading spaces on this line (NOT tabs per spec)
-            while not cursor.is_eof and cursor.current == " ":
-                cursor = cursor.advance()
+            cursor = cursor.skip_spaces()
 
             if cursor.is_eof or cursor.current != ".":
                 cursor = saved_cursor
@@ -1598,12 +1580,11 @@ class FluentParserV1:
 
         pattern_parse = pattern_result
 
-        # v0.9.0: Attribute no longer has span (only top-level entries have spans)
         attribute = Attribute(id=Identifier(id_parse.value), value=pattern_parse.value)
 
         return ParseResult(attribute, pattern_parse.cursor)
 
-    def _parse_term(  # pylint: disable=too-many-branches
+    def _parse_term(
         self, cursor: Cursor
     ) -> ParseResult[Term] | None:
         """Parse term definition (-term-id = pattern).
@@ -1660,8 +1641,7 @@ class FluentParserV1:
                     cursor = cursor.advance()
                 # Skip leading indentation before parsing
                 # _parse_pattern will handle continuation lines itself
-                while not cursor.is_eof and cursor.current == " ":
-                    cursor = cursor.advance()
+                cursor = cursor.skip_spaces()
             # Else: Empty pattern - leave cursor at newline, _parse_pattern will handle it
 
         # Parse pattern
@@ -1692,8 +1672,7 @@ class FluentParserV1:
             # Per spec: Attribute ::= line_end blank? "." ...
             # blank can contain spaces, but NOT tabs
             saved_cursor = cursor
-            while not cursor.is_eof and cursor.current == " ":
-                cursor = cursor.advance()
+            cursor = cursor.skip_spaces()
 
             if cursor.is_eof or cursor.current != ".":
                 # Not an attribute, restore cursor and break

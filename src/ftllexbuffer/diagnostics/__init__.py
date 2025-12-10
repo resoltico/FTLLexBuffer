@@ -6,8 +6,6 @@ Inspired by Rust compiler diagnostics and Elm error messages.
 Python 3.13+. Zero external dependencies.
 """
 
-from __future__ import annotations
-
 from .codes import Diagnostic, DiagnosticCode, SourceSpan
 from .errors import (
     FluentCyclicReferenceError,
@@ -18,6 +16,7 @@ from .errors import (
     FluentSyntaxError,
 )
 from .templates import ErrorTemplate
+from .validation import ValidationError, ValidationResult, ValidationWarning
 
 __all__ = [
     "Diagnostic",
@@ -30,4 +29,7 @@ __all__ = [
     "FluentResolutionError",
     "FluentSyntaxError",
     "SourceSpan",
+    "ValidationError",
+    "ValidationResult",
+    "ValidationWarning",
 ]

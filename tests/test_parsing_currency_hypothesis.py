@@ -490,9 +490,10 @@ class TestCurrencyInferFromLocale:
         """COVERAGE: infer_from_locale with unmapped locale returns error."""
         currency_str = "$100.00"
 
-        # sv_SE not in mapping
+        # Use a locale without territory (just language code) - won't be in mapping
+        # Base locales like "en", "de" have no territory and thus no currency
         result, errors = parse_currency(
-            currency_str, "sv_SE", infer_from_locale=True
+            currency_str, "en", infer_from_locale=True
         )
         assert len(errors) > 0
         assert result is None

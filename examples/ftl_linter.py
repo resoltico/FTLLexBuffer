@@ -24,16 +24,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from ftllexbuffer import (
-    ASTVisitor,
+from ftllexbuffer import parse_ftl
+from ftllexbuffer.syntax.ast import (
     FunctionReference,
     Message,
     MessageReference,
     Resource,
     TermReference,
     VariableReference,
-    parse_ftl,
 )
+from ftllexbuffer.syntax.visitor import ASTVisitor
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,6 +51,7 @@ class FTLLinterVisitor(ASTVisitor):
 
     def __init__(self) -> None:
         """Initialize linter state."""
+        super().__init__()
         self.issues: list[LintIssue] = []
         self.message_ids: set[str] = set()
         self.current_message_id: str | None = None

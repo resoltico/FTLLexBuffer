@@ -225,7 +225,7 @@ valid-message = Hello
         result = bundle.validate_resource(ftl)
 
         # Valid FTL should have no errors or warnings
-        assert result.errors == []
+        assert result.errors == ()
 
     @given(
         msg_id=ftl_identifiers,
@@ -314,8 +314,8 @@ class TestValidationErrorHandling:
 
         result = bundle.validate_resource("")
 
-        assert result.errors == []
-        assert result.warnings == []
+        assert result.errors == ()
+        assert result.warnings == ()
 
     def test_validate_whitespace_only_resource(self) -> None:
         """Validating whitespace-only resource handles gracefully."""
@@ -327,8 +327,8 @@ class TestValidationErrorHandling:
         # What matters is that it returns a ValidationResult without crashing
         assert hasattr(result, "errors")
         assert hasattr(result, "warnings")
-        assert isinstance(result.errors, list)
-        assert isinstance(result.warnings, list)
+        assert isinstance(result.errors, tuple)
+        assert isinstance(result.warnings, tuple)
 
     @given(valid_ftl=st.text(min_size=1))  # Remove arbitrary max
     @settings(suppress_health_check=[HealthCheck.function_scoped_fixture])
@@ -341,8 +341,8 @@ class TestValidationErrorHandling:
 
         assert hasattr(result, "errors")
         assert hasattr(result, "warnings")
-        assert isinstance(result.errors, list)
-        assert isinstance(result.warnings, list)
+        assert isinstance(result.errors, tuple)
+        assert isinstance(result.warnings, tuple)
 
 
 # ============================================================================
@@ -518,8 +518,8 @@ class TestBundleEdgeCases:
 
         # Validate empty resource
         result = bundle.validate_resource("")
-        assert result.errors == []
-        assert result.warnings == []
+        assert result.errors == ()
+        assert result.warnings == ()
 
         # Format non-existent message returns fallback
         result_str, errors = bundle.format_value("nonexistent")
@@ -771,9 +771,9 @@ class TestVariableSubstitution:
         bundle.add_resource(f"{msg_id} = {vars_ftl}")
 
         # Build args dict
-        args = {f"var{i}": i for i in range(var_count)}
+        args: dict[str, int | str | float | bool] = {f"var{i}": i for i in range(var_count)}
 
-        result, errors = bundle.format_value(msg_id, args)
+        result, errors = bundle.format_value(msg_id, args)  # type: ignore[arg-type]
 
         assert errors == []
         # All variable values should appear
@@ -1394,7 +1394,9 @@ class TestArgumentTypeHandling:
         bundle = FluentBundle("en")
         bundle.add_resource(f"{msg_id} = {{ ${var_name} }}")
 
-        result, _errors = bundle.format_value(msg_id, {var_name: list_value})
+        result, _errors = bundle.format_value(
+            msg_id, {var_name: list_value}  # type: ignore[dict-item]
+        )
 
         # Lists may not be supported, but shouldn't crash
         assert isinstance(result, str)
@@ -1506,7 +1508,7 @@ class TestValidationProperties:
         result = bundle.validate_resource(f"{msg_id} = {text}")
 
         # Valid FTL should have no errors
-        assert result.errors == []
+        assert result.errors == ()
 
     @given(
         count=st.integers(min_value=1, max_value=10),
@@ -1522,7 +1524,7 @@ class TestValidationProperties:
         result = bundle.validate_resource(ftl)
 
         # All should validate successfully
-        assert result.errors == []
+        assert result.errors == ()
 
 
 # ============================================================================
@@ -2128,9 +2130,9 @@ msg = { -outer }
         bundle.add_resource(f"{msg_id} = {placeables}")
 
         # Provide all variables
-        args = {f"var{i}": f"V{i}" for i in range(var_count)}
+        args: dict[str, str | int | float | bool] = {f"var{i}": f"V{i}" for i in range(var_count)}
 
-        result, errors = bundle.format_value(msg_id, args)
+        result, errors = bundle.format_value(msg_id, args)  # type: ignore[arg-type]
 
         assert errors == []
         # All values should appear
@@ -2173,7 +2175,7 @@ msg = { $variant ->
 
         # Build pattern: text0 { $v0 } text1 { $v1 } ...
         pattern_parts = []
-        args = {}
+        args: dict[str, str | int | float | bool] = {}
         for i, text in enumerate(text_segments):
             pattern_parts.append(text)
             if i < len(text_segments) - 1:
@@ -2183,7 +2185,7 @@ msg = { $variant ->
         pattern = " ".join(pattern_parts)
         bundle.add_resource(f"{msg_id} = {pattern}")
 
-        result, errors = bundle.format_value(msg_id, args)
+        result, errors = bundle.format_value(msg_id, args)  # type: ignore[arg-type]
 
         assert errors == []
         # All text segments should appear

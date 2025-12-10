@@ -11,7 +11,8 @@ FTLLexBuffer is built with modern Python 3.13+ features and provides full `mypy 
 ### Basic Type-Safe Function
 
 ```python
-from ftllexbuffer import FluentBundle, MessageId
+from ftllexbuffer import FluentBundle
+from ftllexbuffer.localization import MessageId
 
 def format_message(bundle: FluentBundle, msg_id: MessageId) -> str:
     """Format message with proper type annotations."""
@@ -46,7 +47,7 @@ type FTLSource = str
 
 **Your Code**:
 ```python
-from ftllexbuffer import MessageId, LocaleCode, FTLSource
+from ftllexbuffer.localization import MessageId, LocaleCode, FTLSource
 
 # More descriptive than plain 'str'
 def load_translations(locale: LocaleCode, source: FTLSource) -> None:
@@ -121,7 +122,7 @@ for entry in resource.entries:
 ### Core Type Aliases
 
 ```python
-from ftllexbuffer import MessageId, LocaleCode, ResourceId, FTLSource
+from ftllexbuffer.localization import MessageId, LocaleCode, ResourceId, FTLSource
 
 # MessageId - Message identifiers
 msg_id: MessageId = "welcome"
@@ -589,7 +590,8 @@ class ErrorReport:
 from __future__ import annotations
 
 from typing import Generic, TypeVar
-from ftllexbuffer import FluentBundle, MessageId
+from ftllexbuffer import FluentBundle
+from ftllexbuffer.localization import MessageId
 
 T = TypeVar("T")
 
@@ -681,7 +683,7 @@ ignore_missing_imports = false
 ### DO: Use Type Aliases
 
 ```python
-from ftllexbuffer import MessageId, LocaleCode
+from ftllexbuffer.localization import MessageId, LocaleCode
 
 # ✅ Good - descriptive types
 def format_message(msg_id: MessageId, locale: LocaleCode) -> str:
@@ -799,7 +801,7 @@ if Message.guard(msg):
 ---
 
 **Type Hints Guide Last Updated**: December 9, 2025
-**FTLLexBuffer Version**: 0.9.0
+**FTLLexBuffer Version**: 0.10.0
 **Python Version**: 3.13+
 
 **See Also**:

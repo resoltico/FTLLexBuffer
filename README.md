@@ -190,18 +190,23 @@ Quick reference for common terms:
 
 ```python
 # Context 1: FTL Resource (AST)
-from ftllexbuffer import parse_ftl, Resource
+from ftllexbuffer import parse_ftl
+from ftllexbuffer.syntax.ast import Resource
+
 resource: Resource = parse_ftl(ftl_source)  # AST root node
 for entry in resource.entries:  # Traverse AST
     print(entry)
 
 # Context 2: FTL source text
 from ftllexbuffer import FluentBundle
+
 bundle = FluentBundle("en")
 bundle.add_resource(ftl_source)  # ftl_source is a string
 
 # Context 3: Resource loader
-from ftllexbuffer import PathResourceLoader, FluentLocalization
+from ftllexbuffer import FluentLocalization
+from ftllexbuffer.localization import PathResourceLoader
+
 loader = PathResourceLoader("locales/{locale}")
 l10n = FluentLocalization(['lv', 'en'], ['main.ftl'], loader)
 ```
@@ -282,7 +287,7 @@ FTLLexBuffer provides **full bi-directional localization** - both formatting (da
 ```python
 from ftllexbuffer import FluentBundle
 from ftllexbuffer.parsing import parse_decimal, parse_currency
-from ftllexbuffer.parsing.guards import has_parse_errors, is_valid_decimal, is_valid_currency
+from ftllexbuffer.parsing.guards import is_valid_decimal, is_valid_currency
 
 # Create bundle for Latvian locale
 bundle = FluentBundle("lv_LV", use_isolating=False)
@@ -297,13 +302,13 @@ print(formatted)  # "Cena: 1 234,56 €"
 # Parse user input back to data (user → data) - v0.8.0 tuple return
 user_input = "1 234,56"
 result, errors = parse_decimal(user_input, "lv_LV")
-if not has_parse_errors(errors) and is_valid_decimal(result):
+if not errors and is_valid_decimal(result):
     print(result)  # Decimal('1234.56')
 
 # Parse currency with automatic symbol detection - v0.8.0 tuple return
 user_input_currency = "1 234,56 €"
 result, errors = parse_currency(user_input_currency, "lv_LV")
-if not has_parse_errors(errors) and is_valid_currency(result):
+if not errors and is_valid_currency(result):
     amount, currency = result
     print(f"{amount} {currency}")  # Decimal('1234.56') EUR
 
@@ -462,7 +467,8 @@ print(result)  # "Checkout" (falls back to English)
 **Loading from disk**:
 
 ```python
-from ftllexbuffer import FluentLocalization, PathResourceLoader
+from ftllexbuffer import FluentLocalization
+from ftllexbuffer.localization import PathResourceLoader
 
 # Directory structure:
 #   locales/lv/ui.ftl
@@ -483,7 +489,8 @@ See [API.md - FluentLocalization](https://github.com/resoltico/ftllexbuffer/blob
 FTLLexBuffer is **fully type-safe** with `mypy --strict` compliance. Use provided type aliases for better IDE autocomplete and type checking:
 
 ```python
-from ftllexbuffer import FluentBundle, MessageId, LocaleCode, FTLSource
+from ftllexbuffer import FluentBundle
+from ftllexbuffer.localization import MessageId, LocaleCode, FTLSource
 
 def format_message(bundle: FluentBundle, msg_id: MessageId) -> str:
     """Format a message with error logging."""
@@ -501,7 +508,7 @@ def create_localized_bundle(locale: LocaleCode, ftl_source: FTLSource) -> Fluent
     return bundle
 ```
 
-**Available type aliases**:
+**Available type aliases** (from `ftllexbuffer.localization`):
 - `MessageId` - Message identifiers (type alias for `str`)
 - `LocaleCode` - Locale codes like "en_US", "lv_LV" (type alias for `str`)
 - `ResourceId` - Resource identifiers like "main.ftl" (type alias for `str`)

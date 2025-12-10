@@ -328,7 +328,8 @@ result = l10n.format_value('hello')
 #### FTLLexBuffer
 
 ```python
-from ftllexbuffer import FluentLocalization, PathResourceLoader
+from ftllexbuffer import FluentLocalization
+from ftllexbuffer.localization import PathResourceLoader
 
 # Similar API with resource loader
 loader = PathResourceLoader("locales/{locale}")
@@ -555,7 +556,8 @@ def format_message(bundle: FluentBundle, msg_id: str, args: Dict[str, Any]) -> s
 ### FTLLexBuffer (Full mypy --strict)
 
 ```python
-from ftllexbuffer import FluentBundle, MessageId, FluentError
+from ftllexbuffer import FluentBundle, FluentError
+from ftllexbuffer.localization import MessageId
 
 def format_message(bundle: FluentBundle, msg_id: MessageId, args: dict[str, object]) -> str:
     """Format message with error logging."""
@@ -636,13 +638,14 @@ bundle = FluentBundle('en-US')
 **Solution**:
 ```python
 # ❌ fluent.runtime
-from ftllexbuffer import FluentResource  # Doesn't exist
+from fluent.runtime import FluentResource  # Old library had wrapper class
 
 # ✅ FTLLexBuffer - no wrapper needed
 bundle.add_resource(ftl_source)  # Direct string
 
-# Or if you need AST manipulation
+# Or if you need AST manipulation (v0.10.0)
 from ftllexbuffer import parse_ftl
+from ftllexbuffer.syntax.ast import Resource
 resource_ast = parse_ftl(ftl_source)
 ```
 
@@ -761,7 +764,7 @@ from ftllexbuffer import (
 ---
 
 **Migration Guide Last Updated**: December 9, 2025
-**FTLLexBuffer Version**: 0.9.0
+**FTLLexBuffer Version**: 0.10.0
 **fluent.runtime Version Referenced**: 0.4.0
 
 **Note**: This guide covers migration from fluent.runtime to FTLLexBuffer v0.9.0. For v0.9.0 breaking changes from earlier FTLLexBuffer versions, see [CHANGELOG.md](CHANGELOG.md).

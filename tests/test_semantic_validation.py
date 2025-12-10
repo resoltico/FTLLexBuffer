@@ -8,8 +8,9 @@ Per spec: "The validation process may reject syntax which is well-formed."
 """
 
 
+from ftllexbuffer.diagnostics import ValidationResult
 from ftllexbuffer.syntax.parser import FluentParserV1
-from ftllexbuffer.syntax.validator import SemanticValidator, ValidationResult, validate
+from ftllexbuffer.syntax.validator import SemanticValidator, validate
 
 
 class TestValidationFramework:
@@ -19,7 +20,6 @@ class TestValidationFramework:
         """Test validator can be created."""
         validator = SemanticValidator()
         assert validator is not None
-        assert validator.errors == []
 
     def test_validate_empty_resource(self):
         """Empty resource should be valid."""

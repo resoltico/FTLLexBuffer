@@ -1,6 +1,5 @@
 """Number parsing functions with locale awareness.
 
-v0.8.0 BREAKING CHANGE: API aligned with formatting functions.
 - parse_number() returns tuple[float, list[FluentParseError]]
 - parse_decimal() returns tuple[Decimal, list[FluentParseError]]
 - Removed `strict` parameter - functions NEVER raise, errors returned in list
@@ -11,8 +10,6 @@ Thread-safe. Uses Babel for CLDR-compliant parsing.
 Python 3.13+.
 """
 
-from __future__ import annotations
-
 from decimal import Decimal, InvalidOperation
 
 from babel import Locale, UnknownLocaleError
@@ -21,6 +18,7 @@ from babel.numbers import parse_decimal as babel_parse_decimal
 
 from ftllexbuffer.diagnostics import FluentParseError
 from ftllexbuffer.diagnostics.templates import ErrorTemplate
+from ftllexbuffer.locale_utils import normalize_locale
 
 
 def parse_number(
@@ -29,8 +27,6 @@ def parse_number(
 ) -> tuple[float | None, list[FluentParseError]]:
     """Parse locale-aware number string to float.
 
-    v0.8.0 BREAKING CHANGE: Returns tuple instead of raising exceptions.
-    v0.9.0 BREAKING CHANGE: Returns None on failure instead of 0.0 sentinel.
 
     Args:
         value: Number string (e.g., "1 234,56" for lv_LV)
@@ -66,9 +62,7 @@ def parse_number(
     errors: list[FluentParseError] = []
 
     try:
-        # v0.9.0: Normalize locale format (en-US → en_US) for Babel
-        normalized_locale = locale_code.replace("-", "_")
-        locale = Locale.parse(normalized_locale)
+        locale = Locale.parse(normalize_locale(locale_code))
     except (UnknownLocaleError, ValueError):
         diagnostic = ErrorTemplate.parse_locale_unknown(locale_code)
         errors.append(
@@ -103,8 +97,6 @@ def parse_decimal(
 ) -> tuple[Decimal | None, list[FluentParseError]]:
     """Parse locale-aware number string to Decimal (financial precision).
 
-    v0.8.0 BREAKING CHANGE: Returns tuple instead of raising exceptions.
-    v0.9.0 BREAKING CHANGE: Returns None on failure instead of Decimal("0") sentinel.
 
     Use this for financial calculations where float precision loss
     would cause rounding errors.
@@ -149,9 +141,7 @@ def parse_decimal(
     errors: list[FluentParseError] = []
 
     try:
-        # v0.9.0: Normalize locale format (en-US → en_US) for Babel
-        normalized_locale = locale_code.replace("-", "_")
-        locale = Locale.parse(normalized_locale)
+        locale = Locale.parse(normalize_locale(locale_code))
     except (UnknownLocaleError, ValueError):
         diagnostic = ErrorTemplate.parse_locale_unknown(locale_code)
         errors.append(

@@ -6,8 +6,6 @@ All exceptions store Diagnostic objects for rich error information.
 Python 3.13+. Zero external dependencies.
 """
 
-from __future__ import annotations
-
 from .codes import Diagnostic
 
 
@@ -76,7 +74,6 @@ class FluentParseError(FluentError):
     Raised when parsing locale-formatted strings (numbers, dates, currency)
     fails. Part of the unified error handling model aligned with format_*() API.
 
-    v0.8.0: Parsing API now returns tuple[result, list[FluentParseError]]
     instead of raising exceptions, consistent with formatting API.
 
     Attributes:

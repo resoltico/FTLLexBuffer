@@ -22,16 +22,16 @@ FTLLexBuffer provides comprehensive **bi-directional localization**: both format
 
 ```python
 from ftllexbuffer.parsing import parse_decimal
-from ftllexbuffer.parsing.guards import has_parse_errors, is_valid_decimal
+from ftllexbuffer.parsing.guards import is_valid_decimal
 
 # Parse locale-formatted number (v0.8.0 tuple return)
 result, errors = parse_decimal("1 234,56", "lv_LV")
-if not has_parse_errors(errors) and is_valid_decimal(result):
+if not errors and is_valid_decimal(result):
     amount = result  # Decimal('1234.56')
 
 # Parse US format
 result, errors = parse_decimal("1,234.56", "en_US")
-if not has_parse_errors(errors):
+if not errors:
     amount_us = result  # Decimal('1234.56')
 ```
 
@@ -40,7 +40,7 @@ if not has_parse_errors(errors):
 ```python
 from ftllexbuffer import FluentBundle
 from ftllexbuffer.parsing import parse_decimal
-from ftllexbuffer.parsing.guards import has_parse_errors, is_valid_decimal
+from ftllexbuffer.parsing.guards import is_valid_decimal
 
 # Create bundle
 bundle = FluentBundle("lv_LV")
@@ -54,7 +54,7 @@ formatted, _ = bundle.format_pattern("price", {"amount": 1234.56})
 user_input = "1 234,56"
 result, errors = parse_decimal(user_input, "lv_LV")
 
-if not has_parse_errors(errors) and is_valid_decimal(result):
+if not errors and is_valid_decimal(result):
     # Roundtrip: format → parse → format preserves value
     assert float(result) == 1234.56
 ```
@@ -71,7 +71,7 @@ Parse locale-formatted number string to `float`.
 
 ```python
 from ftllexbuffer.parsing import parse_number
-from ftllexbuffer.parsing.guards import has_parse_errors
+# has_parse_errors removed in v0.10.0 - use `if errors:` directly
 
 # US English
 result, errors = parse_number("1,234.5", "en_US")
@@ -87,7 +87,7 @@ result, errors = parse_number("1.234,5", "de_DE")
 
 # Error handling (v0.8.0)
 result, errors = parse_number("invalid", "en_US")
-if has_parse_errors(errors):
+if errors:
     print(f"Parse error: {errors[0]}")
     # result is 0.0 (default fallback)
 ```
@@ -103,11 +103,11 @@ Parse locale-formatted number string to `Decimal` (financial precision).
 ```python
 from decimal import Decimal
 from ftllexbuffer.parsing import parse_decimal
-from ftllexbuffer.parsing.guards import has_parse_errors, is_valid_decimal
+from ftllexbuffer.parsing.guards import is_valid_decimal
 
 # Financial precision - no float rounding errors
 result, errors = parse_decimal("100,50", "lv_LV")
-if not has_parse_errors(errors) and is_valid_decimal(result):
+if not errors and is_valid_decimal(result):
     vat = result * Decimal("0.21")  # → Decimal('21.105') - exact!
 
 # Float would lose precision
@@ -128,11 +128,11 @@ Parse locale-formatted date string to `date` object.
 
 ```python
 from ftllexbuffer.parsing import parse_date
-from ftllexbuffer.parsing.guards import has_parse_errors, is_valid_date
+from ftllexbuffer.parsing.guards import is_valid_date
 
 # US format (MM/DD/YYYY)
 result, errors = parse_date("1/28/2025", "en_US")
-if not has_parse_errors(errors) and is_valid_date(result):
+if not errors and is_valid_date(result):
     date_value = result  # date(2025, 1, 28)
 
 # European format (DD.MM.YYYY)
@@ -171,11 +171,11 @@ Parse locale-formatted datetime string to `datetime` object.
 ```python
 from datetime import timezone
 from ftllexbuffer.parsing import parse_datetime
-from ftllexbuffer.parsing.guards import has_parse_errors, is_valid_datetime
+from ftllexbuffer.parsing.guards import is_valid_datetime
 
 # Parse datetime (v0.8.0 API)
 result, errors = parse_datetime("1/28/2025 14:30", "en_US")
-if not has_parse_errors(errors) and is_valid_datetime(result):
+if not errors and is_valid_datetime(result):
     dt = result  # datetime(2025, 1, 28, 14, 30)
 
 # With timezone
@@ -198,11 +198,11 @@ Parse locale-formatted currency string to `(Decimal, currency_code)` tuple.
 
 ```python
 from ftllexbuffer.parsing import parse_currency
-from ftllexbuffer.parsing.guards import has_parse_errors, is_valid_currency
+from ftllexbuffer.parsing.guards import is_valid_currency
 
 # Unambiguous symbols - work without default_currency
 result, errors = parse_currency("€100.50", "en_US")
-if not has_parse_errors(errors) and is_valid_currency(result):
+if not errors and is_valid_currency(result):
     amount, currency = result  # (Decimal('100.50'), 'EUR')
 
 # Latvian format
@@ -226,7 +226,7 @@ result, errors = parse_currency("$100", "en_CA", infer_from_locale=True)
 
 # Ambiguous symbols without default_currency return error (v0.8.0)
 result, errors = parse_currency("$100", "en_US")
-if has_parse_errors(errors):
+if errors:
     print(f"Ambiguous currency: {errors[0]}")
 ```
 
@@ -261,12 +261,12 @@ result, errors = parse_decimal(formatted, "en_US")  # Wrong locale!
 
 ```python
 from ftllexbuffer.parsing import parse_decimal
-from ftllexbuffer.parsing.guards import has_parse_errors, is_valid_decimal
+from ftllexbuffer.parsing.guards import is_valid_decimal
 
 # v0.8.0: Check errors list instead of try/except
 result, errors = parse_decimal(user_input, locale)
 
-if has_parse_errors(errors):
+if errors:
     show_error_to_user(f"Invalid amount: {errors[0]}")
     return
 
@@ -283,11 +283,11 @@ process_payment(result)
 ```python
 from decimal import Decimal
 from ftllexbuffer.parsing import parse_decimal
-from ftllexbuffer.parsing.guards import has_parse_errors, is_valid_decimal
+from ftllexbuffer.parsing.guards import is_valid_decimal
 
 # CORRECT - Decimal for financial data
 result, errors = parse_decimal("100,50", "lv_LV")
-if not has_parse_errors(errors) and is_valid_decimal(result):
+if not errors and is_valid_decimal(result):
     vat = result * Decimal("0.21")  # → Decimal('21.105') - exact
 
 # WRONG - Float loses precision
@@ -301,11 +301,11 @@ vat = result * 0.21  # → 21.105000000000004 - precision loss!
 **Note on Special Values**: Babel's `parse_decimal()` accepts `NaN`, `Infinity`, and `Inf` (case-insensitive) as valid Decimal values per IEEE 754 standard. Use `is_valid_decimal()` to reject these for financial data:
 
 ```python
-from ftllexbuffer.parsing.guards import has_parse_errors, is_valid_decimal
+from ftllexbuffer.parsing.guards import is_valid_decimal
 
 result, errors = parse_decimal(user_input, locale)
 
-if has_parse_errors(errors):
+if errors:
     raise ValueError(f"Parse error: {errors[0]}")
 
 # Reject special values for financial data
@@ -317,7 +317,7 @@ if not is_valid_decimal(result):
 
 ```python
 from ftllexbuffer.parsing import parse_decimal
-from ftllexbuffer.parsing.guards import has_parse_errors, is_valid_decimal
+from ftllexbuffer.parsing.guards import is_valid_decimal
 
 def parse_user_amount(input_str: str, locale: str) -> Decimal | None:
     # Trim whitespace
@@ -330,7 +330,7 @@ def parse_user_amount(input_str: str, locale: str) -> Decimal | None:
     # Parse (v0.8.0 API)
     result, errors = parse_decimal(input_str, locale)
 
-    if has_parse_errors(errors) or not is_valid_decimal(result):
+    if errors or not is_valid_decimal(result):
         return None
 
     return result
@@ -346,7 +346,7 @@ if amount is None:
 ```python
 from ftllexbuffer.parsing import parse_currency
 from ftllexbuffer.runtime.functions import currency_format
-from ftllexbuffer.parsing.guards import has_parse_errors, is_valid_currency
+from ftllexbuffer.parsing.guards import is_valid_currency
 
 # Verify roundtrip in tests
 def test_roundtrip():
@@ -354,7 +354,7 @@ def test_roundtrip():
     formatted = currency_format(float(original), "lv-LV", currency="EUR")
     result, errors = parse_currency(formatted, "lv_LV")
 
-    assert not has_parse_errors(errors)
+    assert not errors
     assert is_valid_currency(result)
     assert result[0] == original  # Roundtrip preserved!
 ```
@@ -369,7 +369,7 @@ def test_roundtrip():
 from decimal import Decimal
 from ftllexbuffer import FluentBundle
 from ftllexbuffer.parsing import parse_decimal
-from ftllexbuffer.parsing.guards import has_parse_errors, is_valid_decimal
+from ftllexbuffer.parsing.guards import is_valid_decimal
 
 bundle = FluentBundle("lv_LV")
 bundle.add_resource("""
@@ -382,7 +382,7 @@ def process_invoice(user_input: str) -> dict | None:
     # Parse user input (subtotal) - v0.8.0 API
     result, errors = parse_decimal(user_input, "lv_LV")
 
-    if has_parse_errors(errors) or not is_valid_decimal(result):
+    if errors or not is_valid_decimal(result):
         return None
 
     subtotal = result
@@ -415,7 +415,7 @@ result = process_invoice("1 234,56")
 ```python
 from decimal import Decimal
 from ftllexbuffer.parsing import parse_decimal
-from ftllexbuffer.parsing.guards import has_parse_errors, is_valid_decimal
+from ftllexbuffer.parsing.guards import is_valid_decimal
 
 def validate_amount_field(input_value: str, locale: str) -> tuple[Decimal | None, str | None]:
     """Validate and parse amount input field.
@@ -433,7 +433,7 @@ def validate_amount_field(input_value: str, locale: str) -> tuple[Decimal | None
     # Parse (v0.8.0 API)
     result, errors = parse_decimal(input_value, locale)
 
-    if has_parse_errors(errors):
+    if errors:
         return (None, f"Invalid amount format for {locale}")
 
     # Validate finite (not NaN/Infinity)
@@ -463,7 +463,7 @@ process_payment(amount)
 
 ```python
 from ftllexbuffer.parsing import parse_decimal, parse_date
-from ftllexbuffer.parsing.guards import has_parse_errors, is_valid_date, is_valid_decimal
+from ftllexbuffer.parsing.guards import is_valid_date, is_valid_decimal
 
 def import_transactions_csv(csv_path: str, locale: str) -> tuple[list[dict], list[str]]:
     """Import financial transactions from CSV."""
@@ -478,13 +478,13 @@ def import_transactions_csv(csv_path: str, locale: str) -> tuple[list[dict], lis
         for row_num, row in enumerate(reader, start=2):  # Start at 2 (header is row 1)
             # Parse date (v0.8.0 API)
             date_result, date_errors = parse_date(row['date'], locale)
-            if has_parse_errors(date_errors) or not is_valid_date(date_result):
+            if date_errors or not is_valid_date(date_result):
                 import_errors.append(f"Row {row_num}: Invalid date '{row['date']}'")
                 continue
 
             # Parse amount (v0.8.0 API)
             amount_result, amount_errors = parse_decimal(row['amount'], locale)
-            if has_parse_errors(amount_errors) or not is_valid_decimal(amount_result):
+            if amount_errors or not is_valid_decimal(amount_result):
                 import_errors.append(f"Row {row_num}: Invalid amount '{row['amount']}'")
                 continue
 
@@ -528,7 +528,7 @@ parsed = babel_parse_decimal(user_input, locale="lv_LV")
 ```python
 from ftllexbuffer import FluentBundle
 from ftllexbuffer.parsing import parse_decimal
-from ftllexbuffer.parsing.guards import has_parse_errors, is_valid_decimal
+from ftllexbuffer.parsing.guards import is_valid_decimal
 
 # Formatting: FTLLexBuffer
 bundle = FluentBundle("lv_LV")
@@ -538,7 +538,7 @@ formatted = bundle.format_value("price", {"amount": 1234.56})
 user_input = "1 234,56"
 result, errors = parse_decimal(user_input, "lv_LV")
 
-if not has_parse_errors(errors) and is_valid_decimal(result):
+if not errors and is_valid_decimal(result):
     parsed = result  # Same locale format!
 ```
 
@@ -575,9 +575,9 @@ except ValueError as e:
     return
 
 # NEW (v0.8.0): Tuple-based error handling
-from ftllexbuffer.parsing.guards import has_parse_errors
+# has_parse_errors removed in v0.10.0 - use `if errors:` directly
 result, errors = parse_decimal(user_input, locale)
-if has_parse_errors(errors):
+if errors:
     show_error(f"Invalid: {errors[0]}")
     return
 amount = result
@@ -589,15 +589,15 @@ if amount is None:
 
 # NEW (v0.8.0): Check errors list
 result, errors = parse_decimal(user_input, locale)
-if has_parse_errors(errors):
+if errors:
     result = Decimal("0")
 amount = result
 
 # NEW (v0.8.0): Using type guards for full safety
-from ftllexbuffer.parsing.guards import has_parse_errors, is_valid_decimal
+from ftllexbuffer.parsing.guards import is_valid_decimal
 
 result, errors = parse_decimal(user_input, locale)
-if not has_parse_errors(errors) and is_valid_decimal(result):
+if not errors and is_valid_decimal(result):
     # mypy knows result is finite Decimal
     process_payment(result)
 ```
@@ -618,11 +618,11 @@ if not has_parse_errors(errors) and is_valid_decimal(result):
 **Solution**:
 ```python
 from ftllexbuffer.parsing import parse_decimal
-from ftllexbuffer.parsing.guards import has_parse_errors
+# has_parse_errors removed in v0.10.0 - use `if errors:` directly
 
 # Debug: Print the error details
 result, errors = parse_decimal(user_input, locale)
-if has_parse_errors(errors):
+if errors:
     print(f"Parse error: {errors[0]}")
     print(f"Input: '{user_input}'")
     print(f"Locale: {locale}")
@@ -660,7 +660,7 @@ result, errors = parse_number(formatted, "en_US")  # Different locale!
 ```python
 from decimal import Decimal
 from ftllexbuffer.parsing import parse_number, parse_decimal
-from ftllexbuffer.parsing.guards import has_parse_errors
+# has_parse_errors removed in v0.10.0 - use `if errors:` directly
 
 # Wrong: Float precision loss
 result, _ = parse_number("100,50", "lv_LV")  # float
@@ -668,7 +668,7 @@ vat = result * 0.21  # 21.105000000000004
 
 # Correct: Decimal precision
 result, errors = parse_decimal("100,50", "lv_LV")
-if not has_parse_errors(errors):
+if not errors:
     vat = result * Decimal("0.21")  # Decimal('21.105') - exact!
 ```
 
@@ -681,11 +681,11 @@ if not has_parse_errors(errors):
 **Solution**:
 ```python
 from ftllexbuffer.parsing import parse_decimal
-from ftllexbuffer.parsing.guards import has_parse_errors, is_valid_decimal
+from ftllexbuffer.parsing.guards import is_valid_decimal
 
 result, errors = parse_decimal(user_input, locale)
 
-if has_parse_errors(errors):
+if errors:
     raise ValueError(f"Parse failed: {errors[0]}")
 
 # Reject NaN and Infinity for financial calculations
@@ -704,7 +704,7 @@ if not is_valid_decimal(result):
 **Solution**:
 ```python
 from ftllexbuffer.parsing import parse_date
-from ftllexbuffer.parsing.guards import has_parse_errors, is_valid_date
+from ftllexbuffer.parsing.guards import is_valid_date
 
 # US: Interprets as month-first (Jan 2)
 result, _ = parse_date("01/02/2025", "en_US")  # → date(2025, 1, 2)

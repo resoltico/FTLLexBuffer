@@ -14,42 +14,77 @@ Design Principles:
     - Immutable by default (frozen dataclass)
     - Thread-safe (no shared mutable state)
     - CLDR-compliant (matches Intl.NumberFormat semantics)
+    - Explicit error handling (no silent fallbacks)
 
 Python 3.13+. Uses Babel for i18n.
 """
 
-from __future__ import annotations
-
 import logging
 from dataclasses import dataclass
 from datetime import datetime
+from decimal import InvalidOperation
 from typing import Literal
 
-from babel import Locale, UnknownLocaleError  # pylint: disable=import-error
-from babel import dates as babel_dates  # pylint: disable=import-error
-from babel import numbers as babel_numbers  # pylint: disable=import-error
+from babel import Locale, UnknownLocaleError
+from babel import dates as babel_dates
+from babel import numbers as babel_numbers
+
+from ftllexbuffer.locale_utils import normalize_locale
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
+class LocaleValidationError:
+    """Error result from locale validation.
+
+    Returned by LocaleContext.create() when locale code is invalid.
+    Makes validation failures explicit instead of silently swallowing them.
+
+    Attributes:
+        locale_code: The invalid locale code that was provided
+        error_message: Description of why validation failed
+    """
+
+    locale_code: str
+    error_message: str
+
+    def __str__(self) -> str:
+        """Format error for display."""
+        return f"Invalid locale '{self.locale_code}': {self.error_message}"
+
+
+@dataclass(frozen=True, slots=True)
 class LocaleContext:
     """Immutable locale configuration for formatting operations.
 
     Provides thread-safe, locale-specific formatting for numbers, dates, and currency
     without mutating global state. Each FluentBundle owns its LocaleContext.
 
-    Args:
-        locale_code: BCP 47 locale identifier (e.g., 'en-US', 'lv-LV', 'de-DE')
+    Use LocaleContext.create() factory to construct instances with proper validation.
+    Direct construction via __init__ is not recommended (bypasses validation).
 
     Examples:
-        >>> ctx_en = LocaleContext('en-US')
-        >>> ctx_en.format_number(1234.5, use_grouping=True)
+        >>> match LocaleContext.create('en-US'):
+        ...     case LocaleContext() as ctx:
+        ...         print(ctx.format_number(1234.5, use_grouping=True))
+        ...     case LocaleValidationError() as err:
+        ...         print(f"Error: {err}")
         '1,234.5'
 
-        >>> ctx_lv = LocaleContext('lv-LV')
-        >>> ctx_lv.format_number(1234.5, use_grouping=True)
+        >>> match LocaleContext.create('lv-LV'):
+        ...     case LocaleContext() as ctx:
+        ...         print(ctx.format_number(1234.5, use_grouping=True))
+        ...     case LocaleValidationError() as err:
+        ...         print(f"Error: {err}")
         '1 234,5'
+
+        >>> match LocaleContext.create('invalid-locale'):
+        ...     case LocaleContext() as ctx:
+        ...         print("Unexpected success")
+        ...     case LocaleValidationError() as err:
+        ...         print(f"Expected error: {err}")
+        Expected error: Invalid locale 'invalid-locale': ...
 
     Thread Safety:
         LocaleContext is immutable and thread-safe. Multiple threads can
@@ -61,43 +96,82 @@ class LocaleContext:
     """
 
     locale_code: str
+    _babel_locale: Locale
 
-    def __post_init__(self) -> None:
-        """Validate locale code on initialization.
+    @classmethod
+    def create(cls, locale_code: str) -> "LocaleContext | LocaleValidationError":
+        """Create LocaleContext with explicit validation.
+
+        Factory method that validates locale code before construction.
+        For unknown locales, logs a warning and falls back to en_US.
+
+        Args:
+            locale_code: BCP 47 locale identifier (e.g., 'en-US', 'lv-LV', 'de-DE')
+
+        Returns:
+            LocaleContext (may use en_US fallback for unknown locales)
+            LocaleValidationError for invalid locale format
+
+        Examples:
+            >>> result = LocaleContext.create('en-US')
+            >>> isinstance(result, LocaleContext)
+            True
+
+            >>> result = LocaleContext.create('xx_UNKNOWN')  # Unknown locale
+            >>> isinstance(result, LocaleContext)  # Falls back to en_US
+            True
+        """
+        try:
+            normalized = normalize_locale(locale_code)
+            babel_locale = Locale.parse(normalized)
+            return cls(locale_code=locale_code, _babel_locale=babel_locale)
+        except UnknownLocaleError as e:
+            # Unknown locale: log warning and fallback to en_US
+            logger.warning("Unknown locale '%s': %s. Falling back to en_US", locale_code, e)
+            fallback_locale = Locale.parse("en_US")
+            return cls(locale_code=locale_code, _babel_locale=fallback_locale)
+        except ValueError as e:
+            # Invalid format: log warning and fallback to en_US
+            logger.warning(
+                "Invalid locale format '%s': %s. Falling back to en_US", locale_code, e
+            )
+            fallback_locale = Locale.parse("en_US")
+            return cls(locale_code=locale_code, _babel_locale=fallback_locale)
+
+    @classmethod
+    def create_or_raise(cls, locale_code: str) -> "LocaleContext":
+        """Create LocaleContext or raise on validation failure.
+
+        Convenience method for tests and cases where raising is acceptable.
+
+        Args:
+            locale_code: BCP 47 locale identifier (e.g., 'en-US', 'lv-LV', 'de-DE')
+
+        Returns:
+            LocaleContext instance
 
         Raises:
-            UnknownLocaleError: If locale_code is not recognized by CLDR.
+            ValueError: If locale validation fails
+
+        Examples:
+            >>> ctx = LocaleContext.create_or_raise('en-US')
+            >>> ctx.locale_code
+            'en-US'
         """
-        # Validate locale exists in CLDR
-        try:
-            # Convert BCP-47 'en-US' to Babel's POSIX format 'en_US'
-            # BCP-47 uses hyphens, Babel/POSIX uses underscores
-            normalized = self.locale_code.replace("-", "_")
-            Locale.parse(normalized)
-        except (UnknownLocaleError, ValueError) as e:
-            logger.warning("Unknown locale '%s': %s", self.locale_code, e)
-            # Don't raise - allow fallback to default formatting
-            # Fluent spec: "Functions MUST return str, never raise"
+        match cls.create(locale_code):
+            case LocaleContext() as ctx:
+                return ctx
+            case LocaleValidationError() as err:
+                raise ValueError(str(err)) from None
 
     @property
     def babel_locale(self) -> Locale:
-        """Get Babel Locale object for this context.
+        """Get pre-validated Babel Locale object for this context.
 
         Returns:
-            Babel Locale instance (cached by Babel internally)
-
-        Note:
-            Babel.Locale.parse() caches parsed locales, so repeated
-            calls are cheap.
+            Babel Locale instance (validated during construction)
         """
-        try:
-            # Convert BCP-47 'en-US' to Babel's POSIX format 'en_US'
-            normalized = self.locale_code.replace("-", "_")
-            return Locale.parse(normalized)
-        except (UnknownLocaleError, ValueError):
-            # Fallback to English (US) if locale unknown
-            logger.debug("Falling back to en_US for unknown locale: %s", self.locale_code)
-            return Locale.parse("en_US")
+        return self._babel_locale
 
     def format_number(
         self,
@@ -186,20 +260,14 @@ class LocaleContext:
                 )
             )
 
-        except (ValueError, TypeError) as e:
-            # Expected: invalid format pattern or non-numeric value
+        except (ValueError, TypeError, InvalidOperation) as e:
+            # Expected errors: invalid format pattern, non-numeric value, decimal conversion
             logger.debug("Number formatting failed (expected error): %s", e)
             return str(value)
-        except Exception as e:  # pylint: disable=broad-exception-caught
-            # Unexpected: platform-specific errors
-            # i18n MUST NOT crash application - graceful degradation required
-            logger.warning(
-                "Unexpected error in format_number(%s, locale=%s): %s",
-                value,
-                self.locale_code,
-                e,
-                exc_info=True,
-            )
+
+        except RuntimeError as e:
+            # Unexpected platform error from Babel
+            logger.warning("Unexpected error in format_number: %s", e)
             return str(value)
 
     def format_datetime(
@@ -285,18 +353,13 @@ class LocaleContext:
             )
 
         except (ValueError, OverflowError) as e:
-            # Expected: year out of range, invalid datetime
+            # Expected errors: year out of range, invalid datetime
             logger.debug("DateTime formatting failed: %s", e)
             return dt_value.isoformat()
-        except Exception as e:  # pylint: disable=broad-exception-caught
-            # Unexpected: platform-specific errors
-            logger.warning(
-                "Unexpected error in format_datetime(%s, locale=%s): %s",
-                dt_value,
-                self.locale_code,
-                e,
-                exc_info=True,
-            )
+
+        except RuntimeError as e:
+            # Unexpected platform error from Babel
+            logger.warning("Unexpected error in format_datetime: %s", e)
             return dt_value.isoformat()
 
     def format_currency(
@@ -375,18 +438,12 @@ class LocaleContext:
                 )
             )
 
-        except (ValueError, TypeError) as e:
-            # Expected: invalid currency code or non-numeric value
+        except (ValueError, TypeError, InvalidOperation) as e:
+            # Expected errors: invalid currency code, non-numeric value, decimal conversion
             logger.debug("Currency formatting failed (expected error): %s", e)
             return f"{currency} {value}"
-        except Exception as e:  # pylint: disable=broad-exception-caught
-            # Unexpected: platform-specific errors
-            logger.warning(
-                "Unexpected error in format_currency(%s, %s, locale=%s): %s",
-                value,
-                currency,
-                self.locale_code,
-                e,
-                exc_info=True,
-            )
+
+        except RuntimeError as e:
+            # Unexpected platform error from Babel
+            logger.warning("Unexpected error in format_currency: %s", e)
             return f"{currency} {value}"

@@ -22,8 +22,6 @@ Example:
 Python 3.13+. Uses Babel for i18n.
 """
 
-from __future__ import annotations
-
 import logging
 from datetime import datetime
 from typing import Literal
@@ -88,14 +86,20 @@ def number_format(
         Custom patterns follow Babel number pattern syntax.
     """
     # Delegate to LocaleContext (immutable, thread-safe)
-    ctx = LocaleContext(locale_code)
-    return ctx.format_number(
-        value,
-        minimum_fraction_digits=minimum_fraction_digits,
-        maximum_fraction_digits=maximum_fraction_digits,
-        use_grouping=use_grouping,
-        pattern=pattern,
-    )
+    match LocaleContext.create(locale_code):
+        case LocaleContext() as ctx:
+            return ctx.format_number(
+                value,
+                minimum_fraction_digits=minimum_fraction_digits,
+                maximum_fraction_digits=maximum_fraction_digits,
+                use_grouping=use_grouping,
+                pattern=pattern,
+            )
+        case error:
+            # Locale validation failed - return Fluent error placeholder
+            # Fluent spec: Functions MUST return str, never raise
+            logger.warning("NUMBER() function failed: %s", error)
+            return str(value)
 
 
 def datetime_format(
@@ -153,13 +157,22 @@ def datetime_format(
         Custom patterns follow Babel datetime pattern syntax.
     """
     # Delegate to LocaleContext (immutable, thread-safe)
-    ctx = LocaleContext(locale_code)
-    return ctx.format_datetime(
-        value,
-        date_style=date_style,
-        time_style=time_style,
-        pattern=pattern,
-    )
+    match LocaleContext.create(locale_code):
+        case LocaleContext() as ctx:
+            return ctx.format_datetime(
+                value,
+                date_style=date_style,
+                time_style=time_style,
+                pattern=pattern,
+            )
+        case error:
+            # Locale validation failed - return Fluent error placeholder
+            # Fluent spec: Functions MUST return str, never raise
+            logger.warning("DATETIME() function failed: %s", error)
+            # Return ISO format as safe fallback
+            if isinstance(value, datetime):
+                return value.isoformat()
+            return str(value)
 
 
 def currency_format(
@@ -213,12 +226,18 @@ def currency_format(
         - Most others: 2 decimals
     """
     # Delegate to LocaleContext (immutable, thread-safe)
-    ctx = LocaleContext(locale_code)
-    return ctx.format_currency(
-        value,
-        currency=currency,
-        currency_display=currency_display,
-    )
+    match LocaleContext.create(locale_code):
+        case LocaleContext() as ctx:
+            return ctx.format_currency(
+                value,
+                currency=currency,
+                currency_display=currency_display,
+            )
+        case error:
+            # Locale validation failed - return Fluent error placeholder
+            # Fluent spec: Functions MUST return str, never raise
+            logger.warning("CURRENCY() function failed: %s", error)
+            return f"{currency} {value}"
 
 
 # Create function registry and register built-in functions

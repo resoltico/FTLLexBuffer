@@ -59,7 +59,7 @@ class TestResolverExpressionEdgeCases:
         unknown = UnknownExpr()
 
         with pytest.raises(FluentResolutionError, match="Unknown expression type"):
-            resolver._resolve_expression(unknown, {})
+            resolver._resolve_expression(unknown, {})  # type: ignore[arg-type]
 
     def test_resolve_bool_true_as_string(self) -> None:
         """Boolean True converts to lowercase 'true' string."""
@@ -295,10 +295,10 @@ class TestResolverIntegrationEdgeCases:
         )
 
         # List
-        assert resolver._format_value([1, 2, 3]) == "[1, 2, 3]"
+        assert resolver._format_value([1, 2, 3]) == "[1, 2, 3]"  # type: ignore[arg-type]
 
         # Dict
-        result = resolver._format_value({"key": "value"})
+        result = resolver._format_value({"key": "value"})  # type: ignore[arg-type]
         assert "key" in result
         assert "value" in result
 
@@ -307,7 +307,7 @@ class TestResolverIntegrationEdgeCases:
             def __str__(self) -> str:
                 return "custom"
 
-        assert resolver._format_value(CustomObj()) == "custom"
+        assert resolver._format_value(CustomObj()) == "custom"  # type: ignore[arg-type]
 
 
 # ============================================================================

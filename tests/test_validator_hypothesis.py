@@ -25,6 +25,7 @@ import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
+from ftllexbuffer.diagnostics import ValidationResult
 from ftllexbuffer.syntax.ast import (
     Identifier,
     Message,
@@ -34,7 +35,7 @@ from ftllexbuffer.syntax.ast import (
     Variant,
 )
 from ftllexbuffer.syntax.parser import FluentParserV1
-from ftllexbuffer.syntax.validator import SemanticValidator, ValidationResult
+from ftllexbuffer.syntax.validator import SemanticValidator
 from tests.strategies import (
     ftl_deeply_nested_selects,
     ftl_messages,

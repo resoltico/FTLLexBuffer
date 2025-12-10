@@ -20,7 +20,14 @@ from hypothesis import strategies as st
 from ftllexbuffer import FluentBundle
 from ftllexbuffer.runtime.functions import currency_format
 from ftllexbuffer.runtime.locale_context import LocaleContext
-from ftllexbuffer.runtime.plural_rules import SUPPORTED_LOCALES
+
+# Test locale set - representative sample of supported locales
+# Babel supports 200+ locales; these are common ones for testing
+TEST_LOCALES: frozenset[str] = frozenset({
+    "en", "zh", "hi", "es", "fr", "ar", "bn", "pt", "ru", "ja",
+    "de", "jv", "ko", "vi", "te", "tr", "ta", "mr", "ur", "it",
+    "th", "gu", "pl", "uk", "kn", "or", "ml", "my", "pa", "lv",
+})
 
 
 class TestCurrencyFunction:
@@ -188,9 +195,9 @@ class TestCurrencyFunctionErrorHandling:
 
 
 class TestCurrencyFunctionAllLocales:
-    """Test currency_format() across all 30 supported locales."""
+    """Test currency_format() across all 30 test locales."""
 
-    @pytest.mark.parametrize("locale_code", sorted(SUPPORTED_LOCALES))
+    @pytest.mark.parametrize("locale_code", sorted(TEST_LOCALES))
     def test_currency_works_all_locales_eur(self, locale_code: str) -> None:
         """CURRENCY() works for EUR in all 30 locales."""
         result = currency_format(123.45, locale_code, currency="EUR")
@@ -199,17 +206,17 @@ class TestCurrencyFunctionAllLocales:
         # Should contain currency symbol or code
         assert "€" in result or "EUR" in result or "123" in result
 
-    @pytest.mark.parametrize("locale_code", sorted(SUPPORTED_LOCALES))
+    @pytest.mark.parametrize("locale_code", sorted(TEST_LOCALES))
     def test_currency_works_all_locales_usd(self, locale_code: str) -> None:
-        """CURRENCY() works for USD in all 30 locales."""
+        """CURRENCY() works for USD in all 30 test locales."""
         result = currency_format(99.99, locale_code, currency="USD")
         assert isinstance(result, str)
         assert len(result) > 0
         assert "99" in result
 
-    @pytest.mark.parametrize("locale_code", sorted(SUPPORTED_LOCALES))
+    @pytest.mark.parametrize("locale_code", sorted(TEST_LOCALES))
     def test_currency_zero_all_locales(self, locale_code: str) -> None:
-        """Zero currency value works in all locales."""
+        """Zero currency value works in all test locales."""
         result = currency_format(0, locale_code, currency="EUR")
         assert isinstance(result, str)
         assert "0" in result
@@ -220,7 +227,7 @@ class TestCurrencyLocaleContext:
 
     def test_locale_context_currency_en_us(self) -> None:
         """LocaleContext formats EUR in en_US."""
-        ctx = LocaleContext("en-US")
+        ctx = LocaleContext.create_or_raise("en-US")
         result = ctx.format_currency(123.45, currency="EUR")
         assert isinstance(result, str)
         assert "123" in result
@@ -228,7 +235,7 @@ class TestCurrencyLocaleContext:
 
     def test_locale_context_currency_lv_lv(self) -> None:
         """LocaleContext formats EUR in lv_LV."""
-        ctx = LocaleContext("lv-LV")
+        ctx = LocaleContext.create_or_raise("lv-LV")
         result = ctx.format_currency(123.45, currency="EUR")
         assert isinstance(result, str)
         assert "123" in result
@@ -236,7 +243,7 @@ class TestCurrencyLocaleContext:
 
     def test_locale_context_currency_display_modes(self) -> None:
         """LocaleContext supports all currency display modes."""
-        ctx = LocaleContext("en-US")
+        ctx = LocaleContext.create_or_raise("en-US")
 
         symbol = ctx.format_currency(100, currency="USD", currency_display="symbol")
         code = ctx.format_currency(100, currency="USD", currency_display="code")
@@ -321,8 +328,8 @@ price = { $currency ->
         assert "£" in result_other or "GBP" in result_other
 
     def test_bundle_currency_all_30_locales(self) -> None:
-        """CURRENCY function works in FluentBundle for all 30 locales."""
-        for locale in SUPPORTED_LOCALES:
+        """CURRENCY function works in FluentBundle for all 30 test locales."""
+        for locale in TEST_LOCALES:
             bundle = FluentBundle(locale)
             bundle.add_resource('price = { CURRENCY($amount, currency: "EUR") }')
             result, errors = bundle.format_pattern("price", {"amount": 123.45})
@@ -414,12 +421,12 @@ class TestCurrencyHypothesis:
         assert len(result) > 0
 
     @given(
-        locale=st.sampled_from(sorted(SUPPORTED_LOCALES)),
+        locale=st.sampled_from(sorted(TEST_LOCALES)),
         amount=st.floats(min_value=0, max_value=1e6, allow_nan=False, allow_infinity=False),
     )
     @settings(max_examples=100)
     def test_currency_all_locales_never_crash(self, locale: str, amount: float) -> None:
-        """currency_format() works for any locale and amount."""
+        """currency_format() works for any test locale and amount."""
         result = currency_format(amount, locale, currency="EUR")
         assert isinstance(result, str)
         assert len(result) > 0

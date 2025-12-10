@@ -25,18 +25,39 @@ Example:
 Python 3.13+. Zero external dependencies.
 """
 
-from __future__ import annotations
-
 import re
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
+from datetime import datetime
+from decimal import Decimal
 from inspect import signature
-from typing import Any
+from typing import Protocol
 
 from ftllexbuffer.diagnostics import ErrorTemplate, FluentResolutionError
 
-# Type alias for Fluent-compatible functions
-FluentFunction = Callable[..., str]
+# Type alias for Fluent-compatible function values
+type FluentValue = str | int | float | bool | Decimal | datetime | None
+
+
+class FluentFunction(Protocol):
+    """Protocol for Fluent-compatible functions.
+
+    Functions must accept:
+    - value: The primary value to format (positional)
+    - locale_code: The locale code (positional)
+    - **kwargs: Named arguments (keyword-only)
+
+    And return a formatted string.
+    """
+
+    def __call__(
+        self,
+        value: FluentValue,
+        locale_code: str,
+        /,
+        **kwargs: FluentValue,
+    ) -> str:
+        ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,7 +74,7 @@ class FunctionSignature:
     python_name: str
     ftl_name: str
     param_mapping: dict[str, str]
-    callable: FluentFunction
+    callable: Callable[..., str]
 
 
 class FunctionRegistry:
@@ -90,7 +111,7 @@ class FunctionRegistry:
 
     def register(
         self,
-        func: FluentFunction,
+        func: Callable[..., str],
         *,
         ftl_name: str | None = None,
         param_map: dict[str, str] | None = None,
@@ -112,7 +133,7 @@ class FunctionRegistry:
         """
         # Default FTL name: UPPERCASE version of function name
         if ftl_name is None:
-            ftl_name = func.__name__.upper()
+            ftl_name = getattr(func, "__name__", "unknown").upper()
 
         # Auto-generate parameter mappings from function signature
         sig = signature(func)
@@ -133,7 +154,7 @@ class FunctionRegistry:
 
         # Store function signature
         self._functions[ftl_name] = FunctionSignature(
-            python_name=func.__name__,
+            python_name=getattr(func, "__name__", "unknown"),
             ftl_name=ftl_name,
             param_mapping=final_map,
             callable=func,
@@ -142,8 +163,8 @@ class FunctionRegistry:
     def call(
         self,
         ftl_name: str,
-        positional: list[Any],
-        named: dict[str, Any],
+        positional: Sequence[FluentValue],
+        named: Mapping[str, FluentValue],
     ) -> str:
         """Call Python function with FTL arguments.
 
@@ -177,7 +198,13 @@ class FunctionRegistry:
         # Call Python function
         try:
             return func_sig.callable(*positional, **python_kwargs)
-        except Exception as e:
+        except (TypeError, ValueError, KeyError, AttributeError, ArithmeticError) as e:
+            # Catch common function execution errors:
+            # - TypeError: Wrong arguments or non-callable
+            # - ValueError: Invalid argument values
+            # - KeyError: Missing dictionary key
+            # - AttributeError: Missing object attribute
+            # - ArithmeticError: Math errors (ZeroDivision, Overflow, etc.)
             raise FluentResolutionError(ErrorTemplate.function_failed(ftl_name, str(e))) from e
 
     def has_function(self, ftl_name: str) -> bool:
@@ -293,7 +320,6 @@ class FunctionRegistry:
     def __repr__(self) -> str:
         """Return string representation for debugging.
 
-        v0.9.0: Added for better REPL and debugging experience.
 
         Returns:
             String representation showing registered functions
@@ -305,7 +331,7 @@ class FunctionRegistry:
         """
         return f"FunctionRegistry(functions={len(self._functions)})"
 
-    def copy(self) -> FunctionRegistry:
+    def copy(self) -> "FunctionRegistry":
         """Create a shallow copy of this registry.
 
         Returns:
@@ -317,7 +343,7 @@ class FunctionRegistry:
             functions) won't affect the original.
         """
         new_registry = FunctionRegistry()
-        new_registry._functions = self._functions.copy()  # pylint: disable=protected-access
+        new_registry._functions = self._functions.copy()
         return new_registry
 
     @staticmethod

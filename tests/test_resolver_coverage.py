@@ -187,7 +187,9 @@ class TestUnknownExpressionFallback:
 
         # Call _get_fallback_for_placeable with unknown expression
         # This should hit the case _: return "{???}" branch
-        fallback = resolver._get_fallback_for_placeable(UnknownExpression())
+        fallback = resolver._get_fallback_for_placeable(
+            UnknownExpression()  # type: ignore[arg-type]
+        )
 
         assert fallback == "{???}"
 

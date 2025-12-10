@@ -6,36 +6,17 @@ Includes type guards as static methods (eliminates circular imports).
 Python 3.13+. Zero external dependencies.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Protocol, TypeIs
+from typing import TypeIs
 
-if TYPE_CHECKING:
-    from ftllexbuffer.enums import CommentType
+from ftllexbuffer.enums import CommentType
 
 # ============================================================================
 # BASE TYPES
 # ============================================================================
 
-
-class ASTNode(Protocol):
-    """Base protocol for all AST nodes.
-
-    v0.9.0: Added as a Protocol for structural typing.
-
-    All AST nodes are frozen dataclasses with slots. This Protocol allows
-    for type-safe visitor patterns without requiring explicit inheritance.
-
-    Using Protocol enables:
-    - Structural subtyping (duck typing with type checking)
-    - No runtime overhead
-    - Compatibility with frozen dataclasses
-    - Type-safe visitor methods accepting ASTNode
-
-    Note: This is a marker protocol. All frozen dataclass AST nodes
-    automatically conform to this protocol.
-    """
+# ASTNode type alias is defined at the end of this file after all classes
+# This is necessary because it references all the AST node classes
 
 
 @dataclass(frozen=True, slots=True)
@@ -100,7 +81,7 @@ class Identifier:
     name: str
 
     @staticmethod
-    def guard(key: object) -> TypeIs[Identifier]:
+    def guard(key: object) -> TypeIs["Identifier"]:
         """Type guard for Identifier (used in variant keys)."""
         return isinstance(key, Identifier)
 
@@ -114,10 +95,7 @@ class Identifier:
 class Resource:
     """Root AST node containing all entries."""
 
-    entries: tuple[Entry, ...]
-
-
-type Entry = "Message | Term | Comment | Junk"
+    entries: tuple["Entry", ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -132,13 +110,13 @@ class Message:
     """
 
     id: Identifier
-    value: Pattern | None
-    attributes: tuple[Attribute, ...]
-    comment: Comment | None = None
+    value: "Pattern | None"
+    attributes: tuple["Attribute", ...]
+    comment: "Comment | None" = None
     span: Span | None = None
 
     @staticmethod
-    def guard(entry: object) -> TypeIs[Message]:
+    def guard(entry: object) -> TypeIs["Message"]:
         """Type guard for Message (used in entry filtering)."""
         return isinstance(entry, Message)
 
@@ -152,13 +130,13 @@ class Term:
     """
 
     id: Identifier
-    value: Pattern
-    attributes: tuple[Attribute, ...]
-    comment: Comment | None = None
+    value: "Pattern"
+    attributes: tuple["Attribute", ...]
+    comment: "Comment | None" = None
     span: Span | None = None
 
     @staticmethod
-    def guard(entry: object) -> TypeIs[Term]:
+    def guard(entry: object) -> TypeIs["Term"]:
         """Type guard for Term (used in entry filtering)."""
         return isinstance(entry, Term)
 
@@ -167,7 +145,6 @@ class Term:
 class Attribute:
     """Message or term attribute.
 
-    v0.9.0: Removed span (only top-level entries have spans).
 
     Example:
         login = Sign In
@@ -175,14 +152,13 @@ class Attribute:
     """
 
     id: Identifier
-    value: Pattern
+    value: "Pattern"
 
 
 @dataclass(frozen=True, slots=True)
 class Comment:
     """Comment (# single, ## group, ### resource).
 
-    v0.9.0: type changed from str to CommentType enum for type safety.
     """
 
     content: str
@@ -190,7 +166,7 @@ class Comment:
     span: Span | None = None
 
     @staticmethod
-    def guard(entry: object) -> TypeIs[Comment]:
+    def guard(entry: object) -> TypeIs["Comment"]:
         """Type guard for Comment (used in entry filtering)."""
         return isinstance(entry, Comment)
 
@@ -226,7 +202,7 @@ class Junk:
     span: Span | None = None
 
     @staticmethod
-    def guard(entry: object) -> TypeIs[Junk]:
+    def guard(entry: object) -> TypeIs["Junk"]:
         """Type guard for Junk (used in entry filtering)."""
         return isinstance(entry, Junk)
 
@@ -240,10 +216,7 @@ class Junk:
 class Pattern:
     """Text pattern with optional placeables."""
 
-    elements: tuple[PatternElement, ...]
-
-
-type PatternElement = "TextElement | Placeable"
+    elements: tuple["PatternElement", ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -253,7 +226,7 @@ class TextElement:
     value: str
 
     @staticmethod
-    def guard(elem: object) -> TypeIs[TextElement]:
+    def guard(elem: object) -> TypeIs["TextElement"]:
         """Type guard for TextElement.
 
         Enables type-safe narrowing without circular imports.
@@ -275,10 +248,10 @@ class TextElement:
 class Placeable:
     """Dynamic content: { expression }"""
 
-    expression: Expression
+    expression: "Expression"
 
     @staticmethod
-    def guard(elem: object) -> TypeIs[Placeable]:
+    def guard(elem: object) -> TypeIs["Placeable"]:
         """Type guard for Placeable."""
         return isinstance(elem, Placeable)
 
@@ -287,19 +260,11 @@ class Placeable:
 # EXPRESSIONS
 # ============================================================================
 
-type Expression = "SelectExpression | InlineExpression"
-
-type InlineExpression = (
-    "StringLiteral | NumberLiteral | VariableReference | MessageReference | "
-    "TermReference | FunctionReference | Placeable"
-)
-
 
 @dataclass(frozen=True, slots=True)
 class SelectExpression:
     """Conditional expression with variants.
 
-    v0.9.0: Removed span (only top-level entries have spans).
 
     Example:
         { $count ->
@@ -308,11 +273,11 @@ class SelectExpression:
         }
     """
 
-    selector: InlineExpression
-    variants: tuple[Variant, ...]
+    selector: "InlineExpression"
+    variants: tuple["Variant", ...]
 
     @staticmethod
-    def guard(expr: object) -> TypeIs[SelectExpression]:
+    def guard(expr: object) -> TypeIs["SelectExpression"]:
         """Type guard for SelectExpression."""
         return isinstance(expr, SelectExpression)
 
@@ -321,15 +286,11 @@ class SelectExpression:
 class Variant:
     """Single variant in select expression.
 
-    v0.9.0: Removed span (only top-level entries have spans).
     """
 
-    key: VariantKey
-    value: Pattern
+    key: "VariantKey"
+    value: "Pattern"
     default: bool = False
-
-
-type VariantKey = "Identifier | NumberLiteral"
 
 
 # ============================================================================
@@ -354,7 +315,6 @@ class StringLiteral:
 class NumberLiteral:
     """Number literal: 42 or 3.14
 
-    v0.9.0: Stores parsed numeric value instead of string.
     The raw field preserves original source for serialization.
     """
 
@@ -365,7 +325,7 @@ class NumberLiteral:
     """Original source representation (for serialization)."""
 
     @staticmethod
-    def guard(key: object) -> TypeIs[NumberLiteral]:
+    def guard(key: object) -> TypeIs["NumberLiteral"]:
         """Type guard for NumberLiteral (used in variant keys)."""
         return isinstance(key, NumberLiteral)
 
@@ -382,7 +342,7 @@ class VariableReference:
     id: Identifier
 
     @staticmethod
-    def guard(expr: object) -> TypeIs[VariableReference]:
+    def guard(expr: object) -> TypeIs["VariableReference"]:
         """Type guard for VariableReference."""
         return isinstance(expr, VariableReference)
 
@@ -395,7 +355,7 @@ class MessageReference:
     attribute: Identifier | None = None
 
     @staticmethod
-    def guard(expr: object) -> TypeIs[MessageReference]:
+    def guard(expr: object) -> TypeIs["MessageReference"]:
         """Type guard for MessageReference."""
         return isinstance(expr, MessageReference)
 
@@ -406,10 +366,10 @@ class TermReference:
 
     id: Identifier
     attribute: Identifier | None = None
-    arguments: CallArguments | None = None
+    arguments: "CallArguments | None" = None
 
     @staticmethod
-    def guard(expr: object) -> TypeIs[TermReference]:
+    def guard(expr: object) -> TypeIs["TermReference"]:
         """Type guard for TermReference."""
         return isinstance(expr, TermReference)
 
@@ -419,10 +379,10 @@ class FunctionReference:
     """Function call: FUNCTION(arg1, key: value)"""
 
     id: Identifier
-    arguments: CallArguments
+    arguments: "CallArguments"
 
     @staticmethod
-    def guard(expr: object) -> TypeIs[FunctionReference]:
+    def guard(expr: object) -> TypeIs["FunctionReference"]:
         """Type guard for FunctionReference."""
         return isinstance(expr, FunctionReference)
 
@@ -431,8 +391,8 @@ class FunctionReference:
 class CallArguments:
     """Function call arguments."""
 
-    positional: tuple[InlineExpression, ...]
-    named: tuple[NamedArgument, ...]
+    positional: tuple["InlineExpression", ...]
+    named: tuple["NamedArgument", ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -440,4 +400,50 @@ class NamedArgument:
     """Named argument: name: value"""
 
     name: Identifier
-    value: InlineExpression
+    value: "InlineExpression"
+
+
+# ============================================================================
+# TYPE ALIASES
+# ============================================================================
+
+type Entry = Message | Term | Comment | Junk
+type PatternElement = TextElement | Placeable
+type Expression = SelectExpression | InlineExpression
+type InlineExpression = (
+    StringLiteral
+    | NumberLiteral
+    | VariableReference
+    | MessageReference
+    | TermReference
+    | FunctionReference
+    | Placeable
+)
+type VariantKey = Identifier | NumberLiteral
+
+# Complete ASTNode type - union of all AST node types
+# This replaces the forward declaration at the top of the file
+type ASTNode = (
+    Resource
+    | Message
+    | Term
+    | Attribute
+    | Comment
+    | Junk
+    | Pattern
+    | TextElement
+    | Placeable
+    | SelectExpression
+    | Variant
+    | StringLiteral
+    | NumberLiteral
+    | VariableReference
+    | MessageReference
+    | TermReference
+    | FunctionReference
+    | CallArguments
+    | NamedArgument
+    | Identifier
+    | Annotation
+    | Span
+)

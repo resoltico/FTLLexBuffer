@@ -13,8 +13,6 @@ Key features:
 Python 3.13+.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -47,7 +45,6 @@ if TYPE_CHECKING:
 class VariableInfo:
     """Immutable metadata about a variable reference in a message.
 
-    v0.9.0: context changed from str to VariableContext enum for type safety.
 
     Uses Python 3.13's frozen dataclass with slots for zero-allocation storage.
     """
@@ -77,7 +74,6 @@ class FunctionCallInfo:
 class ReferenceInfo:
     """Immutable metadata about message/term references.
 
-    v0.9.0: kind changed from str to ReferenceKind enum for type safety.
     """
 
     id: str
@@ -162,6 +158,7 @@ class IntrospectionVisitor(ASTVisitor):
 
     def __init__(self) -> None:
         """Initialize visitor with empty result sets."""
+        super().__init__()
         self.variables: set[VariableInfo] = set()
         self.functions: set[FunctionCallInfo] = set()
         self.references: set[ReferenceInfo] = set()
@@ -178,7 +175,7 @@ class IntrospectionVisitor(ASTVisitor):
         for element in node.elements:
             self._visit_pattern_element(element)
 
-    def _visit_pattern_element(self, element: PatternElement) -> None:
+    def _visit_pattern_element(self, element: "PatternElement") -> None:
         """Visit a pattern element (TextElement or Placeable)."""
         match element:
             case TextElement():
@@ -186,7 +183,7 @@ class IntrospectionVisitor(ASTVisitor):
             case Placeable(expression=expr):
                 self._visit_expression(expr)
 
-    def _visit_expression(self, expr: Expression | InlineExpression) -> None:
+    def _visit_expression(self, expr: "Expression | InlineExpression") -> None:
         """Visit an expression and extract metadata using pattern matching."""
         # Use Python 3.13 TypeIs for type-safe narrowing via static .guard() methods
         if VariableReference.guard(expr):

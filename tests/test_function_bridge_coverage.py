@@ -24,7 +24,7 @@ class TestParameterSkipLogic:
 
         # Call with instance as first positional arg
         instance = TestClass()
-        result = registry.call("FORMAT", [instance, 42], {})
+        result = registry.call("FORMAT", [instance, 42], {})  # type: ignore[list-item]
         assert result == "Value: 42"
 
         # Verify 'self' was skipped in parameter mapping

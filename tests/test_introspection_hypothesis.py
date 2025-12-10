@@ -9,9 +9,9 @@ from __future__ import annotations
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from ftllexbuffer import FluentParserV1
 from ftllexbuffer.introspection import extract_variables, introspect_message
 from ftllexbuffer.syntax.ast import Message
+from ftllexbuffer.syntax.parser import FluentParserV1
 
 # ============================================================================
 # HYPOTHESIS STRATEGIES
