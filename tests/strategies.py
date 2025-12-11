@@ -178,7 +178,7 @@ def ftl_variants(draw: st.DrawFn) -> Variant:
     key = draw(
         st.one_of(
             st.builds(Identifier, name=ftl_identifiers()),
-            st.builds(NumberLiteral, value=st.integers(0, 100).map(str)),
+            ftl_number_literals(),
         )
     )
     value = draw(ftl_patterns())

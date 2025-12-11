@@ -18,7 +18,7 @@ class TestNumberCustomPatterns:
         # Negative value
         result, errors = bundle.format_pattern("amount", {"value": -1234.56})
         assert result == "(1,234.56)"
-        assert errors == []
+        assert errors == ()
 
     def test_number_accounting_format_positive(self) -> None:
         """Accounting format shows positives normally."""
@@ -30,7 +30,7 @@ class TestNumberCustomPatterns:
         # Positive value
         result, errors = bundle.format_pattern("amount", {"value": 1234.56})
         assert result == "1,234.56"
-        assert errors == []
+        assert errors == ()
 
     def test_number_fixed_decimals_pattern(self) -> None:
         """Custom pattern with fixed decimal places."""
@@ -39,7 +39,7 @@ class TestNumberCustomPatterns:
 
         result, errors = bundle.format_pattern("amount", {"value": 42})
         assert result == "42.000"
-        assert errors == []
+        assert errors == ()
 
     def test_number_pattern_overrides_other_parameters(self) -> None:
         """Pattern parameter overrides other formatting parameters."""
@@ -51,7 +51,7 @@ class TestNumberCustomPatterns:
         result, errors = bundle.format_pattern("amount", {"value": 42})
         # Pattern wins: shows 2 decimals, not 0
         assert result == "42.00"
-        assert errors == []
+        assert errors == ()
 
     def test_number_pattern_locale_aware(self) -> None:
         """Custom pattern respects locale formatting rules."""
@@ -69,7 +69,7 @@ class TestNumberCustomPatterns:
 
         result, errors = bundle.format_pattern("amount", {"value": 1234.56})
         assert result == "1234.56"
-        assert errors == []
+        assert errors == ()
 
 
 class TestDateTimeCustomPatterns:
@@ -83,7 +83,7 @@ class TestDateTimeCustomPatterns:
         dt = datetime(2025, 10, 27, tzinfo=UTC)
         result, errors = bundle.format_pattern("date", {"dt": dt})
         assert result == "2025-10-27"
-        assert errors == []
+        assert errors == ()
 
     def test_datetime_24hour_time_pattern(self) -> None:
         """24-hour time format."""
@@ -93,7 +93,7 @@ class TestDateTimeCustomPatterns:
         dt = datetime(2025, 10, 27, 14, 30, 45, tzinfo=UTC)
         result, errors = bundle.format_pattern("time", {"dt": dt})
         assert result == "14:30:45"
-        assert errors == []
+        assert errors == ()
 
     def test_datetime_short_month_pattern(self) -> None:
         """Short month name format."""
@@ -103,7 +103,7 @@ class TestDateTimeCustomPatterns:
         dt = datetime(2025, 10, 27, tzinfo=UTC)
         result, errors = bundle.format_pattern("date", {"dt": dt})
         assert result == "Oct 27, 2025"
-        assert errors == []
+        assert errors == ()
 
     def test_datetime_full_format_pattern(self) -> None:
         """Full weekday and month names."""
@@ -113,7 +113,7 @@ class TestDateTimeCustomPatterns:
         dt = datetime(2025, 10, 27, tzinfo=UTC)
         result, errors = bundle.format_pattern("date", {"dt": dt})
         assert result == "Monday, October 27, 2025"
-        assert errors == []
+        assert errors == ()
 
     def test_datetime_pattern_overrides_style(self) -> None:
         """Pattern parameter overrides dateStyle parameter."""
@@ -126,7 +126,7 @@ class TestDateTimeCustomPatterns:
         result, errors = bundle.format_pattern("date", {"dt": dt})
         # Pattern wins: ISO format, not full style
         assert result == "2025-10-27"
-        assert errors == []
+        assert errors == ()
 
     def test_datetime_pattern_locale_aware(self) -> None:
         """Custom pattern respects locale formatting rules."""
@@ -149,7 +149,7 @@ class TestPatternBackwardCompatibility:
 
         result, errors = bundle.format_pattern("amount", {"value": 42})
         assert result == "42.00"
-        assert errors == []
+        assert errors == ()
 
     def test_datetime_without_pattern_works(self) -> None:
         """DATETIME() without pattern still works as before."""
@@ -159,7 +159,7 @@ class TestPatternBackwardCompatibility:
         dt = datetime(2025, 10, 27, tzinfo=UTC)
         result, errors = bundle.format_pattern("date", {"dt": dt})
         assert result == "10/27/25"
-        assert errors == []
+        assert errors == ()
 
 
 class TestPatternUseCases:
@@ -175,7 +175,7 @@ class TestPatternUseCases:
         dt = datetime(2025, 1, 28, tzinfo=UTC)
         result, errors = bundle.format_pattern("export-date", {"date": dt})
         assert result == "Eksportēts: 2025-01-28"
-        assert errors == []
+        assert errors == ()
 
     def test_accounting_negative_format(self) -> None:
         """Accounting format for financial statements."""
@@ -202,7 +202,7 @@ class TestPatternUseCases:
         dt = datetime(2025, 10, 27, 14, 30, 45, tzinfo=UTC)
         result, errors = bundle.format_pattern("timestamp", {"time": dt})
         assert result == "Last updated: 14:30:45"
-        assert errors == []
+        assert errors == ()
 
 
 class TestPatternValidationIntegration:

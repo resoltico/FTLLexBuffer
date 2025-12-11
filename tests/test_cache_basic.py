@@ -31,7 +31,7 @@ class TestCacheDisabled:
         result2, errors2 = bundle.format_pattern("msg", {"name": "Alice"})
 
         assert result1 == result2 == "Hello, Alice!"
-        assert errors1 == errors2 == []
+        assert errors1 == errors2 == ()
 
 
 class TestCacheEnabled:
@@ -63,7 +63,7 @@ class TestCacheEnabled:
 
         # Results must match
         assert result1 == result2 == "Hello, Alice!"
-        assert errors1 == errors2 == []
+        assert errors1 == errors2 == ()
 
     def test_cache_miss_different_args(self) -> None:
         """Cache miss when args differ."""
@@ -328,11 +328,11 @@ class TestCacheIntrospection:
         cache = FormatCache(maxsize=2)
 
         # Put initial value
-        cache.put("msg1", {"name": "Alice"}, None, "en", ("Hello Alice", []))
+        cache.put("msg1", {"name": "Alice"}, None, "en", ("Hello Alice", ()))
         assert len(cache) == 1
 
         # Put same key again (should call move_to_end)
-        cache.put("msg1", {"name": "Alice"}, None, "en", ("Hello Alice!", []))
+        cache.put("msg1", {"name": "Alice"}, None, "en", ("Hello Alice!", ()))
         assert len(cache) == 1  # Size unchanged
 
         # Verify value was updated

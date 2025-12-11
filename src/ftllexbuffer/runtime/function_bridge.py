@@ -144,8 +144,12 @@ class FunctionRegistry:
             if param_name in ("self", "/", "*"):
                 continue
 
+            # Strip leading underscores for FTL name (Python convention for unused/private)
+            # but keep original param_name for the mapping value
+            stripped_name = param_name.lstrip("_")
+
             # Convert Python snake_case → FTL camelCase
-            camel_case = self._to_camel_case(param_name)
+            camel_case = self._to_camel_case(stripped_name)
             auto_map[camel_case] = param_name
 
         # Merge custom mappings with auto-generated ones

@@ -356,19 +356,19 @@ class ParseError:
     Design:
         - Stores cursor at error point (for line:column)
         - User-friendly message
-        - Expected tokens list (for better errors)
+        - Expected tokens tuple (immutable for better errors)
         - Immutable for error chaining
 
     Example:
         >>> cursor = Cursor("hello", 2)
-        >>> error = ParseError("Expected '}'", cursor, expected=['}', ']'])
+        >>> error = ParseError("Expected '}'", cursor, expected=('}', ']'))
         >>> error.format_error()
         "1:3: Expected '}' (expected: '}', ']')"
     """
 
     message: str
     cursor: Cursor
-    expected: list[str] = field(default_factory=list)
+    expected: tuple[str, ...] = field(default_factory=tuple)
 
     def format_error(self) -> str:
         """Format error with line:column.

@@ -602,7 +602,7 @@ class FluentBundle:
         args: Mapping[str, FluentValue] | None = None,
         *,
         attribute: str | None = None,
-    ) -> tuple[str, list[FluentError]]:
+    ) -> tuple[str, tuple[FluentError, ...]]:
         """Format message to string with error reporting.
 
         Mozilla python-fluent aligned API that returns both the formatted
@@ -616,7 +616,7 @@ class FluentBundle:
         Returns:
             Tuple of (formatted_string, errors)
             - formatted_string: Best-effort formatted output (never empty)
-            - errors: List of exceptions encountered during resolution
+            - errors: Tuple of exceptions encountered during resolution (immutable)
 
         Note:
             This method NEVER raises exceptions. All errors are collected
@@ -656,14 +656,14 @@ class FluentBundle:
             )
             error = FluentReferenceError(diagnostic)
             # Don't cache errors
-            return ("{???}", [error])
+            return ("{???}", (error,))
 
         # Check if message exists
         if message_id not in self._messages:
             logger.warning("Message '%s' not found", message_id)
             error = FluentReferenceError(ErrorTemplate.message_not_found(message_id))
             # Don't cache missing message errors
-            return (f"{{{message_id}}}", [error])
+            return (f"{{{message_id}}}", (error,))
 
         message = self._messages[message_id]
 
@@ -678,22 +678,22 @@ class FluentBundle:
 
         # Resolve message (resolver handles all errors internally)
         try:
-            result, errors = resolver.resolve_message(message, args, attribute)
+            result, errors_tuple = resolver.resolve_message(message, args, attribute)
 
-            if errors:
+            if errors_tuple:
                 logger.warning(
-                    "Message resolution errors for '%s': %d error(s)", message_id, len(errors)
+                    "Message resolution errors for '%s': %d error(s)", message_id, len(errors_tuple)
                 )
-                for err in errors:
+                for err in errors_tuple:
                     logger.debug("  - %s: %s", type(err).__name__, err)
             else:
                 logger.debug("Resolved message '%s': %s", message_id, result[:50])
 
             # Cache successful resolution (even if there are non-critical errors)
             if self._cache is not None:
-                self._cache.put(message_id, args, attribute, self._locale, (result, errors))
+                self._cache.put(message_id, args, attribute, self._locale, (result, errors_tuple))
 
-            return (result, errors)
+            return (result, errors_tuple)
 
         except RecursionError:
             # Circular reference detected (message/term references form a cycle)
@@ -701,7 +701,7 @@ class FluentBundle:
             logger.error("Circular reference detected in message '%s'", message_id)
             error = FluentCyclicReferenceError(f"Circular reference in {message_id}")
             # Don't cache circular reference errors
-            return (f"{{{message_id}}}", [error])
+            return (f"{{{message_id}}}", (error,))
 
         except (KeyError, AttributeError, RuntimeError) as e:
             # Resolver raised unexpected error (missing variable, invalid attribute, etc.)
@@ -710,11 +710,11 @@ class FluentBundle:
             from ftllexbuffer.diagnostics import FluentResolutionError  # noqa: PLC0415
 
             error_obj = FluentResolutionError(f"Resolution failed: {e}")
-            return (f"{{{message_id}}}", [error_obj])
+            return (f"{{{message_id}}}", (error_obj,))
 
     def format_value(
         self, message_id: str, args: dict[str, FluentValue] | None = None
-    ) -> tuple[str, list[FluentError]]:
+    ) -> tuple[str, tuple[FluentError, ...]]:
         """Format message to string (alias for format_pattern without attribute access).
 
         This method provides API consistency with FluentLocalization.format_value()
@@ -728,7 +728,7 @@ class FluentBundle:
         Returns:
             Tuple of (formatted_string, errors)
             - formatted_string: Best-effort formatted output (never empty)
-            - errors: List of FluentError instances encountered during resolution
+            - errors: Tuple of FluentError instances encountered during resolution (immutable)
 
         Note:
             This method NEVER raises exceptions. All errors are collected

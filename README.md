@@ -6,7 +6,7 @@
 
 Python 3.13+ implementation of the Fluent Localization System v1.0 specification.
 
-> **Legal:** Licensed under MIT. Independent implementation of Apache 2.0-licensed FTL Specification. See [PATENTS.md](https://github.com/resoltico/ftllexbuffer/blob/main/PATENTS.md) for patent considerations and [NOTICE](https://github.com/resoltico/ftllexbuffer/blob/main/NOTICE) for attributions.
+> **Legal:** FTLLexBuffer is licensed under MIT. Independent implementation of Apache 2.0-licensed FTL Specification. See [PATENTS.md](https://github.com/resoltico/ftllexbuffer/blob/main/PATENTS.md) for patent considerations and [NOTICE](https://github.com/resoltico/ftllexbuffer/blob/main/NOTICE) for attributions.
 
 ## Quick Links
 
@@ -27,10 +27,10 @@ Python 3.13+ implementation of the Fluent Localization System v1.0 specification
 - [Contributing](https://github.com/resoltico/ftllexbuffer/blob/main/CONTRIBUTING.md) - Development guidelines
 
 **Key Features**:
-- Full Fluent v1.0 specification compliance
+- Fluent v1.0 specification compliance
 - Bi-directional localization (format and parse)
 - 200+ locale plural rules via Babel CLDR
-- Optional performance caching (50x speedup)
+- Optional performance caching
 
 ---
 
@@ -220,12 +220,9 @@ l10n = FluentLocalization(['lv', 'en'], ['main.ftl'], loader)
 
 ## Requirements
 
-- Python 3.13 and later. The codebase leverages Python 3.13+ features including `type` keyword type aliases (PEP 695) and `TypeIs` type guards (PEP 742).
+- Python 3.13 and later. The codebase leverages Python 3.13+ features including `type` keyword type aliases (PEP 695) and `TypeIs` type guards (PEP 742). Date/datetime parsing uses Python stdlib (`strptime`, `fromisoformat`) with Babel CLDR patterns.
 - Runtime dependencies:
   - `Babel>=2.17.0` (CLDR-compliant i18n formatting and parsing)
-  - **Note**: Date/datetime parsing uses Python 3.13 stdlib (`strptime`, `fromisoformat`) with Babel CLDR patterns - no external date libraries required
-
-**Legal Note:** FTLLexBuffer is licensed under MIT. For patent considerations and licensing details, see [PATENTS.md](https://github.com/resoltico/ftllexbuffer/blob/main/PATENTS.md) and [NOTICE](https://github.com/resoltico/ftllexbuffer/blob/main/NOTICE).
 
 ## Installation
 
@@ -278,11 +275,9 @@ result, errors = bundle.format_value("greeting", {"name": "Alice"})
 result, errors = bundle.format_pattern("button", attribute="tooltip")
 ```
 
-### Bi-Directional Localization (v0.5.0+, Breaking change in v0.8.0)
+### Bi-Directional Localization
 
 FTLLexBuffer provides **full bi-directional localization** - both formatting (data → display) and parsing (display → data). This is critical for forms, invoices, and any user input that needs to be locale-aware.
-
-**v0.8.0 BREAKING CHANGE**: All parse functions now return `tuple[result, list[FluentParseError]]`.
 
 ```python
 from ftllexbuffer import FluentBundle
@@ -299,14 +294,12 @@ price = Cena: { CURRENCY($amount, currency: "EUR") }
 formatted, _ = bundle.format_pattern("price", {"amount": 1234.56})
 print(formatted)  # "Cena: 1 234,56 €"
 
-# Parse user input back to data (user → data) - v0.8.0 tuple return
-user_input = "1 234,56"
+# Parse user input back to data (user → data)user_input = "1 234,56"
 result, errors = parse_decimal(user_input, "lv_LV")
 if not errors and is_valid_decimal(result):
     print(result)  # Decimal('1234.56')
 
-# Parse currency with automatic symbol detection - v0.8.0 tuple return
-user_input_currency = "1 234,56 €"
+# Parse currency with automatic symbol detectionuser_input_currency = "1 234,56 €"
 result, errors = parse_currency(user_input_currency, "lv_LV")
 if not errors and is_valid_currency(result):
     amount, currency = result
@@ -336,7 +329,7 @@ bundle = FluentBundle("en_US", use_isolating=False)
 
 ---
 
-**Note on Error Handling**: All formatting methods return `(result, errors)` tuples. The `result` is always usable (fallback on error), and `errors` is a list of `FluentError` instances. **Critical**: `format_pattern()` **NEVER raises exceptions** - all errors are collected in the `errors` list. This is by design for graceful degradation in production. **In production code, always check the errors list** and log/report translation issues. Quick Start examples ignore errors for brevity.
+**Note on Error Handling**: All formatting methods return `(result, errors)` tuples. The `result` is always usable (fallback on error), and `errors` is an immutable tuple of `FluentError` instances. **Critical**: `format_pattern()` **NEVER raises exceptions** - all errors are collected in the `errors` tuple. This is by design for graceful degradation in production. **In production code, always check the errors tuple** and log/report translation issues. Quick Start examples ignore errors for brevity.
 
 ---
 
@@ -567,10 +560,10 @@ Main API for Fluent message formatting.
 
 **Parameters:**
 - `locale` (str): Locale code (e.g., "en_US", "lv_LV", "de_DE", "pl_PL")
-- `enable_cache` (bool, default=False): Enable format result caching (v0.5.0+)
-- `cache_size` (int, default=1000): Maximum cache entries (v0.5.0+)
+- `enable_cache` (bool, default=False): Enable format result caching
+- `cache_size` (int, default=1000): Maximum cache entries
 
-**Caching (v0.5.0+)**:
+**Caching**:
 - Opt-in LRU cache for `format_pattern()` results
 - Up to 50x speedup for repeated formatting calls
 - Thread-safe with automatic invalidation on bundle mutations
@@ -843,14 +836,12 @@ Main API for Fluent message formatting.
           print(f"Error at line {error.line}: {error.message}")
   ```
 
-- `clear_cache() -> None` (v0.5.0+)
-
+- `clear_cache() -> None`
   Clear format result cache manually.
 
   Cache is automatically cleared on `add_resource()` and `add_function()`.
 
-- `get_cache_stats() -> dict[str, int] | None` (v0.5.0+)
-
+- `get_cache_stats() -> dict[str, int] | None`
   Get cache statistics (hits, misses, size, hit rate).
 
   Returns `None` if caching not enabled.
@@ -915,8 +906,7 @@ FluentLocalization(
   # result → "Goodbye!" (falls back to English)
   ```
 
-- `format_pattern(message_id: str, args: dict[str, object] | None = None, *, attribute: str | None = None) -> tuple[str, list[FluentError]]` (v0.5.0+)
-
+- `format_pattern(message_id: str, args: dict[str, object] | None = None, *, attribute: str | None = None) -> tuple[str, list[FluentError]]`
   Format message with attribute support and fallback chain.
 
   **Parameters:**
@@ -926,34 +916,29 @@ FluentLocalization(
 
   **Returns:** Tuple of `(formatted_value, errors)`
 
-- `add_function(name: str, func: Callable) -> None` (v0.5.0+)
-
+- `add_function(name: str, func: Callable) -> None`
   Register custom function on all bundles in fallback chain.
 
   **Parameters:**
   - `name` (str): Function name in FTL (UPPERCASE by convention)
   - `func` (Callable): Python function implementation
 
-- `introspect_message(message_id: str) -> MessageIntrospection | None` (v0.5.0+)
-
+- `introspect_message(message_id: str) -> MessageIntrospection | None`
   Get message introspection from first bundle containing the message.
 
   **Returns:** `MessageIntrospection` or `None` if message not found
 
-- `get_babel_locale() -> str` (v0.5.0+)
-
+- `get_babel_locale() -> str`
   Get Babel locale identifier from primary (first) bundle.
 
   **Returns:** Locale string (e.g., "lv", "en")
 
-- `validate_resource(ftl_source: str) -> ValidationResult` (v0.5.0+)
-
+- `validate_resource(ftl_source: str) -> ValidationResult`
   Validate FTL resource using primary bundle.
 
   **Returns:** `ValidationResult` with parse errors and warnings
 
-- `clear_cache() -> None` (v0.5.0+)
-
+- `clear_cache() -> None`
   Clear format cache on all bundles in fallback chain.
 
 - `has_message(message_id: str) -> bool`
@@ -1004,8 +989,7 @@ Formats numeric values with locale-aware thousand separators and decimal points.
 - `useGrouping` (bool, optional): Use thousand separators (default: true)
   - When true: `1234` → `1,234` (en-US), `1 234` (lv-LV), `1.234` (de-DE)
   - When false: `1234` → `1234` (all locales)
-- `pattern` (string, optional): Custom number pattern (overrides other options) - **Added in v0.5.0**
-  - Uses Babel number patterns (e.g., `"#,##0.00;(#,##0.00)"` for accounting format with negative values in parentheses)
+- `pattern` (string, optional): Custom number pattern (overrides other options)  - Uses Babel number patterns (e.g., `"#,##0.00;(#,##0.00)"` for accounting format with negative values in parentheses)
 
 **Examples:**
 
@@ -1096,8 +1080,7 @@ Formats datetime values with locale-specific patterns.
 **Options:**
 - `dateStyle`: "short" | "medium" | "long" | "full" (default: "medium")
 - `timeStyle`: "short" | "medium" | "long" | "full" | null (default: null)
-- `pattern` (string, optional): Custom datetime pattern (overrides style options) - **Added in v0.5.0**
-  - Uses Babel/CLDR patterns (e.g., `"yyyy-MM-dd"` for ISO 8601 dates, `"HH:mm:ss"` for time)
+- `pattern` (string, optional): Custom datetime pattern (overrides style options)  - Uses Babel/CLDR patterns (e.g., `"yyyy-MM-dd"` for ISO 8601 dates, `"HH:mm:ss"` for time)
 
 **Examples:**
 ```ftl
@@ -1208,7 +1191,7 @@ result, errors = bundle.format_pattern("a")
 
 ### CLDR Plural Rules via Babel (200+ Locales)
 
-**v0.9.0**: FTLLexBuffer uses Babel's CLDR implementation for plural rules, supporting 200+ locales with full Unicode CLDR compliance.
+FTLLexBuffer uses Babel's CLDR implementation for plural rules, supporting 200+ locales with full Unicode CLDR compliance.
 
 **Key Benefits**:
 - **Comprehensive Coverage**: All CLDR-supported locales (200+ languages/regions)

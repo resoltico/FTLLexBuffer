@@ -248,7 +248,7 @@ Some methods use "resource" in their name - context determines meaning:
 
 | Term | Definition | Usage |
 |------|------------|-------|
-| **Errors list** | List of FluentError instances | `errors: list[FluentError]` |
+| **Errors tuple** | Immutable tuple of FluentError instances | `errors: tuple[FluentError, ...]` |
 | **Fallback** | Default value when error occurs | "Returns readable fallback" |
 | **Graceful degradation** | Continues with fallback instead of crashing | "Never raises, always degrades gracefully" |
 | **Junk entry** | Unparseable FTL syntax | `Junk` AST node type |
@@ -426,8 +426,8 @@ Complete alphabetical reference:
 
 ---
 
-**Terminology Guide Last Updated**: December 9, 2025
-**FTLLexBuffer Version**: 0.10.0
+**Terminology Guide Last Updated**: December 11, 2025
+**FTLLexBuffer Version**: 0.11.0
 
 **See Also**:
 - [README.md - Terminology Section](README.md#terminology)

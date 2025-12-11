@@ -342,7 +342,7 @@ result, errors = l10n.format_value('hello')
 - ✅ **Similar API**: Both have FluentLocalization for multi-locale
 - ⚠️ **CRITICAL Return difference**:
   - fluent.runtime: Returns just string: `result = l10n.format_value('hello')`
-  - FTLLexBuffer: Returns tuple: `result, errors = l10n.format_value('hello')`
+  - FTLLexBuffer: Returns tuple: `result, errors = l10n.format_value('hello')` (errors is immutable tuple as of v0.11.0)
 - ✅ **PathResourceLoader**: Similar to FluentResourceLoader
 
 ---
@@ -604,7 +604,7 @@ def test_message_formatting():
     result, errors = bundle.format_pattern('hello')
 
     assert result == "Hello!"
-    assert errors == []
+    assert errors == ()  # Empty tuple (v0.11.0)
 ```
 
 **Benefits**:
@@ -703,7 +703,7 @@ from ftllexbuffer import (
 ⚠️ Constructor takes single locale, not list
 ⚠️ No FluentResource wrapper - direct string to `add_resource()`
 ⚠️ Different exception types (but same behavior)
-⚠️ Return tuples instead of mutable error list parameters
+⚠️ Return immutable error tuples instead of mutable lists (v0.11.0: `tuple[FluentError, ...]`)
 ⚠️ Python 3.13+ required (vs 3.6+)
 
 ### What's New in FTLLexBuffer
@@ -763,10 +763,10 @@ from ftllexbuffer import (
 
 ---
 
-**Migration Guide Last Updated**: December 9, 2025
-**FTLLexBuffer Version**: 0.10.0
+**Migration Guide Last Updated**: December 11, 2025
+**FTLLexBuffer Version**: 0.11.0
 **fluent.runtime Version Referenced**: 0.4.0
 
-**Note**: This guide covers migration from fluent.runtime to FTLLexBuffer v0.9.0. For v0.9.0 breaking changes from earlier FTLLexBuffer versions, see [CHANGELOG.md](CHANGELOG.md).
+**Note**: This guide covers migration from fluent.runtime to FTLLexBuffer. For v0.11.0 breaking changes (immutable error tuples), see [CHANGELOG.md](CHANGELOG.md).
 
 **Feedback**: If you encounter migration issues not covered here, please open an issue!

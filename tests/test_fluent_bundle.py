@@ -113,7 +113,7 @@ button-save = Saglabāt
         result, errors = bundle.format_pattern("hello")
 
         assert result == "Sveiki, pasaule!"
-        assert errors == [], f"Unexpected errors: {errors}"
+        assert errors == (), f"Unexpected errors: {errors}"
 
     def test_format_pattern_with_variable(self, bundle: Any) -> None:
         """format_pattern substitutes variable from args."""
@@ -121,7 +121,7 @@ button-save = Saglabāt
 
         assert "Jānis" in result
         assert "Laipni lūdzam" in result
-        assert errors == [], f"Unexpected errors: {errors}"
+        assert errors == (), f"Unexpected errors: {errors}"
 
     def test_format_pattern_with_multiple_variables(self, bundle: Any) -> None:
         """format_pattern substitutes multiple variables."""
@@ -129,7 +129,7 @@ button-save = Saglabāt
 
         assert "Anna" in result
         assert "Sveiki" in result
-        assert errors == [], f"Unexpected errors: {errors}"
+        assert errors == (), f"Unexpected errors: {errors}"
 
     def test_format_pattern_missing_variable_uses_placeholder(self, bundle: Any) -> None:
         """format_pattern handles missing variable gracefully."""
@@ -149,7 +149,7 @@ button-save = Saglabāt
 
         # Should successfully retrieve the .tooltip attribute
         assert result == "Saglabā ierakstu datubāzē"
-        assert errors == [], f"Unexpected errors: {errors}"
+        assert errors == (), f"Unexpected errors: {errors}"
 
     def test_format_pattern_missing_message_raises_error(self, bundle: Any) -> None:
         """format_pattern for non-existent message raises FluentReferenceError."""
@@ -164,14 +164,14 @@ button-save = Saglabāt
         result, errors = bundle.format_pattern("hello", None)
 
         assert result == "Sveiki, pasaule!"
-        assert errors == [], f"Unexpected errors: {errors}"
+        assert errors == (), f"Unexpected errors: {errors}"
 
     def test_format_pattern_empty_args(self, bundle: Any) -> None:
         """format_pattern with empty dict works."""
         result, errors = bundle.format_pattern("hello", {})
 
         assert result == "Sveiki, pasaule!"
-        assert errors == [], f"Unexpected errors: {errors}"
+        assert errors == (), f"Unexpected errors: {errors}"
 
 
 class TestFluentBundleHasMessage:
@@ -302,7 +302,7 @@ class TestFluentBundleErrorHandling:
         result, errors = bundle.format_pattern("test", {})
 
         assert result == "Test message"
-        assert errors == [], f"Unexpected errors: {errors}"
+        assert errors == (), f"Unexpected errors: {errors}"
 
     def test_add_resource_with_terms_and_junk(self) -> None:
         """add_resource handles mix of messages, terms, and junk."""
@@ -340,7 +340,7 @@ class TestFluentBundleIntegration:
 
         assert "Sveiki" in result
         assert "Pēteris" in result
-        assert errors == [], f"Unexpected errors: {errors}"
+        assert errors == (), f"Unexpected errors: {errors}"
 
     def test_multiple_locales_independent(self) -> None:
         """Multiple bundles for different locales are independent."""
@@ -352,10 +352,10 @@ class TestFluentBundleIntegration:
 
         result_lv, errors_lv = bundle_lv.format_pattern("hello")
         assert result_lv == "Sveiki!"
-        assert errors_lv == []
+        assert errors_lv == ()
         result_en, errors_en = bundle_en.format_pattern("hello")
         assert result_en == "Hello!"
-        assert errors_en == []
+        assert errors_en == ()
 
     def test_overwrite_message_with_new_resource(self) -> None:
         """Adding resource with same message ID overwrites."""
@@ -364,12 +364,12 @@ class TestFluentBundleIntegration:
         bundle.add_resource("msg = Original")
         result1, errors1 = bundle.format_pattern("msg")
         assert result1 == "Original"
-        assert errors1 == []
+        assert errors1 == ()
 
         bundle.add_resource("msg = Updated")
         result2, errors2 = bundle.format_pattern("msg")
         assert result2 == "Updated"
-        assert errors2 == []
+        assert errors2 == ()
 
 
 class TestFluentBundleEdgeCases:
@@ -417,14 +417,14 @@ class TestFluentBundleEdgeCases:
         # Normal case works
         result, errors = bundle.format_pattern("msg", {})
         assert result == "Test value"
-        assert errors == [], f"Unexpected errors: {errors}"
+        assert errors == (), f"Unexpected errors: {errors}"
 
         # Even with weird args, should not crash
         result, errors = bundle.format_pattern(
             "msg", {"weird": object()}  # type: ignore[dict-item]
         )
         assert isinstance(result, str)
-        assert errors == [], f"Unexpected errors: {errors}"
+        assert errors == (), f"Unexpected errors: {errors}"
 
     def test_add_resource_with_invalid_fluent_syntax(self) -> None:
         """Bundle handles completely invalid Fluent syntax."""
@@ -486,7 +486,7 @@ msg = Test message
         bundle.add_resource("msg = Test message")
         result, errors = bundle.format_pattern("msg", {})
         assert result == "Test message"
-        assert errors == [], f"Unexpected errors: {errors}"
+        assert errors == (), f"Unexpected errors: {errors}"
 
     def test_get_message_ids_with_terms_excluded(self) -> None:
         """get_message_ids returns only messages, not terms."""
@@ -702,7 +702,7 @@ def test_use_isolating_enabled_by_default():
     # Should contain FSI (U+2068) and PDI (U+2069) marks
     assert "\u2068Alice\u2069" in result
     assert result == "مرحبا \u2068Alice\u2069!"
-    assert errors == [], f"Unexpected errors: {errors}"
+    assert errors == (), f"Unexpected errors: {errors}"
 
 
 def test_use_isolating_can_be_disabled():
@@ -715,7 +715,7 @@ def test_use_isolating_can_be_disabled():
     assert "\u2068" not in result
     assert "\u2069" not in result
     assert result == "Hello Alice!"
-    assert errors == [], f"Unexpected errors: {errors}"
+    assert errors == (), f"Unexpected errors: {errors}"
 
 
 def test_use_isolating_with_multiple_placeables():
@@ -726,7 +726,7 @@ def test_use_isolating_with_multiple_placeables():
 
     # Each placeable wrapped independently
     assert result == "\u2068Alice\u2069 و \u2068Bob\u2069"
-    assert errors == [], f"Unexpected errors: {errors}"
+    assert errors == (), f"Unexpected errors: {errors}"
 
 
 def test_cache_enabled_property_when_enabled():

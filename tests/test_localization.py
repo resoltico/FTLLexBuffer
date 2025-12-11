@@ -145,7 +145,7 @@ class TestFormatValue:
         result, errors = l10n.format_value("hello")
 
         assert result == "Hello, World!"
-        assert errors == []
+        assert errors == ()
 
     def test_format_message_with_variables(self) -> None:
         """Format message with variable interpolation."""

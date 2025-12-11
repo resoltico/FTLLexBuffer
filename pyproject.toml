@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "ftllexbuffer"
-version = "0.10.0"
+version = "0.11.0"
 description = "Python implementation of the FTL (Fluent Translation List) specification"
 readme = "README.md"
 requires-python = ">=3.13"
@@ -294,6 +294,7 @@ disable = [
     "duplicate-code",             # Similar __all__ lists across modules is intentional
     "too-many-return-statements", # Parser/resolver patterns need multiple returns
     "import-outside-toplevel",    # Runtime imports avoid circular dependencies
+    "cyclic-import",              # Parser modules are mutually recursive by design (grammar)
     "unreachable",                # Pylint doesn't recognize Never return type from Result monad
     "assignment-from-no-return",  # Pylint doesn't recognize Never return type from Result monad
     "invalid-name",               # Visitor pattern visit_NodeName methods

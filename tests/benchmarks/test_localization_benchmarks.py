@@ -39,7 +39,7 @@ class TestLocalizationBenchmarks:
         result, errors = benchmark(l10n_two_locales.format_value, "home")
 
         assert result == "Mājas"
-        assert errors == []
+        assert errors == ()
 
     def test_format_second_locale_fallback(
         self, benchmark, l10n_two_locales: FluentLocalization
@@ -48,7 +48,7 @@ class TestLocalizationBenchmarks:
         result, errors = benchmark(l10n_two_locales.format_value, "about")
 
         assert result == "About"
-        assert errors == []
+        assert errors == ()
 
     def test_format_three_locale_chain(
         self, benchmark, l10n_three_locales: FluentLocalization
@@ -57,4 +57,4 @@ class TestLocalizationBenchmarks:
         result, errors = benchmark(l10n_three_locales.format_value, "contact")
 
         assert result == "Kontaktai"
-        assert errors == []
+        assert errors == ()

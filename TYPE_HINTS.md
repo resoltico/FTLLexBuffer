@@ -18,7 +18,7 @@ def format_message(bundle: FluentBundle, msg_id: MessageId) -> str:
     """Format message with proper type annotations."""
     result, errors = bundle.format_pattern(msg_id)
     if errors:
-        # errors is list[FluentError] - fully typed
+        # errors is tuple[FluentError, ...] - fully typed (v0.11.0: immutable)
         for error in errors:
             print(f"Error: {error}")
     return result
@@ -216,13 +216,13 @@ class MessageFormatter:
     def _log_errors(
         self,
         msg_id: MessageId,
-        errors: list[FluentError],
+        errors: tuple[FluentError, ...],
     ) -> None:
         """Log translation errors.
 
         Args:
             msg_id: Message that had errors
-            errors: List of errors encountered
+            errors: Tuple of errors encountered (immutable as of v0.11.0)
         """
         for error in errors:
             logger.warning(
@@ -505,11 +505,11 @@ from ftllexbuffer import (
 )
 
 
-def handle_errors(errors: list[FluentError]) -> None:
+def handle_errors(errors: tuple[FluentError, ...]) -> None:
     """Handle translation errors with exhaustive matching.
 
     Args:
-        errors: List of errors from formatting
+        errors: Tuple of errors from formatting (immutable as of v0.11.0)
     """
     for error in errors:
         match error:
@@ -545,29 +545,29 @@ from ftllexbuffer import FluentError, FluentReferenceError
 class ErrorReport:
     """Type-safe error categorization."""
 
-    critical: list[FluentError]
-    warnings: list[FluentError]
+    critical: tuple[FluentError, ...]
+    warnings: tuple[FluentError, ...]
 
     @classmethod
-    def from_errors(cls, errors: list[FluentError]) -> ErrorReport:
+    def from_errors(cls, errors: tuple[FluentError, ...]) -> ErrorReport:
         """Categorize errors by severity.
 
         Args:
-            errors: List of translation errors
+            errors: Tuple of translation errors (immutable as of v0.11.0)
 
         Returns:
             Categorized error report
         """
-        critical: list[FluentError] = []
-        warnings: list[FluentError] = []
+        critical_list: list[FluentError] = []
+        warnings_list: list[FluentError] = []
 
         for error in errors:
             if isinstance(error, FluentReferenceError):
-                critical.append(error)
+                critical_list.append(error)
             else:
-                warnings.append(error)
+                warnings_list.append(error)
 
-        return cls(critical=critical, warnings=warnings)
+        return cls(critical=tuple(critical_list), warnings=tuple(warnings_list))
 
     @property
     def has_critical(self) -> bool:
@@ -800,8 +800,8 @@ if Message.guard(msg):
 
 ---
 
-**Type Hints Guide Last Updated**: December 9, 2025
-**FTLLexBuffer Version**: 0.10.0
+**Type Hints Guide Last Updated**: December 11, 2025
+**FTLLexBuffer Version**: 0.11.0
 **Python Version**: 3.13+
 
 **See Also**:

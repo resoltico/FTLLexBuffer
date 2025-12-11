@@ -246,7 +246,7 @@ class TestFormatPatternErrorHandling:
 
         result, errors = bundle.format_pattern("msg", None)
         assert result == "Value"
-        assert errors == []
+        assert errors == ()
 
     def test_format_with_empty_args(self):
         """Kills: len(args) > 0 mutations.
@@ -258,7 +258,7 @@ class TestFormatPatternErrorHandling:
 
         result, errors = bundle.format_pattern("msg", {})
         assert result == "Value"
-        assert errors == []
+        assert errors == ()
 
     def test_format_with_missing_variable(self):
         """Kills: variable lookup error handling mutations.
@@ -364,8 +364,8 @@ class TestResourceAccumulationValidation:
 
         assert first_result == "First"
         assert second_result == "Second"
-        assert first_errors == []
-        assert second_errors == []
+        assert first_errors == ()
+        assert second_errors == ()
 
     def test_add_resource_preserves_other_messages(self):
         """Kills: dict clear() mutations.

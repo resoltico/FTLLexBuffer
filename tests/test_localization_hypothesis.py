@@ -86,7 +86,7 @@ class TestLocalizationUniversalProperties:
         result, errors = l10n.format_value(message_id)
 
         assert isinstance(result, str)
-        assert isinstance(errors, list)
+        assert isinstance(errors, tuple)
 
     @given(
         locales=st.lists(locale_codes(), min_size=2, max_size=4, unique=True),

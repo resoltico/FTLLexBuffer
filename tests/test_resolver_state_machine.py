@@ -268,7 +268,7 @@ class FluentResolverStateMachine(RuleBasedStateMachine):
         # Try resolving attribute
         result, errors = self.resolver.resolve_message(message, args={}, attribute=attr_name)
         assert text in result
-        assert errors == [], f"Unexpected errors: {errors}"
+        assert errors == (), f"Unexpected errors: {errors}"
 
     @rule(msg_id=messages)
     def resolve_nonexistent_attribute(self, msg_id: str):
@@ -444,7 +444,7 @@ class FluentResolverStateMachine(RuleBasedStateMachine):
         # Resolve with count argument
         result, errors = self.resolver.resolve_message(message, args={"count": number})
         assert result in ["singular", "plural"]
-        assert errors == [], f"Unexpected errors: {errors}"
+        assert errors == (), f"Unexpected errors: {errors}"
 
     @rule()
     def test_message_no_value(self):
@@ -506,7 +506,7 @@ class FluentResolverStateMachine(RuleBasedStateMachine):
 
         if func_name == "NUMBER":
             assert "42" in result
-            assert errors == []
+            assert errors == ()
         else:
             # Should gracefully degrade (unknown function)
             assert len(errors) > 0  # Should have error for unknown function

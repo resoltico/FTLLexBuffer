@@ -90,7 +90,7 @@ class FluentResolver:
         message: Message,
         args: Mapping[str, FluentValue] | None = None,
         attribute: str | None = None,
-    ) -> tuple[str, list[FluentError]]:
+    ) -> tuple[str, tuple[FluentError, ...]]:
         """Resolve message to final string with error collection.
 
         Mozilla python-fluent aligned API:
@@ -106,7 +106,7 @@ class FluentResolver:
         Returns:
             Tuple of (formatted_string, errors)
             - formatted_string: Best-effort output (never empty)
-            - errors: List of exceptions encountered
+            - errors: Tuple of exceptions encountered (immutable)
 
         Note:
             Per Fluent spec, resolution never fails catastrophically.
@@ -123,13 +123,13 @@ class FluentResolver:
                     ErrorTemplate.attribute_not_found(attribute, message.id.name)
                 )
                 self.errors.append(error)
-                return (f"{{{message.id.name}.{attribute}}}", self.errors)
+                return (f"{{{message.id.name}.{attribute}}}", tuple(self.errors))
             pattern = attr.value
         else:
             if message.value is None:
                 error = FluentReferenceError(ErrorTemplate.message_no_value(message.id.name))
                 self.errors.append(error)
-                return (f"{{{message.id.name}}}", self.errors)
+                return (f"{{{message.id.name}}}", tuple(self.errors))
             pattern = message.value
 
         # Check for circular references
@@ -138,12 +138,12 @@ class FluentResolver:
             cycle_path = [*self._resolution_stack, msg_key]
             error = FluentCyclicReferenceError(ErrorTemplate.cyclic_reference(cycle_path))
             self.errors.append(error)
-            return (f"{{{msg_key}}}", self.errors)
+            return (f"{{{msg_key}}}", tuple(self.errors))
 
         try:
             self._resolution_stack.append(msg_key)
             result = self._resolve_pattern(pattern, args)
-            return (result, self.errors)
+            return (result, tuple(self.errors))
         finally:
             self._resolution_stack.pop()
 

@@ -2,7 +2,7 @@
 
 Complete reference documentation for FTLLexBuffer's public API.
 
-**Latest Version**: 0.10.0 | [Changelog](CHANGELOG.md)
+**Latest Version**: 0.11.0 | [Changelog](CHANGELOG.md)
 
 **Package**: `ftllexbuffer`
 **Python Version**: 3.13+
@@ -26,9 +26,9 @@ Complete reference documentation for FTLLexBuffer's public API.
 
 ## Importing from FTLLexBuffer
 
-**v0.10.0 Breaking Change**: Root `ftllexbuffer` package now exports only **12 essential symbols**. Advanced features require explicit submodule imports.
+Root `ftllexbuffer` package exports only **12 essential symbols**. Advanced features require explicit submodule imports.
 
-### Core API (Root Imports - v0.10.0)
+### Core API (Root Imports)
 
 **Essential imports available from root** (only these 12 symbols):
 
@@ -362,7 +362,7 @@ FluentBundle(locale: LocaleCode, *, use_isolating: bool = True)
   - Format: `"language_TERRITORY"` or `"language-TERRITORY"` (both separators supported)
   - Examples: `"en_US"`, `"en-US"`, `"ar_SA"`, `"ar-SA"`, `"lv_LV"`, `"lv-LV"`
   - Automatic normalization: Both BCP 47 (hyphen) and POSIX (underscore) formats supported
-  - **v0.9.0**: Uses Babel's CLDR data (200+ locales supported)
+  - Uses Babel's CLDR data (200+ locales supported)
   - Fallback: Simple one/other rules for unsupported/invalid locales
 
 - **`use_isolating`** (bool, default=True): Wrap interpolated values in Unicode bidi isolation marks
@@ -401,7 +401,7 @@ Parse and load FTL source into bundle.
 **Parameters**:
 
 - **`source`** (FTLSource): FTL source (UTF-8 encoded string)
-- **`source_path`** (str | None, optional): File path for error messages (Added in v0.2.0)
+- **`source_path`** (str | None, optional): File path for error messages
 
 **Returns**:
 
@@ -417,7 +417,7 @@ Parse and load FTL source into bundle.
 - Non-critical syntax errors become `Junk` entries (logged at DEBUG level)
 - Messages/Terms with duplicate IDs: **last-write-wins** (later definition replaces earlier)
 - Comments are parsed but not stored (not needed for runtime)
-- **source_path** (v0.2.0+): When provided, includes file context in error/warning logs for easier debugging
+- **source_path**: When provided, includes file context in error/warning logs for easier debugging
 
 **Example**:
 
@@ -432,7 +432,7 @@ hello = Sveiki!
 goodbye = Uz redzēšanos!
 """)
 
-# From file (with source_path for better error messages - v0.2.0+)
+# From file (with source_path for better error messages)
 ftl_path = Path("locale/lv/main.ftl")
 bundle.add_resource(ftl_path.read_text(encoding="utf-8"), source_path=str(ftl_path))
 # Junk errors now logged as: "Junk entry in locale/lv/main.ftl:42: invalid syntax"
@@ -451,7 +451,7 @@ format_pattern(
     args: dict[str, Any] | None = None,
     *,
     attribute: str | None = None
-) -> tuple[str, list[FluentError]]
+) -> tuple[str, tuple[FluentError, ...]]
 ```
 
 Format message to localized string with variable substitution.
@@ -464,20 +464,20 @@ Format message to localized string with variable substitution.
 
 **Returns**:
 
-- **`tuple[str, list[FluentError]]`**: Tuple of (formatted_string, errors)
+- **`tuple[str, tuple[FluentError, ...]]`**: Tuple of (formatted_string, errors)
   - `formatted_string`: Best-effort formatted output (never empty, always contains readable fallback)
-  - `errors`: List of FluentError instances encountered during resolution. May contain:
+  - `errors`: Immutable tuple of FluentError instances encountered during resolution. May contain:
     - **FluentReferenceError**: Missing message, variable, or term
     - **FluentResolutionError**: Runtime error during function execution
     - **FluentCyclicReferenceError**: Circular reference detected (message references itself)
 
 **Error Handling** (Mozilla python-fluent aligned):
 
-- **Never raises exceptions**: All errors collected in list[FluentError] returned
+- **Never raises exceptions**: All errors collected in tuple[FluentError, ...] returned
 - **Readable fallbacks**: `{$variable}`, `{message}`, `{-term}` (per Fluent spec)
-- **Graceful degradation**: Always returns usable output, errors list available for logging
-- **Circular references**: Returns `"{message_id}"` with FluentCyclicReferenceError in errors list
-- **Missing variables**: Returns readable fallback `{$name}` with FluentReferenceError in errors list
+- **Graceful degradation**: Always returns usable output, errors tuple available for logging
+- **Circular references**: Returns `"{message_id}"` with FluentCyclicReferenceError in errors tuple
+- **Missing variables**: Returns readable fallback `{$name}` with FluentReferenceError in errors tuple
 
 **Examples**:
 
@@ -541,7 +541,7 @@ result, errors = bundle.format_pattern("nonexistent")
 format_value(
     message_id: str,
     args: dict[str, Any] | None = None
-) -> tuple[str, list[FluentError]]
+) -> tuple[str, tuple[FluentError, ...]]
 ```
 
 Format message to string (alias for format_pattern without attribute access).
@@ -555,7 +555,7 @@ Format message to string (alias for format_pattern without attribute access).
 
 **Returns**:
 
-- **`tuple[str, list[FluentError]]`**: Tuple of (formatted_string, errors)
+- **`tuple[str, tuple[FluentError, ...]]`**: Tuple of (formatted_string, errors)
 
 **Note**: Identical behavior to `format_pattern()` without attribute parameter. Use this when you don't need to access message attributes.
 
@@ -854,8 +854,6 @@ if missing:
 
 #### get_all_message_variables
 
-> **Added in**: 0.1.1
-
 ```python
 get_all_message_variables() -> dict[str, frozenset[str]]
 ```
@@ -946,8 +944,6 @@ print(f"Functions: {info.get_function_names()}")
 ---
 
 #### get_babel_locale
-
-**Added in v0.2.0**
 
 ```python
 get_babel_locale() -> str
@@ -1483,8 +1479,6 @@ print(missing)  # None
 
 #### list_functions()
 
-**Added in v0.4.0**
-
 ```python
 FunctionRegistry.list_functions() -> list[str]
 ```
@@ -1507,8 +1501,6 @@ print(f"Available functions: {len(functions)}")
 ---
 
 #### get_function_info()
-
-**Added in v0.4.0**
 
 ```python
 FunctionRegistry.get_function_info(ftl_name: str) -> FunctionSignature | None
@@ -1550,8 +1542,6 @@ if info:
 ---
 
 #### `__iter__()`, `__len__()`, `__contains__()`
-
-**Added in v0.4.0**
 
 FunctionRegistry implements dict-like protocol for convenient iteration and membership testing.
 
@@ -1725,7 +1715,7 @@ List of parse error entries. Each `ValidationError` object has structured fields
 - `.column` (int | None): Column number where error occurred
 - `.source_path` (str | None): Source file path (if available)
 
-**Note**: In v0.9.0+, errors are structured `ValidationError` instances (not raw `Junk` AST nodes).
+**Note**: Errors are structured `ValidationError` instances (not raw `Junk` AST nodes).
 
 #### warnings
 
@@ -1758,13 +1748,13 @@ print(f"Valid: {result.is_valid}")
 print(f"Errors: {result.error_count}")
 print(f"Warnings: {result.warning_count}")
 
-# Check syntax errors (v0.9.0: ValidationError instances)
+# Check syntax errors
 if not result.is_valid:
     for error in result.errors:
         location = f"line {error.line}" if error.line else "unknown location"
         print(f"Parse error at {location}: {error.message}")
 
-# Check semantic warnings (v0.9.0: ValidationWarning instances)
+# Check semantic warnings
 if result.warning_count > 0:
     for warning in result.warnings:
         location = f"line {warning.line}" if warning.line else "unknown location"
@@ -1786,7 +1776,7 @@ All formatting methods in FTLLexBuffer return `(result, errors)` tuples. This de
 
 ### Core Principle: Errors Never Crash Your Application
 
-**CRITICAL**: `format_pattern()` and `format_value()` **NEVER raise exceptions**. All errors are collected and returned in the `errors` list. The `result` string is **always usable**, providing a fallback value even on error.
+**CRITICAL**: `format_pattern()` and `format_value()` **NEVER raise exceptions**. All errors are collected and returned in the immutable `errors` tuple. The `result` string is **always usable**, providing a fallback value even on error.
 
 ```python
 # This NEVER crashes - even with invalid input
@@ -2216,8 +2206,6 @@ FTLLexBuffer provides built-in Fluent functions following ECMA-402 International
 
 ### NUMBER
 
-> **Added in**: 0.1.0
-
 ```python
 NUMBER(value, options)
 ```
@@ -2230,7 +2218,7 @@ Format numeric values with locale-specific separators.
 - **`minimumFractionDigits`** (int, default=0): Minimum decimal places
 - **`maximumFractionDigits`** (int, default=3): Maximum decimal places
 - **`useGrouping`** (bool, default=True): Use thousand separators
-- **`pattern`** (string, optional): Custom number pattern (overrides other options) - **Added in v0.5.0**
+- **`pattern`** (string, optional): Custom number pattern (overrides other options)
 
 **Returns**: Formatted number string
 
@@ -2277,8 +2265,6 @@ bundle_de.format_pattern("price", {"amount": 1234.5})
 
 ### DATETIME
 
-> **Added in**: 0.1.0
-
 ```python
 DATETIME(value, options)
 ```
@@ -2290,7 +2276,7 @@ Format datetime values with locale-specific patterns.
 - **`value`** (datetime | str): datetime object or ISO 8601 string
 - **`dateStyle`** ("short" | "medium" | "long" | "full", default="medium"): Date format
 - **`timeStyle`** ("short" | "medium" | "long" | "full" | None, default=None): Time format
-- **`pattern`** (string, optional): Custom datetime pattern (overrides style options) - **Added in v0.5.0**
+- **`pattern`** (string, optional): Custom datetime pattern (overrides style options)
 
 **Returns**: Formatted datetime string
 
@@ -2336,8 +2322,6 @@ bundle.format_pattern("timestamp", {"time": dt})
 ```
 
 ### CURRENCY
-
-**Added in v0.2.0**
 
 ```python
 CURRENCY(value, options)
@@ -2471,8 +2455,6 @@ bundle = FluentBundle("ar", use_isolating=False)
 
 ## Parsing API
 
-> **Added in**: 0.5.0
-
 FTLLexBuffer provides bi-directional localization: both formatting (data → display) and parsing (display → data). The parsing API complements the formatting functions (NUMBER, DATETIME, CURRENCY) by providing the inverse operations.
 
 **Module**: `ftllexbuffer.parsing`
@@ -2488,8 +2470,6 @@ FTLLexBuffer provides bi-directional localization: both formatting (data → dis
 ---
 
 ### parse_number()
-
-> **Added in**: 0.5.0 | **Breaking change in**: 0.8.0
 
 ```python
 from ftllexbuffer.parsing import parse_number
@@ -2512,8 +2492,6 @@ Parse locale-aware number string to `float`.
 - `tuple[float, list[FluentParseError]]`:
   - First element: Parsed float, or `0.0` if parsing failed
   - Second element: List of errors (empty on success)
-
-**v0.8.0 Breaking Change**: Returns tuple instead of raising exceptions. The `strict` parameter was removed.
 
 **Locale Behavior**:
 - Uses Babel's `parse_decimal()` internally (CLDR-compliant)
@@ -2539,7 +2517,7 @@ result, errors = parse_number("1 234,5", "lv_LV")
 result, errors = parse_number("1.234,5", "de_DE")
 # result → 1234.5, errors → []
 
-# Error handling (v0.8.0+)
+# Error handling
 result, errors = parse_number("invalid", "en_US")
 if errors:
     print(f"Parse error: {errors[0]}")
@@ -2557,8 +2535,6 @@ else:
 ---
 
 ### parse_decimal()
-
-> **Added in**: 0.5.0 | **Breaking change in**: 0.8.0
 
 ```python
 from decimal import Decimal
@@ -2582,8 +2558,6 @@ Parse locale-aware number string to `Decimal` (financial precision).
 - `tuple[Decimal, list[FluentParseError]]`:
   - First element: Parsed Decimal, or `Decimal("0")` if parsing failed
   - Second element: List of errors (empty on success)
-
-**v0.8.0 Breaking Change**: Returns tuple instead of raising exceptions. The `strict` parameter was removed.
 
 **Why Decimal for Financial Data**:
 
@@ -2630,7 +2604,7 @@ result, errors = parse_decimal("1 234,56", "lv_LV")
 result, errors = parse_decimal("1.234,56", "de_DE")
 # result → Decimal('1234.56'), errors → []
 
-# Error handling (v0.8.0+)
+# Error handling
 result, errors = parse_decimal("invalid", "en_US")
 if errors:
     print(f"Parse error: {errors[0]}")
@@ -2648,8 +2622,6 @@ if errors:
 ---
 
 ### parse_date()
-
-> **Added in**: 0.5.0 | **Breaking change in**: 0.8.0
 
 ```python
 from datetime import date
@@ -2674,8 +2646,6 @@ Parse locale-aware date string to `date` object.
   - First element: Parsed date object, or `None` if parsing failed
   - Second element: List of errors (empty on success)
 
-**v0.8.0 Breaking Change**: Returns tuple instead of raising exceptions. The `strict` parameter was removed.
-
 **Locale Behavior**:
 - Uses Babel CLDR patterns with Python 3.13 `strptime` for flexible parsing
 - Locale determines day-first vs month-first interpretation:
@@ -2683,7 +2653,7 @@ Parse locale-aware date string to `date` object.
   - Europe: "01/02/2025" → February 1 (day-first)
 - ISO 8601 format ("2025-01-28") works universally (recommended for unambiguous dates)
 
-**Supported Patterns** (v0.7.0+):
+**Supported Patterns**:
 1. ISO 8601 format (fast path): "2025-01-28"
 2. Locale-specific CLDR patterns from Babel
 3. **No fallback patterns** - only ISO 8601 and locale CLDR patterns are supported
@@ -2706,7 +2676,7 @@ result, errors = parse_date("28.01.2025", "lv_LV")
 result, errors = parse_date("2025-01-28", "en_US")
 # result → date(2025, 1, 28), errors → []
 
-# Error handling (v0.8.0+)
+# Error handling
 result, errors = parse_date("invalid", "en_US")
 if errors:
     print(f"Parse error: {errors[0]}")
@@ -2729,15 +2699,13 @@ result, _ = parse_date("2025-01-02", locale)  # → Always January 2
 - **Python 3.13 stdlib only** - Uses `datetime.strptime()` and `datetime.fromisoformat()` (no external date libraries)
 - **Babel CLDR patterns** - Converts Babel date patterns to strptime format directives (e.g., `"M/d/yy"` → `"%m/%d/%y"`)
 - **Fast path** - ISO 8601 dates use native `fromisoformat()` for maximum speed
-- **No fallback patterns** (v0.7.0+) - Only ISO 8601 and locale CLDR patterns are supported
+- **No fallback patterns** - Only ISO 8601 and locale CLDR patterns are supported
 - **Thread-safe** - No global state, immutable pattern lists
 - **Zero external dependencies** beyond Babel (already required for number formatting)
 
 ---
 
 ### parse_datetime()
-
-> **Added in**: 0.5.0 | **Breaking change in**: 0.8.0
 
 ```python
 from datetime import datetime, timezone
@@ -2764,8 +2732,6 @@ Parse locale-aware datetime string to `datetime` object.
 - `tuple[datetime | None, list[FluentParseError]]`:
   - First element: Parsed datetime object, or `None` if parsing failed
   - Second element: List of errors (empty on success)
-
-**v0.8.0 Breaking Change**: Returns tuple instead of raising exceptions. The `strict` parameter was removed.
 
 **Timezone Handling**:
 - If string contains timezone info, uses that timezone
@@ -2795,7 +2761,7 @@ result, errors = parse_datetime("2025-01-28 14:30", "en_US")
 result, errors = parse_datetime("2025-01-28 14:30", "en_US", tzinfo=timezone.utc)
 # result → datetime(2025, 1, 28, 14, 30, tzinfo=timezone.utc), errors → []
 
-# Error handling (v0.8.0+)
+# Error handling
 result, errors = parse_datetime("invalid", "en_US")
 if errors:
     print(f"Parse error: {errors[0]}")
@@ -2813,8 +2779,6 @@ elif is_valid_datetime(result):
 ---
 
 ### parse_currency()
-
-> **Added in**: 0.5.0 | **Breaking change in**: 0.8.0
 
 ```python
 from decimal import Decimal
@@ -2846,13 +2810,11 @@ Parse locale-aware currency string to `(Decimal, currency_code)` tuple.
     - `currency_code`: ISO 4217 currency code (e.g., "EUR", "USD", "JPY")
   - Second element: List of errors (empty on success)
 
-**v0.8.0 Breaking Change**: Returns nested tuple instead of raising exceptions. The `strict` parameter was removed.
-
 **Supported Currencies**:
 - All ISO 4217 currency codes (EUR, USD, GBP, JPY, etc.)
 - Major currency symbols (€, $, £, ¥, etc.)
 - Currency codes can appear before or after amount (locale-dependent)
-- **v0.7.0+**: Ambiguous symbols ($, ¢, ₨, ₱, kr) require `default_currency` or `infer_from_locale`
+- Ambiguous symbols ($, ¢, ₨, ₱, kr) require `default_currency` or `infer_from_locale`
 
 **Locale Behavior**:
 - Uses Babel's currency parsing (CLDR-compliant)
@@ -2880,7 +2842,7 @@ result, errors = parse_currency("USD 1,234.56", "en_US")
 result, errors = parse_currency("1 234,56 €", "lv_LV")
 # result → (Decimal('1234.56'), 'EUR'), errors → []
 
-# Ambiguous symbol ($) - requires default_currency (v0.7.0+)
+# Ambiguous symbol ($) - requires default_currency
 result, errors = parse_currency("$100", "en_CA", default_currency="CAD")
 # result → (Decimal('100'), 'CAD'), errors → []
 
@@ -2888,7 +2850,7 @@ result, errors = parse_currency("$100", "en_CA", default_currency="CAD")
 result, errors = parse_currency("$100", "en_CA", infer_from_locale=True)
 # result → (Decimal('100'), 'CAD'), errors → []
 
-# Error handling (v0.8.0+)
+# Error handling
 result, errors = parse_currency("invalid", "en_US")
 if errors:
     print(f"Parse error: {errors[0]}")
@@ -2924,8 +2886,7 @@ original = Decimal("1234.56")
 formatted = currency_format(float(original), locale, currency="EUR")
 # → "1 234,56 €"
 
-# Parse user input (v0.8.0 API)
-result, errors = parse_currency(formatted, locale)
+# Parse user inputresult, errors = parse_currency(formatted, locale)
 # result → (Decimal('1234.56'), 'EUR'), errors → []
 
 # Roundtrip: Value must be preserved
@@ -2953,8 +2914,6 @@ result, errors = parse_currency(formatted, locale)  # Success
 
 ### Error Handling
 
-> **v0.8.0 Breaking Change**: All parsing functions now return `tuple[result, list[FluentParseError]]` instead of raising exceptions. The `strict` parameter was removed.
-
 All parsing functions follow the same error handling pattern:
 
 ```python
@@ -2962,7 +2921,7 @@ from decimal import Decimal
 from ftllexbuffer.parsing import parse_decimal
 from ftllexbuffer.parsing.guards import is_valid_decimal
 
-# v0.8.0: Check errors list instead of catching exceptions
+# Check errors list
 result, errors = parse_decimal(user_input, locale)
 
 if errors:
@@ -2987,7 +2946,7 @@ process_payment(result)
 - `parse_currency()` returns `None`
 
 **Type guards** (from `ftllexbuffer.parsing.guards`):
-- Check errors directly: `if errors:` or `if not errors:` (v0.10.0: has_parse_errors removed)
+- Check errors directly: `if errors:` or `if not errors:`
 - `is_valid_decimal(value)` - Check Decimal is finite (not NaN/Infinity)
 - `is_valid_number(value)` - Check float is finite (not NaN/Infinity)
 - `is_valid_currency(value)` - Check currency tuple is not None and has finite amount
@@ -3014,8 +2973,7 @@ bundle.add_resource("""
 """)
 
 def process_invoice(user_input: str) -> dict | None:
-    # Parse user input (v0.8.0 API)
-    subtotal, errors = parse_decimal(user_input, "lv_LV")
+    # Parse user input    subtotal, errors = parse_decimal(user_input, "lv_LV")
 
     if errors or not is_valid_decimal(subtotal):
         return None  # Invalid input
@@ -3063,8 +3021,7 @@ def validate_amount_field(input_value: str, locale: str) -> tuple[Decimal | None
     if not input_value:
         return (None, "Amount is required")
 
-    # Parse (v0.8.0 API)
-    result, errors = parse_decimal(input_value, locale)
+    # Parse    result, errors = parse_decimal(input_value, locale)
     if errors:
         return (None, f"Invalid amount format for {locale}")
 
@@ -3108,14 +3065,12 @@ def import_transactions_csv(csv_path: str, locale: str) -> tuple[list[dict], lis
         reader = csv.DictReader(f)
 
         for row_num, row in enumerate(reader, start=2):  # Start at 2 (header is row 1)
-            # Parse date (v0.8.0 API)
-            date_result, date_errors = parse_date(row['date'], locale)
+            # Parse date            date_result, date_errors = parse_date(row['date'], locale)
             if has_parse_errors(date_errors):
                 errors.append(f"Row {row_num}: Invalid date '{row['date']}'")
                 continue
 
-            # Parse amount (v0.8.0 API)
-            amount_result, amount_errors = parse_decimal(row['amount'], locale)
+            # Parse amount            amount_result, amount_errors = parse_decimal(row['amount'], locale)
             if has_parse_errors(amount_errors):
                 errors.append(f"Row {row_num}: Invalid amount '{row['amount']}'")
                 continue
@@ -3157,7 +3112,7 @@ user_input = "1 234,56"
 parsed = babel_parse_decimal(user_input, locale="lv_LV")
 ```
 
-**After (FTLLexBuffer for both - v0.8.0+ API)**:
+**After (FTLLexBuffer for both)**:
 
 ```python
 from ftllexbuffer import FluentBundle
@@ -3168,7 +3123,7 @@ from ftllexbuffer.parsing import parse_decimal
 bundle = FluentBundle("lv_LV")
 formatted = bundle.format_value("price", {"amount": 1234.56})
 
-# Parsing: FTLLexBuffer (consistent API, v0.8.0+)
+# Parsing: FTLLexBuffer (consistent API)
 user_input = "1 234,56"
 result, errors = parse_decimal(user_input, "lv_LV")  # Same locale format!
 if not errors:
@@ -3179,7 +3134,7 @@ if not errors:
 - Single import source (`ftllexbuffer`)
 - Consistent locale code format (underscore-separated: "lv_LV")
 - Symmetric API design (format ↔ parse)
-- Structured error handling (v0.8.0+) - errors as data, not exceptions
+- Structured error handling - errors as data, not exceptions
 - Integrated documentation
 
 ---
@@ -3214,8 +3169,6 @@ from ftllexbuffer import number_format, datetime_format, currency_format
 ---
 
 ### number_format()
-
-> **Added in**: 0.1.0
 
 ```python
 def number_format(
@@ -3277,8 +3230,6 @@ number_format(1234567, "en-US", use_grouping=False)
 
 ### datetime_format()
 
-> **Added in**: 0.1.0
-
 ```python
 def datetime_format(
     value: datetime | str,
@@ -3334,8 +3285,6 @@ datetime_format("2025-10-27T14:30:00Z", "en-US", date_style="long")
 ---
 
 ### currency_format()
-
-**Added in v0.2.0**
 
 ```python
 def currency_format(
@@ -4471,7 +4420,7 @@ l10n.add_resource('en', 'hello = Hello!')
 #### format_value
 
 ```python
-format_value(message_id: MessageId, args: dict[str, object] | None = None) -> tuple[str, list[FluentError]]
+format_value(message_id: MessageId, args: dict[str, object] | None = None) -> tuple[str, tuple[FluentError, ...]]
 ```
 
 Format message with automatic locale fallback.
@@ -4483,10 +4432,10 @@ Format message with automatic locale fallback.
 
 **Returns**:
 
-- **`tuple[str, list[FluentError]]`**: Tuple of (formatted_value, errors)
+- **`tuple[str, tuple[FluentError, ...]]`**: Tuple of (formatted_value, errors)
   - If message found: Returns formatted result from first bundle containing message
-  - If not found in any locale: Returns `({message_id}, [FluentReferenceError])`
-  - errors: List of FluentError exceptions (empty list if successful)
+  - If not found in any locale: Returns `({message_id}, (FluentReferenceError(), ))`
+  - errors: Immutable tuple of FluentError exceptions (empty tuple if successful)
 
 **Fallback Behavior**:
 
@@ -5306,12 +5255,12 @@ print(serialize_ftl(renamed))
 
 Public AST node types available for inspection and manipulation.
 
-**Import** (v0.10.0):
+**Import**:
 
 AST node types require **submodule imports**:
 
 ```python
-# v0.10.0: Import from syntax.ast submodule
+# Import from syntax.ast submodule
 from ftllexbuffer.syntax.ast import (
     Resource, Message, Term, Comment, Junk, Attribute,
     Pattern, TextElement, Placeable,
@@ -5615,8 +5564,6 @@ class NumberLiteral:
     value: int | float  # Parsed numeric value
     raw: str           # Original source text (for serialization)
 ```
-
-**v0.9.0 Breaking Change**: `value` is now the parsed numeric value (int | float), not a string. Use `raw` for the original source text.
 
 **Example:**
 ```python
@@ -5937,7 +5884,7 @@ for element in pattern.elements:
 
 FTLLexBuffer provides type guard methods for runtime type checking of AST nodes. These utilities use Python 3.13's `TypeIs` for type-safe narrowing, making them ideal for pattern matching and visitor implementations.
 
-**v0.9.0**: Type guards are static methods on AST classes.
+Type guards are static methods on AST classes.
 
 **Import AST Classes**:
 ```python
@@ -5953,8 +5900,6 @@ from ftllexbuffer import (
 ```
 
 **Why use type guards?** They provide both runtime checking AND type narrowing for mypy. After calling `Message.guard(entry)`, mypy knows `entry` is a `Message` type.
-
-**v0.9.0 Breaking Change**: Type guards are now static methods on AST classes (e.g., `Message.guard()`) instead of standalone functions (e.g., `is_message()`).
 
 ### Understanding TypeIs Type Narrowing
 
@@ -5975,7 +5920,7 @@ entry = resource.entries[0]
 # Type: Message | Term | Comment | Junk (union type)
 # entry.id.name  # Type error! Not all union members have 'id'
 
-# With type guard - type is narrowed (v0.9.0: static method API)
+# With type guard - type is narrowed
 if Message.guard(entry):
     # Inside this block, type checker knows entry is Message
     print(entry.id.name)  # No type error - Message has 'id'
@@ -6000,7 +5945,7 @@ from ftllexbuffer import ASTVisitor, Message, Term
 class MyVisitor(ASTVisitor):
     def visit_Resource(self, node):
         for entry in node.entries:
-            # Type narrowing enables safe attribute access (v0.9.0: static methods)
+            # Type narrowing enables safe attribute access
             if Message.guard(entry):
                 self.process_message(entry)  # entry: Message
             elif Term.guard(entry):
@@ -6166,7 +6111,7 @@ from ftllexbuffer import parse_ftl, Message, Term, Junk
 
 resource = parse_ftl(ftl_source)
 
-# v0.9.0: Use static method API for type guards
+# Use static method API for type guards
 for entry in resource.entries:
     if Message.guard(entry):
         print(f"Message: {entry.id.name}")
@@ -6760,10 +6705,10 @@ def format_message(bundle: FluentBundle, msg_id: str, **args: Any) -> str:
 ### Message Formatting
 
 - **Fast**: `format_pattern()` walks AST and interpolates variables (no re-parsing)
-- **Caching available**: v0.6.0+ supports format caching with `enable_cache=True` (50x speedup)
+- **Caching available**: Format caching supported with `enable_cache=True` (50x speedup)
 - **Recommendation**: Enable caching for production web/mobile apps
 
-### Format Caching (v0.6.0+)
+### Format Caching
 
 **Overview:**
 FTLLexBuffer supports optional LRU format caching for significant performance improvements. When enabled, formatted message results are cached by (message_id, args_hash), avoiding repeated AST walks and interpolation.
@@ -6866,7 +6811,7 @@ l10n = FluentLocalization(
 # No cache benefit: Each message formatted once during tool execution
 ```
 
-#### Cache Introspection (v0.6.0+)
+#### Cache Introspection
 
 **Monitor cache performance:**
 ```python

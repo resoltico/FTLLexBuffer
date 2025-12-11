@@ -6,10 +6,10 @@ FTLLexBuffer v0.8.0+ provides full bi-directional localization:
 
 This enables locale-aware forms, invoices, and financial applications.
 
-v0.8.0 API CHANGES:
-- All parse functions return tuple[result, list[FluentParseError]]
-- Functions never raise exceptions - errors in list
-- Removed strict parameter
+v0.11.0 API CHANGES:
+- All parse functions return tuple[result, tuple[FluentParseError, ...]] (immutable)
+- Functions never raise exceptions - errors in immutable tuple
+- Removed strict parameter (v0.8.0)
 
 Implementation:
 - Number/currency parsing: Babel's parse_decimal() (CLDR-compliant)
@@ -43,7 +43,7 @@ total = Kopa: { CURRENCY($total, currency: "EUR") }
     user_input = "1 234,56"
     print(f"User input (subtotal): {user_input}")
 
-    # v0.8.0: Now returns tuple[Decimal, list[FluentParseError]]
+    # v0.11.0: Now returns tuple[Decimal, tuple[FluentParseError, ...]] (immutable)
     subtotal, errors = parse_decimal(user_input, "lv_LV")
     if errors or subtotal is None:
         print(f"Failed to parse subtotal: {errors[0]}")

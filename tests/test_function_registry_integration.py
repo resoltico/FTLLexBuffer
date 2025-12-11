@@ -195,7 +195,7 @@ class TestFunctionDiscoveryWorkflow:
             # Safe to use in FTL
             bundle.add_resource("price = { NUMBER($amount, minimumFractionDigits: 2) }")
             result, errors = bundle.format_pattern("price", {"amount": 123.456})
-            assert errors == []
+            assert errors == ()
             assert "123" in result
 
     def test_list_functions_for_auto_documentation(self) -> None:
@@ -244,7 +244,7 @@ class TestFinancialUseCases:
         # Safe to use
         bundle.add_resource('price = { CURRENCY($amount, currency: "EUR") }')
         result, errors = bundle.format_pattern("price", {"amount": 1234.56})
-        assert errors == []
+        assert errors == ()
         assert "1" in result
         assert "234" in result
 
@@ -265,7 +265,7 @@ class TestFinancialUseCases:
         # Use in VAT calculation
         bundle.add_resource("vat = VAT: { NUMBER($amount, minimumFractionDigits: 2) }")
         result, errors = bundle.format_pattern("vat", {"amount": 23.45})
-        assert errors == []
+        assert errors == ()
         assert "23.45" in result
 
     def test_custom_financial_function_registration(self) -> None:
@@ -291,7 +291,7 @@ class TestFinancialUseCases:
         # Use in FTL
         bundle.add_resource("vat = VAT: €{ LATVIAN_VAT($amount) }")
         result, errors = bundle.format_pattern("vat", {"amount": 100.0})
-        assert errors == []
+        assert errors == ()
         assert "21.00" in result
 
     def test_iterate_all_functions_for_validation(self) -> None:

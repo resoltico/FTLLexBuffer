@@ -47,7 +47,7 @@ class TestBundleMessageRegistry:
         result, errors = bundle.format_pattern(msg_id)
         assert isinstance(result, str), "format_pattern must return string"
         assert len(result) > 0, "Formatted message should not be empty"
-        assert errors == [], f"No errors expected for simple message, got {errors}"
+        assert errors == (), f"No errors expected for simple message, got {errors}"
 
     @given(
         msg_id=ftl_identifiers(),
@@ -86,7 +86,7 @@ class TestBundleMessageRegistry:
         assert (
             value2.strip() in result or result.strip() == value2.strip()
         ), "Later message should override earlier"
-        assert errors == [], f"No errors expected for override, got {errors}"
+        assert errors == (), f"No errors expected for override, got {errors}"
 
 
 class TestBundleVariableInterpolation:
@@ -114,7 +114,7 @@ class TestBundleVariableInterpolation:
         result, errors = bundle.format_pattern(msg_id, {var_name: var_value})
 
         assert str(var_value) in result, f"Variable value {var_value} not in result: {result}"
-        assert errors == [], f"No errors expected for variable interpolation, got {errors}"
+        assert errors == (), f"No errors expected for variable interpolation, got {errors}"
 
     @given(
         msg_id=ftl_identifiers(),
@@ -154,7 +154,7 @@ class TestBundleVariableInterpolation:
 
         for value in args.values():
             assert value in result, f"Variable value {value} missing from result"
-        assert errors == [], f"No errors expected for multiple variables, got {errors}"
+        assert errors == (), f"No errors expected for multiple variables, got {errors}"
 
 
 class TestBundleLocaleHandling:
@@ -179,7 +179,7 @@ class TestBundleLocaleHandling:
 
         result, errors = bundle.format_pattern(msg_id)
         assert isinstance(result, str), "Locale should not affect basic formatting"
-        assert errors == [], f"No errors expected for simple message, got {errors}"
+        assert errors == (), f"No errors expected for simple message, got {errors}"
 
 
 class TestBundleIsolatingMarks:
@@ -204,7 +204,7 @@ class TestBundleIsolatingMarks:
 
         assert "\u2068" in result, "FSI mark missing with use_isolating=True"
         assert "\u2069" in result, "PDI mark missing with use_isolating=True"
-        assert errors == [], f"No errors expected for isolating marks, got {errors}"
+        assert errors == (), f"No errors expected for isolating marks, got {errors}"
 
     @given(
         msg_id=ftl_identifiers(),
@@ -225,7 +225,7 @@ class TestBundleIsolatingMarks:
 
         assert "\u2068" not in result, "FSI mark present with use_isolating=False"
         assert "\u2069" not in result, "PDI mark present with use_isolating=False"
-        assert errors == [], f"No errors expected without isolating marks, got {errors}"
+        assert errors == (), f"No errors expected without isolating marks, got {errors}"
 
 
 class TestBundleValidation:
@@ -300,7 +300,7 @@ class TestBundleStateConsistency:
 
         result, errors = bundle.format_pattern(msg_id)
         assert isinstance(result, str), "format_pattern should succeed when has_message=True"
-        assert errors == [], f"No errors expected when has_message=True, got {errors}"
+        assert errors == (), f"No errors expected when has_message=True, got {errors}"
 
 
 class TestBundleErrorHandling:

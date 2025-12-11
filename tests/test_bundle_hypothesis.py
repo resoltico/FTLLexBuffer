@@ -76,7 +76,7 @@ legal = { -brand.legal }
 
         # Should successfully add and format
         result, errors = bundle.format_value("legal")
-        assert errors == []
+        assert errors == ()
         assert "Acme Corporation" in result
 
     def test_term_attributes_with_term_references(self) -> None:
@@ -95,7 +95,7 @@ welcome = { -brand.full }
         bundle.add_resource(ftl)
 
         result, errors = bundle.format_value("welcome")
-        assert errors == []
+        assert errors == ()
         assert "Acme" in result
 
     @given(attr_count=st.integers(min_value=1, max_value=5))  # Keep small bound for memory
@@ -116,7 +116,7 @@ msg = {{ -term }}
 
         # Should successfully parse and validate
         result, errors = bundle.format_value("msg")
-        assert errors == []
+        assert errors == ()
         assert "Base Value" in result
 
 
@@ -401,7 +401,7 @@ items = { $count ->
         result, errors = bundle.format_value("items", {"count": quantity})
 
         assert isinstance(result, str)
-        assert errors == []
+        assert errors == ()
 
     @given(
         # Keep min constraints (business logic), remove arbitrary max
@@ -454,11 +454,11 @@ class TestBundleRobustness:
 
         # Should successfully format first and last messages
         result_first, errors_first = bundle.format_value("msg0")
-        assert errors_first == []
+        assert errors_first == ()
         assert "Message 0" in result_first
 
         result_last, errors_last = bundle.format_value(f"msg{msg_count - 1}")
-        assert errors_last == []
+        assert errors_last == ()
         assert f"Message {msg_count - 1}" in result_last
 
     @given(
@@ -567,7 +567,7 @@ math = √(x²+y²)
         # All should format correctly
         for msg_id in ["emoji", "arabic", "chinese", "math"]:
             result, errors = bundle.format_value(msg_id)
-            assert errors == []
+            assert errors == ()
             assert len(result) > 0
 
 
@@ -595,7 +595,7 @@ class TestResourceManagement:
         # All messages should be accessible
         for i in range(msg_count):
             result, errors = bundle.format_value(f"msg{i}")
-            assert errors == []
+            assert errors == ()
             assert f"Message {i}" in result
 
     @given(
@@ -636,7 +636,7 @@ class TestResourceManagement:
         bundle.add_resource("msg = Hello")
 
         result, errors = bundle.format_value("msg")
-        assert errors == []
+        assert errors == ()
         assert "Hello" in result
 
 
@@ -662,7 +662,7 @@ class TestMessageFormatting:
 
         result, errors = bundle.format_value(msg_id)
 
-        assert errors == []
+        assert errors == ()
         assert text in result
 
     @given(
@@ -685,7 +685,7 @@ class TestMessageFormatting:
 
         result, errors = bundle.format_pattern(msg_id, attribute=attr_name)
 
-        assert errors == []
+        assert errors == ()
         assert attr_value in result
 
     @given(
@@ -731,7 +731,7 @@ class TestVariableSubstitution:
 
         result, errors = bundle.format_value(msg_id, {var_name: var_value})
 
-        assert errors == []
+        assert errors == ()
         assert str(var_value) in result
 
     @given(
@@ -751,7 +751,7 @@ class TestVariableSubstitution:
 
         result, errors = bundle.format_value(msg_id, {var_name: var_value})
 
-        assert errors == []
+        assert errors == ()
         assert var_value in result
 
     @given(
@@ -775,7 +775,7 @@ class TestVariableSubstitution:
 
         result, errors = bundle.format_value(msg_id, args)  # type: ignore[arg-type]
 
-        assert errors == []
+        assert errors == ()
         # All variable values should appear
         for i in range(var_count):
             assert str(i) in result
@@ -827,7 +827,7 @@ class TestFunctionCalls:
 
         result, errors = bundle.format_value(msg_id, {var_name: number})
 
-        assert errors == []
+        assert errors == ()
         assert isinstance(result, str)
         assert len(result) > 0
 
@@ -887,7 +887,7 @@ class TestTermResolution:
 
         result, errors = bundle.format_value(msg_id)
 
-        assert errors == []
+        assert errors == ()
         assert term_value in result
 
     @given(
@@ -913,7 +913,7 @@ class TestTermResolution:
 
         result, errors = bundle.format_value(msg_id)
 
-        assert errors == []
+        assert errors == ()
         assert attr_value in result
 
 
@@ -946,7 +946,7 @@ class TestMessageReferences:
 
         result, errors = bundle.format_value(msg_id2)
 
-        assert errors == []
+        assert errors == ()
         assert value in result
 
 
@@ -976,7 +976,7 @@ class TestAttributeAccess:
         # Access each attribute
         for i in range(attr_count):
             result, errors = bundle.format_pattern(msg_id, attribute=f"attr{i}")
-            assert errors == []
+            assert errors == ()
             assert f"Value{i}" in result
 
 
@@ -1039,7 +1039,7 @@ class TestErrorRecovery:
         # Bundle should still be usable
         bundle.add_resource("valid = Works")
         _result, errors = bundle.format_value("valid")
-        assert errors == []
+        assert errors == ()
 
 
 # ============================================================================
@@ -1071,7 +1071,7 @@ class TestSelectExpressions:
 
         result, errors = bundle.format_value(msg_id, {var_name: count})
 
-        assert errors == []
+        assert errors == ()
         assert isinstance(result, str)
 
     @given(
@@ -1098,7 +1098,7 @@ class TestSelectExpressions:
 
         result, errors = bundle.format_value(msg_id, {"count": count})
 
-        assert errors == []
+        assert errors == ()
         assert len(result) > 0
 
 
@@ -1132,7 +1132,7 @@ class TestNumberFormattingVariations:
 
         result, errors = bundle.format_value(msg_id, {"num": number})
 
-        assert errors == []
+        assert errors == ()
         assert isinstance(result, str)
 
     @given(
@@ -1149,7 +1149,7 @@ class TestNumberFormattingVariations:
 
         result, errors = bundle.format_value(msg_id, {"num": number})
 
-        assert errors == []
+        assert errors == ()
         assert isinstance(result, str)
 
 
@@ -1175,7 +1175,7 @@ class TestWhitespaceHandling:
 
         result, errors = bundle.format_value(msg_id)
 
-        assert errors == []
+        assert errors == ()
         # Whitespace may be trimmed by parser/formatter
         assert "Value" in result
 
@@ -1202,7 +1202,7 @@ class TestWhitespaceHandling:
 
         result, errors = bundle.format_value(msg_id)
 
-        assert errors == []
+        assert errors == ()
         assert text in result
 
 
@@ -1226,7 +1226,7 @@ class TestUnicodeEdgeCases:
 
         result, errors = bundle.format_value(msg_id)
 
-        assert errors == []
+        assert errors == ()
         assert emoji in result
 
     @given(
@@ -1241,7 +1241,7 @@ class TestUnicodeEdgeCases:
 
         result, errors = bundle.format_value(msg_id)
 
-        assert errors == []
+        assert errors == ()
         assert rtl_text in result
 
     @given(
@@ -1259,7 +1259,7 @@ class TestUnicodeEdgeCases:
 
         result, errors = bundle.format_value(msg_id)
 
-        assert errors == []
+        assert errors == ()
         assert char in result
 
 
@@ -1378,7 +1378,7 @@ class TestArgumentTypeHandling:
 
         result, errors = bundle.format_value(msg_id, {var_name: bool_value})
 
-        assert errors == []
+        assert errors == ()
         assert isinstance(result, str)
 
     @given(
@@ -1451,7 +1451,7 @@ class TestAttributeEdgeCases:
             attribute=attr_name,
         )
 
-        assert errors == []
+        assert errors == ()
         assert str(var_value) in result
 
 
@@ -1480,7 +1480,7 @@ class TestIsolationMode:
 
         result, errors = bundle.format_value(msg_id)
 
-        assert errors == []
+        assert errors == ()
         # Text should always be present
         assert text in result or text in result.replace("\u2068", "").replace("\u2069", "")
 
@@ -1653,7 +1653,7 @@ msg3 = { msg1 }
         result, errors = bundle.format_value("msg0")
 
         # Should resolve entire chain
-        assert errors == []
+        assert errors == ()
         assert "End" in result
 
     def test_complex_reference_graph(self) -> None:
@@ -1673,7 +1673,7 @@ msg3 = { msg1 }
         result, errors = bundle.format_value("msg0")
 
         # Should resolve diamond
-        assert errors == []
+        assert errors == ()
         assert "A" in result
         assert "B" in result
 
@@ -1706,7 +1706,7 @@ msg = { $outer ->
 
         result, errors = bundle.format_value("msg", {"outer": "a", "inner": 1})
 
-        assert errors == []
+        assert errors == ()
         assert "A1" in result
 
     @given(
@@ -1740,7 +1740,7 @@ msg = { $x ->
 
         result, errors = bundle.format_value("msg", {"x": outer_val, "y": inner_val})
 
-        assert errors == []
+        assert errors == ()
         assert isinstance(result, str)
         assert len(result) > 0
 
@@ -1759,7 +1759,7 @@ msg = { $count ->
 
         result, errors = bundle.format_value("msg", {"count": 5})
 
-        assert errors == []
+        assert errors == ()
         assert "5" in result
         assert "items" in result
 
@@ -1788,7 +1788,7 @@ items = { $count ->
 
         result, errors = bundle.format_value("items", {"count": count})
 
-        assert errors == []
+        assert errors == ()
         assert isinstance(result, str)
 
     def test_select_with_term_references(self) -> None:
@@ -1806,7 +1806,7 @@ msg = { $premium ->
 
         result, errors = bundle.format_value("msg", {"premium": "true"})
 
-        assert errors == []
+        assert errors == ()
         assert "Premium" in result
         assert "FTLLexBuffer" in result
 
@@ -1879,7 +1879,7 @@ class TestCacheBehavior:
         # Format all messages
         for i in range(msg_count):
             result, errors = bundle.format_value(f"msg{i}")
-            assert errors == []
+            assert errors == ()
             assert f"Message {i}" in result
 
     @given(
@@ -1955,7 +1955,7 @@ class TestBidirectionalTextHandling:
 
         result, errors = bundle.format_value(msg_id)
 
-        assert errors == []
+        assert errors == ()
         # Text should appear (possibly with isolating chars)
         assert rtl_text in result or rtl_text in result.replace("\u2068", "").replace("\u2069", "")
 
@@ -1966,7 +1966,7 @@ class TestBidirectionalTextHandling:
 
         result, errors = bundle.format_value("msg")
 
-        assert errors == []
+        assert errors == ()
         assert "Hello" in result.replace("\u2068", "").replace("\u2069", "")
         assert "مرحبا" in result.replace("\u2068", "").replace("\u2069", "")
 
@@ -1985,7 +1985,7 @@ class TestBidirectionalTextHandling:
 
         result, errors = bundle.format_value(msg_id, {var_name: rtl_value})
 
-        assert errors == []
+        assert errors == ()
         # RTL value should appear
         assert rtl_value in result.replace("\u2068", "").replace("\u2069", "")
 
@@ -2054,7 +2054,7 @@ msg = { $var ->
         # Bundle should still be usable
         bundle.add_resource("valid = Works fine")
         _result, errors = bundle.format_value("valid")
-        assert errors == []
+        assert errors == ()
 
     @given(
         msg_id=ftl_identifiers,
@@ -2109,7 +2109,7 @@ msg = { -outer }
 
         result, errors = bundle.format_value("msg")
 
-        assert errors == []
+        assert errors == ()
         assert "Outer" in result
         assert "Middle" in result
         assert "Inner" in result
@@ -2134,7 +2134,7 @@ msg = { -outer }
 
         result, errors = bundle.format_value(msg_id, args)  # type: ignore[arg-type]
 
-        assert errors == []
+        assert errors == ()
         # All values should appear
         for i in range(var_count):
             assert f"V{i}" in result
@@ -2157,7 +2157,7 @@ msg = { $variant ->
 
         result, errors = bundle.format_value("msg", {"variant": "full"})
 
-        assert errors == []
+        assert errors == ()
         assert "FTLLexBuffer" in result
 
     @given(
@@ -2187,7 +2187,7 @@ msg = { $variant ->
 
         result, errors = bundle.format_value(msg_id, args)  # type: ignore[arg-type]
 
-        assert errors == []
+        assert errors == ()
         # All text segments should appear
         for text in text_segments:
             assert text in result
@@ -2216,7 +2216,7 @@ msg = Welcome to { -brand }!
             {"count": 5, "price": 99.99}
         )
 
-        assert errors == []
+        assert errors == ()
         assert "FTLLexBuffer" in result
         assert "5" in result or "items" in result
 
@@ -2250,7 +2250,7 @@ class TestFunctionArgumentEdgeCases:
 
         result, errors = bundle.format_value(msg_id, {"num": number})
 
-        assert errors == []
+        assert errors == ()
         assert isinstance(result, str)
 
     @given(
@@ -2272,7 +2272,7 @@ class TestFunctionArgumentEdgeCases:
 
         result, errors = bundle.format_value(msg_id, {"num": number})
 
-        assert errors == []
+        assert errors == ()
         assert isinstance(result, str)
 
     def test_number_function_negative_zero(self) -> None:
@@ -2282,7 +2282,7 @@ class TestFunctionArgumentEdgeCases:
 
         result, errors = bundle.format_value("msg", {"num": -0.0})
 
-        assert errors == []
+        assert errors == ()
         assert isinstance(result, str)
 
     @given(
@@ -2427,7 +2427,7 @@ class TestResourceOrdering:
         # All messages should be accessible
         for i in range(msg_count):
             result, errors = bundle.format_value(f"msg{i}")
-            assert errors == []
+            assert errors == ()
             assert f"Value {i}" in result
 
     def test_partial_override_preserves_others(self) -> None:
@@ -2478,7 +2478,7 @@ class TestAdditionalRobustness:
 
         result, errors = bundle.format_value(msg_id)
 
-        assert errors == []
+        assert errors == ()
         assert "Value" in result
 
     @given(
@@ -2495,7 +2495,7 @@ class TestAdditionalRobustness:
 
         result, errors = bundle.format_value(msg_id)
 
-        assert errors == []
+        assert errors == ()
         assert special_char in result
 
     def test_empty_message_value(self) -> None:
@@ -2522,7 +2522,7 @@ class TestAdditionalRobustness:
 
         result, errors = bundle.format_value(msg_id, {msg_id: number})
 
-        assert errors == []
+        assert errors == ()
         assert str(number) in result
 
     def test_resource_with_only_comments(self) -> None:
@@ -2539,4 +2539,4 @@ class TestAdditionalRobustness:
         # Should not crash
         bundle.add_resource("msg = Works")
         _result, errors = bundle.format_value("msg")
-        assert errors == []
+        assert errors == ()

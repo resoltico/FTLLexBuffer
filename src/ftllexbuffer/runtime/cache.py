@@ -38,7 +38,7 @@ type _FluentValue = str | int | float | bool | Decimal | datetime | None
 type _CacheKey = tuple[str, tuple[tuple[str, _FluentValue], ...], str | None, str]
 
 # Internal type alias for cache values (prefixed with _ per naming convention)
-type _CacheValue = tuple[str, list[FluentError]]
+type _CacheValue = tuple[str, tuple[FluentError, ...]]
 
 
 class FormatCache:

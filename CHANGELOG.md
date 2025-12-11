@@ -5,6 +5,156 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] - 2025-12-10
+
+### Breaking Changes
+
+- **Immutable error collections - All error tuples instead of lists**
+  - `FluentBundle.format_pattern()` now returns `tuple[str, tuple[FluentError, ...]]` (was `tuple[str, list[FluentError]]`)
+  - `FluentBundle.format_value()` now returns `tuple[str, tuple[FluentError, ...]]` (was `tuple[str, list[FluentError]]`)
+  - `FluentResolver.resolve_message()` now returns `tuple[str, tuple[FluentError, ...]]` (was `tuple[str, list[FluentError]]`)
+  - `ParseError.expected` changed from `list[str]` to `tuple[str, ...]`
+  - `FormatCache._CacheValue` changed from `tuple[str, list[FluentError]]` to `tuple[str, tuple[FluentError, ...]]`
+  - **Rationale**: Immutable data structures prevent accidental mutation, align with frozen dataclasses, and improve thread safety
+  - **Impact**: Code that mutates error lists or compares with empty lists must be updated
+  - **Migration**:
+    ```python
+    # OLD (v0.10.0):
+    result, errors = bundle.format_pattern("hello")
+    assert errors == []  # Compare with empty list
+    errors.append(custom_error)  # Mutation allowed
+
+    # NEW (v0.11.0):
+    result, errors = bundle.format_pattern("hello")
+    assert errors == ()  # Compare with empty tuple
+    # errors.append(...) would raise AttributeError
+    ```
+
+### Changed
+
+- **Parser architecture refactored into focused modules**
+  - Monolithic `parser.py` (1,872 lines) split into 7 specialized modules:
+    - `parser/core.py` - FluentParserV1 class and parse() entry point
+    - `parser/primitives.py` - Identifier, number, string literal parsers
+    - `parser/whitespace.py` - Whitespace utilities and continuation detection
+    - `parser/patterns.py` - Pattern and placeable parsing
+    - `parser/expressions.py` - Select expressions, inline expressions, function calls
+    - `parser/entries.py` - Message, term, attribute, comment parsing
+    - `parser/__init__.py` - Public API re-exports
+  - **100% backward compatible**: `from ftllexbuffer.syntax.parser import FluentParserV1` still works
+  - **Rationale**: Improves code maintainability, reduces cognitive load, enables better testing isolation
+  - **Impact**: No user-visible changes - internal refactoring only
+  - **Benefits**:
+    - Cleaner separation of concerns (primitives → patterns → expressions → entries)
+    - Easier to locate and modify specific parsing logic
+    - Reduced file size enables faster IDE navigation and code review
+    - Each module has focused, testable responsibility
+
+### Internal
+
+- **Circular import handling with runtime imports**
+  - Parser modules use runtime imports with `# noqa: PLC0415` to avoid circular dependencies
+  - Circular dependency: `expressions.py` ↔ `patterns.py` (select expressions contain patterns, patterns contain placeables from expressions)
+  - **Pattern**: Import within function scope only where needed
+  - Added Pylint `cyclic-import` to global disable list (architectural necessity for grammar implementation)
+
+- **Absolute imports throughout parser modules**
+  - All parser modules use absolute imports (`from ftllexbuffer.syntax.ast import ...`)
+  - Eliminates relative import confusion (`from ..ast` vs `from ...ast`)
+  - Ruff TID252 compliance enforced via linting
+
+- **Complexity suppressions**
+  - Added `# noqa: PLR0912` to complex grammar-driven methods:
+    - `parse_pattern()` - 13 branches (handles multiline continuations, placeables, stop conditions)
+    - `parse_term()` - 14 branches (handles term syntax, attributes, multiline patterns)
+    - `parse_inline_expression()` - 20 branches (dispatches to all expression types)
+  - **Rationale**: Parser complexity is inherent to FTL grammar, not code smell
+
+### Migration Notes
+
+#### For Users
+
+**BREAKING CHANGES SUMMARY**:
+
+1. **Error tuple returns**: Format functions return immutable tuples instead of mutable lists
+2. **Empty error checks**: Compare with `()` instead of `[]`
+3. **No error mutation**: Cannot append/modify error collections
+
+**Migration Steps**:
+
+```python
+# 1. Update empty error checks
+# OLD (v0.10.0):
+result, errors = bundle.format_pattern("hello")
+if errors == []:
+    print("Success")
+
+# NEW (v0.11.0):
+result, errors = bundle.format_pattern("hello")
+if errors == ():  # or: if not errors
+    print("Success")
+
+# 2. Update error iteration (no changes needed - tuples are iterable)
+for error in errors:
+    print(error)  # Works the same
+
+# 3. Remove error mutation
+# OLD (v0.10.0):
+result, errors = bundle.format_pattern("hello")
+errors.append(custom_error)  # Mutation
+
+# NEW (v0.11.0):
+result, errors = bundle.format_pattern("hello")
+# Create new tuple with additional error
+errors = (*errors, custom_error)
+```
+
+#### For Library Developers
+
+**Parser module structure** (internal API):
+```python
+# All parser functionality still available from single import
+from ftllexbuffer.syntax.parser import FluentParserV1
+
+# Internal modules (not part of public API):
+# - ftllexbuffer.syntax.parser.core
+# - ftllexbuffer.syntax.parser.primitives
+# - ftllexbuffer.syntax.parser.whitespace
+# - ftllexbuffer.syntax.parser.patterns
+# - ftllexbuffer.syntax.parser.expressions
+# - ftllexbuffer.syntax.parser.entries
+```
+
+**Updated type signatures**:
+```python
+# Format functions
+FluentBundle.format_pattern(
+    message_id: str,
+    args: Mapping[str, FluentValue] | None = None,
+    *,
+    attribute: str | None = None,
+) -> tuple[str, tuple[FluentError, ...]]  # Changed from list[FluentError]
+
+FluentBundle.format_value(
+    message_id: str,
+    args: dict[str, FluentValue] | None = None
+) -> tuple[str, tuple[FluentError, ...]]  # Changed from list[FluentError]
+
+# Resolver
+FluentResolver.resolve_message(
+    message: Message,
+    args: Mapping[str, FluentValue] | None = None,
+    attribute: str | None = None,
+) -> tuple[str, tuple[FluentError, ...]]  # Changed from list[FluentError]
+
+# ParseError
+@dataclass(frozen=True, slots=True)
+class ParseError:
+    message: str
+    cursor: Cursor
+    expected: tuple[str, ...] = field(default_factory=tuple)  # Changed from list[str]
+```
+
 ## [0.10.0] - 2025-12-10
 
 ### Breaking Changes

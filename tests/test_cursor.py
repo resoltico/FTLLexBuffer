@@ -435,14 +435,14 @@ class TestParseError:
 
         assert error.message == "Expected '}'"
         assert error.cursor.pos == 2
-        assert error.expected == []
+        assert error.expected == ()
 
     def test_create_parse_error_with_expected(self) -> None:
         """Create ParseError with expected tokens."""
         cursor = Cursor("hello", 2)
-        error = ParseError("Unexpected", cursor, expected=["}",  "]"])
+        error = ParseError("Unexpected", cursor, expected=("}", "]"))
 
-        assert error.expected == ["}", "]"]
+        assert error.expected == ("}", "]")
 
     def test_parse_error_immutability(self) -> None:
         """ParseError is immutable."""
@@ -465,7 +465,7 @@ class TestParseError:
     def test_format_error_with_expected(self) -> None:
         """Format error with expected tokens."""
         cursor = Cursor("hello", 2)
-        error = ParseError("Unexpected token", cursor, expected=["}",  "]"])
+        error = ParseError("Unexpected token", cursor, expected=("}",  "]"))
 
         formatted = error.format_error()
 
@@ -657,7 +657,7 @@ class TestCursorIntegration:
         source = "line1\nline2 { $var\nline3"
         cursor = Cursor(source, 18)  # After $var
 
-        error = ParseError("Expected '}'", cursor, expected=["}"])
+        error = ParseError("Expected '}'", cursor, expected=("}", ))
         formatted = error.format_with_context()
 
         assert "2:13:" in formatted

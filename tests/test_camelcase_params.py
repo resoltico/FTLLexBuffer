@@ -18,7 +18,7 @@ class TestNumberCamelCase:
         bundle.add_resource("price = { NUMBER($amount, minimumFractionDigits: 2) }")
         result, errors = bundle.format_pattern("price", {"amount": 19.5})
         assert "19.50" in result
-        assert errors == []
+        assert errors == ()
 
     def test_minimum_fraction_digits_snakecase(self) -> None:
         """NUMBER accepts minimum_fraction_digits in snake_case (backward compat)."""
@@ -26,7 +26,7 @@ class TestNumberCamelCase:
         bundle.add_resource("price = { NUMBER($amount, minimum_fraction_digits: 2) }")
         result, errors = bundle.format_pattern("price", {"amount": 19.5})
         assert "19.50" in result
-        assert errors == []
+        assert errors == ()
 
     def test_maximum_fraction_digits_camelcase(self) -> None:
         """NUMBER accepts maximumFractionDigits in camelCase."""
@@ -34,7 +34,7 @@ class TestNumberCamelCase:
         bundle.add_resource("percent = { NUMBER($ratio, maximumFractionDigits: 0) }")
         result, errors = bundle.format_pattern("percent", {"ratio": 42.789})
         assert "43" in result or "42" in result
-        assert errors == []
+        assert errors == ()
 
     def test_multiple_camelcase_params(self) -> None:
         """NUMBER accepts multiple camelCase parameters."""
@@ -44,7 +44,7 @@ class TestNumberCamelCase:
         )
         result, errors = bundle.format_pattern("val", {"n": 123.456})
         assert "123.456" in result or "123.46" in result
-        assert errors == []
+        assert errors == ()
 
 
 class TestDateTimeCamelCase:
@@ -62,7 +62,7 @@ class TestDateTimeCamelCase:
         assert "1" in result
         assert "15" in result
         assert "25" in result
-        assert errors == []
+        assert errors == ()
 
     def test_date_style_snakecase(self) -> None:
         """DATETIME accepts date_style in snake_case (backward compat)."""
@@ -75,7 +75,7 @@ class TestDateTimeCamelCase:
         assert "1" in result
         assert "15" in result
         assert "25" in result
-        assert errors == []
+        assert errors == ()
 
     def test_time_style_camelcase(self) -> None:
         """DATETIME accepts timeStyle in camelCase."""
@@ -89,7 +89,7 @@ class TestDateTimeCamelCase:
 
         # Should contain time component
         assert ":" in result
-        assert errors == []
+        assert errors == ()
 
 
 class TestMixedCasing:
@@ -110,8 +110,8 @@ price2 = { NUMBER($val, minimum_fraction_digits: 2) }
         assert "42.50" in result1
         assert "42.50" in result2
         assert result1.strip() == result2.strip()
-        assert errors1 == []
-        assert errors2 == []
+        assert errors1 == ()
+        assert errors2 == ()
 
 
 class TestLocales:
@@ -127,7 +127,7 @@ class TestLocales:
         assert "1" in result
         assert "234" in result
         assert "5" in result
-        assert errors == []
+        assert errors == ()
 
     def test_camelcase_latvian_locale(self) -> None:
         """camelCase params work with Latvian locale."""
@@ -138,7 +138,7 @@ class TestLocales:
         assert "1" in result
         assert "234" in result
         assert "5" in result
-        assert errors == []
+        assert errors == ()
 
 
 class TestCustomFunctions:
@@ -162,7 +162,7 @@ class TestCustomFunctions:
 
         result, errors = bundle.format_pattern("price", {"amt": 123.45})
         assert "€123.45" in result
-        assert errors == []
+        assert errors == ()
 
 
 class TestEdgeCases:
@@ -175,7 +175,7 @@ class TestEdgeCases:
         result, errors = bundle.format_pattern("val", {"amount": 1234.5})
         assert "1" in result
         assert "234" in result
-        assert errors == []
+        assert errors == ()
 
     def test_datetime_no_params(self) -> None:
         """DATETIME works without parameters."""
@@ -186,4 +186,4 @@ class TestEdgeCases:
         result, errors = bundle.format_pattern("date", {"time": dt})
 
         assert "2025" in result
-        assert errors == []
+        assert errors == ()

@@ -136,7 +136,7 @@ def count_reference_nodes_by_type(json_ast: dict[str, Any]) -> dict[str, int]:
         "Junk": 0,
     }
 
-    body = json_ast.get("body", [])
+    body = json_ast.get("body", ())
     for entry in body:
         entry_type = entry.get("type", "")
         if entry_type in counts:

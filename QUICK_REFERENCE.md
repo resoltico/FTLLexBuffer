@@ -260,8 +260,8 @@ FluentBundle(locale: str, *, use_isolating: bool = True)
 **Key Methods**:
 ```python
 bundle.add_resource(ftl_source: str) -> None
-bundle.format_pattern(message_id, args=None, *, attribute=None) -> tuple[str, list[FluentError]]
-bundle.format_value(message_id, args=None) -> tuple[str, list[FluentError]]
+bundle.format_pattern(message_id, args=None, *, attribute=None) -> tuple[str, tuple[FluentError, ...]]
+bundle.format_value(message_id, args=None) -> tuple[str, tuple[FluentError, ...]]
 bundle.validate_resource(ftl_source: str) -> ValidationResult
 bundle.has_message(message_id: str) -> bool
 bundle.get_message_ids() -> list[str]
@@ -294,7 +294,7 @@ FluentLocalization(
 **Key Methods**:
 ```python
 l10n.add_resource(locale: str, ftl_source: str) -> None
-l10n.format_value(message_id, args=None) -> tuple[str, list[FluentError]]
+l10n.format_value(message_id, args=None) -> tuple[str, tuple[FluentError, ...]]
 l10n.has_message(message_id: str) -> bool
 l10n.get_bundles() -> Generator[FluentBundle]
 ```
@@ -385,8 +385,7 @@ file-size = { FILESIZE($bytes) }
 - `minimumFractionDigits` (int): Minimum decimal places (default: 0)
 - `maximumFractionDigits` (int): Maximum decimal places (default: 3)
 - `useGrouping` (bool): Use thousand separators (default: true)
-- `pattern` (string): Custom number pattern (overrides other options) - **Added in v0.5.0**
-
+- `pattern` (string): Custom number pattern (overrides other options)
 **Examples**:
 ```ftl
 price = { NUMBER($amount, minimumFractionDigits: 2) }
@@ -399,8 +398,7 @@ accounting = { NUMBER($amount, pattern: "#,##0.00;(#,##0.00)") }
 **Options**:
 - `dateStyle`: "short" | "medium" | "long" | "full" (default: "medium")
 - `timeStyle`: "short" | "medium" | "long" | "full" | null (default: null)
-- `pattern` (string): Custom datetime pattern (overrides style options) - **Added in v0.5.0**
-
+- `pattern` (string): Custom datetime pattern (overrides style options)
 **Examples**:
 ```ftl
 short-date = { DATETIME($timestamp, dateStyle: "short") }
@@ -437,38 +435,33 @@ price-name = { CURRENCY($amount, currency: "EUR", currencyDisplay: "name") }
 
 ---
 
-## Parsing API (v0.5.0+, Breaking change in v0.8.0)
+## Parsing API
 
 **Bi-directional localization**: Parse locale-formatted strings back to Python types.
-
-**v0.8.0 BREAKING CHANGE**: All parse functions now return `tuple[result, list[FluentParseError]]`.
 
 ```python
 from ftllexbuffer.parsing import parse_number, parse_decimal, parse_date, parse_datetime, parse_currency
 from ftllexbuffer.parsing.guards import has_parse_errors, is_valid_decimal
 
-# Parse numbers (v0.8.0 tuple return)
-result, errors = parse_decimal("1 234,56", "lv_LV")
+# Parse numbersresult, errors = parse_decimal("1 234,56", "lv_LV")
 if not has_parse_errors(errors) and is_valid_decimal(result):
     amount = result  # Decimal('1234.56')
 
-# Parse dates (v0.8.0 tuple return)
-result, errors = parse_date("28.01.2025", "lv_LV")
+# Parse datesresult, errors = parse_date("28.01.2025", "lv_LV")
 if not has_parse_errors(errors):
     date_value = result  # date(2025, 1, 28)
 
-# Parse currency (v0.8.0 tuple return)
-result, errors = parse_currency("1 234,56 €", "lv_LV")
+# Parse currencyresult, errors = parse_currency("1 234,56 €", "lv_LV")
 if not has_parse_errors(errors) and result is not None:
     amount, currency = result  # (Decimal('1234.56'), 'EUR')
 ```
 
-**Key Functions (v0.8.0 signatures)**:
-- `parse_number(value, locale)` → `tuple[float, list[FluentParseError]]`
-- `parse_decimal(value, locale)` → `tuple[Decimal, list[FluentParseError]]`
-- `parse_date(value, locale)` → `tuple[date | None, list[FluentParseError]]`
-- `parse_datetime(value, locale, tzinfo=None)` → `tuple[datetime | None, list[FluentParseError]]`
-- `parse_currency(value, locale)` → `tuple[tuple[Decimal, str] | None, list[FluentParseError]]`
+**Key Functions**:
+- `parse_number(value, locale)` → `tuple[float, tuple[FluentParseError, ...]]`
+- `parse_decimal(value, locale)` → `tuple[Decimal, tuple[FluentParseError, ...]]`
+- `parse_date(value, locale)` → `tuple[date | None, tuple[FluentParseError, ...]]`
+- `parse_datetime(value, locale, tzinfo=None)` → `tuple[datetime | None, tuple[FluentParseError, ...]]`
+- `parse_currency(value, locale)` → `tuple[tuple[Decimal, str] | None, tuple[FluentParseError, ...]]`
 
 **Implementation**: Uses Babel for number parsing, Python 3.13 stdlib (`strptime`, `fromisoformat`) with Babel CLDR patterns for date parsing.
 
@@ -503,7 +496,7 @@ print(info.get_function_names())
 # → frozenset({'NUMBER'})
 ```
 
-### Function Introspection (v0.4.0+)
+### Function Introspection
 
 ```python
 # List all available functions
@@ -706,7 +699,7 @@ print(f"Found messages: {collector.messages}")
 
 ## Supported Locales
 
-**v0.9.0 - CLDR plural rules via Babel**: 200+ locales with full Unicode CLDR compliance — see [README.md - Locale Support](README.md#locale-support) for details.
+**CLDR plural rules via Babel**: 200+ locales with full Unicode CLDR compliance — see [README.md - Locale Support](README.md#locale-support) for details.
 
 ---
 
@@ -736,6 +729,6 @@ print(f"Fluent Specification {__fluent_spec_version__}")
 
 ---
 
-**Quick Reference Last Updated**: December 9, 2025
-**FTLLexBuffer Version**: 0.10.0
+**Quick Reference Last Updated**: December 11, 2025
+**FTLLexBuffer Version**: 0.11.0
 **Python Requirement**: 3.13+

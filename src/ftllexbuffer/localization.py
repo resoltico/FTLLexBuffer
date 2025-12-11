@@ -314,7 +314,7 @@ class FluentLocalization:
 
     def format_value(
         self, message_id: MessageId, args: Mapping[str, FluentValue] | None = None
-    ) -> tuple[str, list[FluentError]]:
+    ) -> tuple[str, tuple[FluentError, ...]]:
         """Format message with fallback chain.
 
         Tries each locale in priority order until message is found.
@@ -327,7 +327,7 @@ class FluentLocalization:
         Returns:
             Tuple of (formatted_value, errors)
             - If message found: Returns formatted result from first bundle with message
-            - If not found: Returns ({message_id}, [error])
+            - If not found: Returns ({message_id}, (error,))
 
         Example:
             >>> l10n = FluentLocalization(['lv', 'en'])
@@ -347,9 +347,9 @@ class FluentLocalization:
             if bundle.has_message(message_id):
                 # Message exists in this locale - format it
                 value, bundle_errors = bundle.format_pattern(message_id, args)
-                # FluentBundle.format_pattern returns list[FluentError]
+                # FluentBundle.format_pattern returns tuple[FluentError, ...]
                 errors.extend(bundle_errors)
-                return (value, errors)
+                return (value, tuple(errors))
 
         # No locale had the message - return fallback
         # Use pattern matching for graceful degradation
@@ -361,11 +361,11 @@ class FluentLocalization:
                     message=f"Message '{message_id}' not found in any locale",
                 )
                 errors.append(FluentError(diagnostic))
-                return (f"{{{message_id}}}", errors)
+                return (f"{{{message_id}}}", tuple(errors))
             case _:
                 # Invalid message ID - treat as simple string error
                 errors.append(FluentError("Empty message ID"))
-                return ("{???}", errors)
+                return ("{???}", tuple(errors))
 
     def has_message(self, message_id: MessageId) -> bool:
         """Check if message exists in any locale.
@@ -384,7 +384,7 @@ class FluentLocalization:
         args: Mapping[str, FluentValue] | None = None,
         *,
         attribute: str | None = None,
-    ) -> tuple[str, list[FluentError]]:
+    ) -> tuple[str, tuple[FluentError, ...]]:
         """Format message with attribute support (fallback chain).
 
         Extends format_value() with attribute access.
@@ -416,7 +416,7 @@ class FluentLocalization:
             if bundle.has_message(message_id):
                 value, bundle_errors = bundle.format_pattern(message_id, args, attribute=attribute)
                 errors.extend(bundle_errors)
-                return (value, errors)
+                return (value, tuple(errors))
 
         # Not found - return fallback
         diagnostic = Diagnostic(
@@ -424,7 +424,7 @@ class FluentLocalization:
             message=f"Message '{message_id}' not found in any locale",
         )
         errors.append(FluentError(diagnostic))
-        return (f"{{{message_id}}}", errors)
+        return (f"{{{message_id}}}", tuple(errors))
 
     def add_function(self, name: str, func: Callable[..., str]) -> None:
         """Register custom function on all bundles.

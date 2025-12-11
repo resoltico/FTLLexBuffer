@@ -16,7 +16,7 @@ class TestLocalizationFormatPattern:
 
         result, errors = l10n.format_pattern("button", attribute="tooltip")
         assert result == "Klikšķiniet, lai iesniegtu"
-        assert errors == []
+        assert errors == ()
 
     def test_format_pattern_fallback_with_attribute(self) -> None:
         """Format pattern falls back to second locale with attribute."""
@@ -26,7 +26,7 @@ class TestLocalizationFormatPattern:
         # Message not in lv, falls back to en
         result, errors = l10n.format_pattern("button", attribute="tooltip")
         assert result == "Click to submit"
-        assert errors == []
+        assert errors == ()
 
     def test_format_pattern_not_found(self) -> None:
         """Format pattern returns fallback when message not found."""

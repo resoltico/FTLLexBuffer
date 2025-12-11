@@ -23,6 +23,7 @@ import pytest
 from ftllexbuffer.syntax.ast import Junk, Message, Term
 from ftllexbuffer.syntax.cursor import Cursor
 from ftllexbuffer.syntax.parser import FluentParserV1
+from ftllexbuffer.syntax.parser.primitives import parse_identifier, parse_number
 
 
 class TestParseNumberErrorPaths:
@@ -39,11 +40,10 @@ class TestParseNumberErrorPaths:
         Example: test = { - }
         Trigger: Minus sign followed by non-digit or EOF
         """
-        parser = FluentParserV1()
         # Create cursor pointing at '-' followed by space
         cursor = Cursor("test = { - }", 9)  # Position at '-'
 
-        result = parser._parse_number(cursor)
+        result = parse_number(cursor)
 
         assert result is None
 
@@ -53,10 +53,9 @@ class TestParseNumberErrorPaths:
         Example: test = { -
         Trigger: Minus sign at EOF
         """
-        parser = FluentParserV1()
         cursor = Cursor("test = { -", 9)  # Position at '-', EOF after
 
-        result = parser._parse_number(cursor)
+        result = parse_number(cursor)
 
         assert result is None
 
@@ -66,10 +65,9 @@ class TestParseNumberErrorPaths:
         Example: test = { -x }
         Trigger: Minus sign followed by alphabetic character
         """
-        parser = FluentParserV1()
         cursor = Cursor("test = { -x }", 9)  # Position at '-'
 
-        result = parser._parse_number(cursor)
+        result = parse_number(cursor)
 
         assert result is None
 
@@ -79,10 +77,9 @@ class TestParseNumberErrorPaths:
         Example: test = { 3. }
         Trigger: Decimal point followed by non-digit
         """
-        parser = FluentParserV1()
         cursor = Cursor("test = { 3. }", 9)  # Position at '3'
 
-        result = parser._parse_number(cursor)
+        result = parse_number(cursor)
 
         assert result is None
 
@@ -92,10 +89,9 @@ class TestParseNumberErrorPaths:
         Example: test = { 3.
         Trigger: Decimal point at end of input
         """
-        parser = FluentParserV1()
         cursor = Cursor("test = { 3.", 9)  # Position at '3', EOF after decimal
 
-        result = parser._parse_number(cursor)
+        result = parse_number(cursor)
 
         assert result is None
 
@@ -106,10 +102,9 @@ class TestParseNumberErrorPaths:
         Trigger: Decimal point as first character
         Note: This actually triggers line 222 first (no digits before decimal)
         """
-        parser = FluentParserV1()
         cursor = Cursor("test = { . }", 9)  # Position at '.'
 
-        result = parser._parse_number(cursor)
+        result = parse_number(cursor)
 
         assert result is None
         # Should fail at the start - '.' is not a digit
@@ -234,10 +229,9 @@ class TestParseIdentifierErrorPaths:
 
         Trigger: EOF when identifier is required
         """
-        parser = FluentParserV1()
         cursor = Cursor("", 0)
 
-        result = parser._parse_identifier(cursor)
+        result = parse_identifier(cursor)
 
         assert result is None
 
@@ -247,10 +241,9 @@ class TestParseIdentifierErrorPaths:
         Example: 123test
         Trigger: First character is digit
         """
-        parser = FluentParserV1()
         cursor = Cursor("123test = value", 0)
 
-        result = parser._parse_identifier(cursor)
+        result = parse_identifier(cursor)
 
         assert result is None
 
@@ -260,10 +253,9 @@ class TestParseIdentifierErrorPaths:
         Example: @invalid
         Trigger: First character is not letter, digit, underscore, or hyphen
         """
-        parser = FluentParserV1()
         cursor = Cursor("@invalid = value", 0)
 
-        result = parser._parse_identifier(cursor)
+        result = parse_identifier(cursor)
 
         assert result is None
 

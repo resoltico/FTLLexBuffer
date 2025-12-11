@@ -38,7 +38,7 @@ entries-count = {$count ->
         result, errors = benchmark(bundle.format_pattern, "hello")
 
         assert result == "Hello, World!"
-        assert errors == []
+        assert errors == ()
 
     def test_format_message_with_variable(
         self, benchmark, bundle: FluentBundle
@@ -49,7 +49,7 @@ entries-count = {$count ->
         )
 
         assert "Anna" in result
-        assert errors == []
+        assert errors == ()
 
     def test_format_message_with_multiple_variables(
         self, benchmark, bundle: FluentBundle
@@ -60,7 +60,7 @@ entries-count = {$count ->
         result, errors = benchmark(bundle.format_pattern, "user-info", args)
 
         assert "John" in result
-        assert errors == []
+        assert errors == ()
 
     def test_format_select_expression(
         self, benchmark, bundle: FluentBundle
@@ -71,4 +71,4 @@ entries-count = {$count ->
         )
 
         assert "5 entries" in result
-        assert errors == []
+        assert errors == ()
