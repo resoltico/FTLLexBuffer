@@ -627,7 +627,7 @@ class FluentBundle:
             >>> # Successful formatting
             >>> result, errors = bundle.format_pattern("hello")
             >>> assert result == 'Sveiki, pasaule!'
-            >>> assert errors == []
+            >>> assert errors == ()
 
             >>> # Missing variable - returns fallback and error
             >>> bundle.add_resource('msg = Hello { $name }!')
@@ -639,7 +639,7 @@ class FluentBundle:
             >>> # Attribute access
             >>> result, errors = bundle.format_pattern("button-save", attribute="tooltip")
             >>> assert result == 'Saglabā pašreizējo ierakstu datubāzē'
-            >>> assert errors == []
+            >>> assert errors == ()
         """
         # Check cache first (if enabled)
         if self._cache is not None:
@@ -738,7 +738,7 @@ class FluentBundle:
             >>> bundle.add_resource("welcome = Hello, { $name }!")
             >>> result, errors = bundle.format_value("welcome", {"name": "Alice"})
             >>> assert result == "Hello, Alice!"
-            >>> assert errors == []
+            >>> assert errors == ()
         """
         return self.format_pattern(message_id, args, attribute=None)
 

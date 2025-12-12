@@ -60,7 +60,7 @@ from ftllexbuffer.diagnostics import (
 ```python
 from ftllexbuffer.introspection import (
     introspect_message, MessageIntrospection,
-    extract_variables, extract_references,
+    extract_variables,
 )
 ```
 

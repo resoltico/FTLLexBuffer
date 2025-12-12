@@ -1543,6 +1543,7 @@ if "CURRENCY" in bundle._function_registry:
 
 Initial release.
 
+[0.11.1]: https://github.com/resoltico/ftllexbuffer/releases/tag/v0.11.1
 [0.11.0]: https://github.com/resoltico/ftllexbuffer/releases/tag/v0.11.0
 [0.10.0]: https://github.com/resoltico/ftllexbuffer/releases/tag/v0.10.0
 [0.9.1]: https://github.com/resoltico/ftllexbuffer/releases/tag/v0.9.1

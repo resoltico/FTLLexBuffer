@@ -300,7 +300,7 @@ def example_csv_import() -> None:
 if __name__ == "__main__":
     print("=" * 60)
     print("Bi-Directional Localization Examples")
-    print("FTLLexBuffer v0.8.0+")
+    print("FTLLexBuffer v0.11.0+")
     print("=" * 60)
 
     example_invoice_processing()

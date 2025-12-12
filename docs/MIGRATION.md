@@ -769,8 +769,8 @@ from ftllexbuffer import (
 
 ---
 
-**Migration Guide Last Updated**: December 11, 2025
-**FTLLexBuffer Version**: 0.11.0
+**Migration Guide Last Updated**: December 12, 2025
+**FTLLexBuffer Version**: 0.11.1
 **fluent.runtime Version Referenced**: 0.4.0
 
 **Note**: This guide covers migration from fluent.runtime to FTLLexBuffer. For v0.11.0 breaking changes (immutable error tuples), see [CHANGELOG.md](CHANGELOG.md).

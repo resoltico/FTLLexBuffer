@@ -735,6 +735,6 @@ print(f"Fluent Specification {__fluent_spec_version__}")
 
 ---
 
-**Quick Reference Last Updated**: December 11, 2025
-**FTLLexBuffer Version**: 0.11.0
+**Quick Reference Last Updated**: December 12, 2025
+**FTLLexBuffer Version**: 0.11.1
 **Python Requirement**: 3.13+

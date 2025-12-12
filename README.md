@@ -18,8 +18,6 @@ FTLLexBuffer implements Mozilla's [Fluent](https://projectfluent.org/) localizat
 
 FTLLexBuffer extends the Fluent v1.0 specification with **bi-directional localization** (parse locale-formatted strings back to Python types), **CURRENCY formatting**, **message introspection**, and **full type safety** (`mypy --strict` compatible).
 
-> **Legal:** MIT licensed. Independent implementation of Apache 2.0-licensed FTL Specification. See [PATENTS.md](PATENTS.md) and [NOTICE](NOTICE).
-
 ---
 
 ## Quick Links
@@ -110,7 +108,7 @@ files = { $count ->
 
 ---
 
-## License
+## License & Legal
 
 MIT License - See [LICENSE](LICENSE).
 
