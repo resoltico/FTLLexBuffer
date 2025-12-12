@@ -132,7 +132,7 @@ $ python examples/thread_safety.py
 
 ## Related Documentation
 
-- [TYPE_HINTS.md](../TYPE_HINTS.md) - Type hints guide for FTLLexBuffer
+- [TYPE_HINTS_GUIDE.md](../docs/TYPE_HINTS_GUIDE.md) - Type hints guide for FTLLexBuffer
 - [thread_safety.py](thread_safety.py) - Thread safety patterns with type hints
 
 ---

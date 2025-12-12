@@ -1,8 +1,14 @@
+<!--
+RETRIEVAL_HINTS:
+  keywords: [cheat sheet, quick reference, examples, code snippets, patterns, copy paste]
+  answers: [how to format message, how to parse number, how to use bundle, common patterns]
+  related: [../README.md, DOC_01_Core.md, PARSING_GUIDE.md]
+-->
 # FTLLexBuffer Quick Reference
 
 **One-page cheat sheet for common tasks**
 
-Python 3.13+ | [Full API Documentation](API.md) | [Examples](examples/)
+Python 3.13+ | [Full API Documentation](DOC_00_Index.md) | [Examples](../examples/)
 
 ---
 
@@ -465,7 +471,7 @@ if not has_parse_errors(errors) and result is not None:
 
 **Implementation**: Uses Babel for number parsing, Python 3.13 stdlib (`strptime`, `fromisoformat`) with Babel CLDR patterns for date parsing.
 
-**See**: [PARSING.md](PARSING.md) for complete guide with best practices and examples.
+**See**: [PARSING_GUIDE.md](PARSING_GUIDE.md) for complete guide with best practices and examples.
 
 ---
 
@@ -699,16 +705,16 @@ print(f"Found messages: {collector.messages}")
 
 ## Supported Locales
 
-**CLDR plural rules via Babel**: 200+ locales with full Unicode CLDR compliance — see [README.md - Locale Support](README.md#locale-support) for details.
+**CLDR plural rules via Babel**: 200+ locales with full Unicode CLDR compliance. Includes all major languages (English, Spanish, French, German, Chinese, Japanese, Arabic, Russian, etc.) plus regional variants. Unsupported locales fall back to English-style one/other rules.
 
 ---
 
 ## Getting Help
 
-- **Full API Documentation**: [API.md](API.md)
-- **Examples**: [examples/](examples/)
-- **Testing Guide**: [TESTING.md](TESTING.md)
-- **Contributing**: [CONTRIBUTING.md](CONTRIBUTING.md)
+- **Full API Documentation**: [DOC_00_Index.md](DOC_00_Index.md)
+- **Examples**: [examples/](../examples/)
+- **Testing Guide**: [TESTING.md](../TESTING.md)
+- **Contributing**: [CONTRIBUTING.md](../CONTRIBUTING.md)
 - **Issues**: https://github.com/resoltico/ftllexbuffer/issues
 
 ---

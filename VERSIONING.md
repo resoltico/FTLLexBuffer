@@ -1,3 +1,9 @@
+<!--
+RETRIEVAL_HINTS:
+  keywords: [version, versioning, semver, release, bump, importlib.metadata, pyproject.toml]
+  answers: [how to bump version, version management, release process, semantic versioning]
+  related: [CHANGELOG.md, CONTRIBUTING.md, pyproject.toml]
+-->
 # Version Management
 
 **Status:** Production-ready
@@ -211,7 +217,7 @@ Comprehensive validation of version management:
    - Rejects `0.0.0+dev`, `0.0.0+unknown` in CI
 
 4. **`test_version_in_api_docs_matches()`** [INFORMATIONAL]
-   - Warns if API.md doesn't reference current version
+   - Warns if docs/DOC_00_Index.md doesn't reference current version
    - Informational only - doesn't fail builds
 
 5. **`test_changelog_has_current_version()`** [INFORMATIONAL] ✨ NEW

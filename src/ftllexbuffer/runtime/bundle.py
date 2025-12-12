@@ -1,6 +1,6 @@
 """FluentBundle - Main API for Fluent message formatting.
 
-Python 3.13+. Minimal external dependencies (returns, Babel).
+Python 3.13+. External dependency: Babel (CLDR locale data).
 """
 
 import logging
@@ -72,11 +72,11 @@ class FluentBundle:
         ... ''')
         >>> result, errors = bundle.format_pattern("hello")
         >>> assert result == 'Sveiki, pasaule!'
-        >>> assert errors == []
+        >>> assert errors == ()
         >>>
         >>> result, errors = bundle.format_pattern("welcome", {"name": "Jānis"})
         >>> assert result == 'Laipni lūdzam, Jānis!'
-        >>> assert errors == []
+        >>> assert errors == ()
     """
 
     __slots__ = (

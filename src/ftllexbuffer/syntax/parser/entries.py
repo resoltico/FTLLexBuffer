@@ -217,7 +217,7 @@ def parse_attribute(cursor: Cursor) -> ParseResult[Attribute] | None:
     return ParseResult(attribute, pattern_parse.cursor)
 
 
-def parse_term(cursor: Cursor) -> ParseResult[Term] | None:  # noqa: PLR0912
+def parse_term(cursor: Cursor) -> ParseResult[Term] | None:
     """Parse term definition (-term-id = pattern).
 
     FTL syntax:

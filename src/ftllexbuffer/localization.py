@@ -142,7 +142,7 @@ class FluentLocalization:
         >>> l10n.add_resource('lv', 'welcome = Sveiki, { $name }!')
         >>> l10n.add_resource('en', 'welcome = Hello, { $name }!')
         >>> result = l10n.format_value('welcome', {'name': 'Anna'})
-        # Returns: ('Sveiki, Anna!', [])
+        # Returns: ('Sveiki, Anna!', ())
 
     Attributes:
         locales: Immutable tuple of locale codes in fallback priority order

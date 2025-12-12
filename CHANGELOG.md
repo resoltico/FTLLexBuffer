@@ -1,9 +1,28 @@
+<!--
+RETRIEVAL_HINTS:
+  keywords: [changelog, release notes, version history, breaking changes, migration, what's new]
+  answers: [what changed in version, breaking changes, release history, version changes]
+  related: [docs/MIGRATION.md, VERSIONING.md]
+-->
 # Changelog
 
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.11.1] - 2025-12-12
+
+### Fixed
+
+- **Documentation**
+  - Fixed docstring examples in `__init__.py` to show tuple returns `()` instead of list returns `[]` (matches v0.11.0 API)
+  - Fixed `FluentLocalization` docstring example to show tuple return (matches v0.11.0 API)
+
+### Changed
+
+- **Documentation**
+  - Documentation overhaul, generally
 
 ## [0.11.0] - 2025-12-10
 
@@ -1217,7 +1236,7 @@ from ftllexbuffer.parsing import (
 **Recommended**:
 - Use `parse_decimal()` for all financial calculations (Decimal precision)
 - Enable caching in production for performance-critical applications
-- Read [PARSING.md](https://github.com/resoltico/ftllexbuffer/blob/main/PARSING.md) for best practices
+- Read [PARSING_GUIDE.md](https://github.com/resoltico/ftllexbuffer/blob/main/docs/PARSING_GUIDE.md) for best practices
 
 #### For Library Developers
 
@@ -1524,6 +1543,10 @@ if "CURRENCY" in bundle._function_registry:
 
 Initial release.
 
+[0.11.0]: https://github.com/resoltico/ftllexbuffer/releases/tag/v0.11.0
+[0.10.0]: https://github.com/resoltico/ftllexbuffer/releases/tag/v0.10.0
+[0.9.1]: https://github.com/resoltico/ftllexbuffer/releases/tag/v0.9.1
+[0.9.0]: https://github.com/resoltico/ftllexbuffer/releases/tag/v0.9.0
 [0.8.0]: https://github.com/resoltico/ftllexbuffer/releases/tag/v0.8.0
 [0.7.0]: https://github.com/resoltico/ftllexbuffer/releases/tag/v0.7.0
 [0.6.0]: https://github.com/resoltico/ftllexbuffer/releases/tag/v0.6.0

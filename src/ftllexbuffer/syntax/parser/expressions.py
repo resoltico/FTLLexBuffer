@@ -197,7 +197,7 @@ def parse_select_expression(
     return ParseResult(select_expr, cursor)
 
 
-def parse_argument_expression(cursor: Cursor) -> ParseResult[InlineExpression] | None:  # noqa: PLR0911
+def parse_argument_expression(cursor: Cursor) -> ParseResult[InlineExpression] | None:
     """Parse a single argument expression (variable, string, number, or identifier).
 
     Helper method extracted from parse_call_arguments to reduce complexity.
@@ -249,7 +249,7 @@ def parse_argument_expression(cursor: Cursor) -> ParseResult[InlineExpression] |
     return None  # "Expected argument expression (variable, string, number, or identifier)"
 
 
-def parse_call_arguments(cursor: Cursor) -> ParseResult[CallArguments] | None:  # noqa: PLR0911
+def parse_call_arguments(cursor: Cursor) -> ParseResult[CallArguments] | None:
     """Parse function call arguments: (pos1, pos2, name1: val1, name2: val2)
 
     Arguments consist of positional arguments followed by named arguments.
@@ -478,7 +478,7 @@ def parse_term_reference(cursor: Cursor) -> ParseResult[TermReference] | None:
     return ParseResult(term_ref, cursor)
 
 
-def parse_inline_expression(  # noqa: PLR0911, PLR0912, PLR0915
+def parse_inline_expression(
     cursor: Cursor,
 ) -> ParseResult[
     InlineExpression

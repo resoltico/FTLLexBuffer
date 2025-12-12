@@ -1,7 +1,7 @@
 """Immutable cursor infrastructure for type-safe parsing.
 
 Implements the immutable cursor pattern for zero-`None` parsing.
-Python 3.13+. Zero external dependencies (returns library already in pyproject.toml).
+Python 3.13+. Zero external dependencies.
 
 Design Philosophy:
     - Cursor is immutable (frozen dataclass)

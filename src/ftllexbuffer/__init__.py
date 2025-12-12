@@ -48,9 +48,9 @@ Example - Multi-locale fallback:
     >>> l10n.add_resource('lv', 'hello = Sveiki!')
     >>> l10n.add_resource('en', 'hello = Hello!\\ngoodbye = Goodbye!')
     >>> l10n.format_value('hello')
-    ('Sveiki!', [])
+    ('Sveiki!', ())
     >>> l10n.format_value('goodbye')  # Falls back to English
-    ('Goodbye!', [])
+    ('Goodbye!', ())
 
 Example - AST manipulation:
     >>> from ftllexbuffer import parse_ftl

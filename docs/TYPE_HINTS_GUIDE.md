@@ -1,3 +1,9 @@
+<!--
+RETRIEVAL_HINTS:
+  keywords: [type hints, typing, mypy, type safety, pep 695, typeis, type guards, annotations]
+  answers: [how to use type hints, mypy configuration, type safe code, python typing]
+  related: [DOC_02_Types.md, QUICK_REFERENCE.md]
+-->
 # Type Hints Guide - FTLLexBuffer
 
 **Comprehensive guide to using Python 3.13+ type hints with FTLLexBuffer**
@@ -805,6 +811,6 @@ if Message.guard(msg):
 **Python Version**: 3.13+
 
 **See Also**:
-- [API.md](API.md) - Complete API reference
+- [DOC_00_Index.md](DOC_00_Index.md) - Complete API reference
 - [QUICK_REFERENCE.md](QUICK_REFERENCE.md) - Quick examples
-- [examples/](examples/) - Working code samples
+- [examples/](../examples/) - Working code samples

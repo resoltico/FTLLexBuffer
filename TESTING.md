@@ -1,3 +1,9 @@
+<!--
+RETRIEVAL_HINTS:
+  keywords: [testing, pytest, hypothesis, coverage, lint, mypy, ruff, pylint, test commands]
+  answers: [how to run tests, test commands, coverage requirements, lint commands]
+  related: [CONTRIBUTING.md, scripts/test.sh, scripts/lint.sh]
+-->
 # FTLLexBuffer Testing Documentation
 
 This document describes the testing infrastructure for FTLLexBuffer.

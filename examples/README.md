@@ -238,7 +238,7 @@ Demonstrates:
 
 **Run**: `python examples/custom_functions.py`
 
-**See also**: [ADVANCED_CUSTOM_FUNCTIONS.md](../ADVANCED_CUSTOM_FUNCTIONS.md) - Comprehensive guide to custom function development including error handling patterns, Babel integration, testing strategies, and best practices.
+**See also**: [CUSTOM_FUNCTIONS_GUIDE.md](../docs/CUSTOM_FUNCTIONS_GUIDE.md) - Comprehensive guide to custom function development including error handling patterns, Babel integration, testing strategies, and best practices.
 
 ---
 
@@ -382,8 +382,8 @@ price = Price: { NUMBER($amount, minimumFractionDigits: 2) } EUR
 
 ## See Also
 
-- [API.md](../API.md) - Complete API reference with all public APIs documented
+- [docs/DOC_00_Index.md](../docs/DOC_00_Index.md) - Complete API reference
 - [README.md](../README.md) - Project overview and getting started guide
-- [ADVANCED_CUSTOM_FUNCTIONS.md](../ADVANCED_CUSTOM_FUNCTIONS.md) - Comprehensive guide to extending FTLLexBuffer with custom formatting functions
+- [CUSTOM_FUNCTIONS_GUIDE.md](../docs/CUSTOM_FUNCTIONS_GUIDE.md) - Comprehensive guide to extending FTLLexBuffer with custom formatting functions
 - [TESTING.md](../TESTING.md) - Testing strategies and quality assurance practices
 - [CONTRIBUTING.md](../CONTRIBUTING.md) - Contribution guidelines for developers

@@ -1,3 +1,9 @@
+<!--
+RETRIEVAL_HINTS:
+  keywords: [migration, fluent.runtime, upgrade, breaking changes, mozilla fluent, python fluent]
+  answers: [how to migrate from fluent.runtime, upgrade to ftllexbuffer, breaking changes]
+  related: [../CHANGELOG.md, ../README.md]
+-->
 # Migration Guide: fluent.runtime → FTLLexBuffer
 
 **Complete guide for migrating from Mozilla's fluent.runtime to FTLLexBuffer**
@@ -756,7 +762,7 @@ from ftllexbuffer import (
 
 ## Getting Help
 
-- **FTLLexBuffer Documentation**: [API.md](API.md)
+- **FTLLexBuffer Documentation**: [docs/DOC_00_Index.md](docs/DOC_00_Index.md)
 - **Examples**: [examples/](examples/)
 - **Quick Reference**: [QUICK_REFERENCE.md](QUICK_REFERENCE.md)
 - **Issues**: https://github.com/resoltico/ftllexbuffer/issues

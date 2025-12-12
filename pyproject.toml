@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "ftllexbuffer"
-version = "0.11.0"
+version = "0.11.1"
 description = "Python implementation of the FTL (Fluent Translation List) specification"
 readme = "README.md"
 requires-python = ">=3.13"
@@ -47,7 +47,7 @@ dev = [
     "hypothesis>=6.148.7",
     "mypy>=1.19.0",
     "pylint>=4.0.4",
-    "ruff>=0.14.8",
+    "ruff>=0.14.9",
     "pytest-benchmark>=5.2.3",
 ]
 publish = [
@@ -79,20 +79,15 @@ only-include = [
     "/examples",
     "/src",
     "/tests",
-    "ADVANCED_CUSTOM_FUNCTIONS.md",
-    "API.md",
+    "/docs",
     "CHANGELOG.md",
     "CONTRIBUTING.md",
     "LICENSE",
-    "MIGRATION.md",
     "NOTICE",
-    "PARSING.md",
     "PATENTS.md",
-    "QUICK_REFERENCE.md",
     "README.md",
     "TESTING.md",
-    "TERMINOLOGY.md",
-    "TYPE_HINTS.md",
+    "VERSIONING.md",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -216,7 +211,9 @@ ignore = [
 "src/ftllexbuffer/introspection.py" = ["N802"]
 
 # Parser: Inherent complexity from EBNF grammar + real bugs to fix separately
-"src/ftllexbuffer/syntax/parser.py" = ["PLR0912", "F841", "ARG002"]
+"src/ftllexbuffer/syntax/parser/core.py" = ["PLR0912"]
+"src/ftllexbuffer/syntax/parser/entries.py" = ["PLR0912"]
+"src/ftllexbuffer/syntax/parser/expressions.py" = ["PLR0912", "PLR0911", "PLR0915", "F841", "ARG002"]
 
 # Visitor: Commented example code + inherent complexity from AST node dispatch
 "src/ftllexbuffer/syntax/visitor.py" = ["ERA001", "PLR0911", "PLR0912"]

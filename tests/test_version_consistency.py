@@ -148,25 +148,25 @@ def test_version_in_api_docs_matches():
     This test is informational - it's acceptable for docs to lag behind
     code version during development, but they should match for releases.
     """
-    # Check if API.md exists and references version
-    api_md_path = Path(__file__).parent.parent / "API.md"
+    # Check if DOC_00_Index.md exists and references version
+    index_md_path = Path(__file__).parent.parent / "docs" / "DOC_00_Index.md"
 
-    if not api_md_path.exists():
-        # API.md not present, skip test
+    if not index_md_path.exists():
+        # docs/DOC_00_Index.md not present, skip test
         return
 
-    api_content = api_md_path.read_text(encoding="utf-8")
+    index_content = index_md_path.read_text(encoding="utf-8")
     version = ftllexbuffer.__version__
 
     # This is informational - don't fail if version not mentioned
     # (docs may use generic examples or not reference version at all)
-    if version in api_content:
+    if version in index_content:
         # Version found in docs - good!
         pass
     else:
         # Version not in docs - informational warning only
         warnings.warn(
-            f"API.md does not reference version {version}. "
+            f"docs/DOC_00_Index.md does not reference version {version}. "
             f"Consider updating documentation for release.",
             stacklevel=2,
         )

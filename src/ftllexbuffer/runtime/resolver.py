@@ -1,7 +1,7 @@
 """Fluent message resolver - converts AST to formatted strings.
 
 Resolves patterns by walking AST, interpolating variables, evaluating selectors.
-Python 3.13+. Zero external dependencies.
+Python 3.13+. Indirect dependency: Babel (via plural_rules).
 """
 
 from collections.abc import Mapping

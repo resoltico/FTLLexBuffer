@@ -1,3 +1,9 @@
+<!--
+RETRIEVAL_HINTS:
+  keywords: [custom functions, add_function, fluent functions, factory pattern, locale-aware, formatting functions]
+  answers: [how to create custom function, add custom function, locale-aware function, extend ftllexbuffer]
+  related: [DOC_04_Runtime.md, QUICK_REFERENCE.md]
+-->
 # Advanced Custom Functions Guide
 
 **Comprehensive guide to extending FTLLexBuffer with custom formatting functions**
@@ -920,12 +926,12 @@ class TestFileSizeHypothesis:
 7. **Test comprehensively** with unit tests and property-based tests
 
 **For More Examples**:
-- See [examples/custom_functions.py](examples/custom_functions.py) for complete working code
-- See [tests/test_custom_functions.py](tests/test_custom_functions.py) for test patterns
+- See [examples/custom_functions.py](../examples/custom_functions.py) for complete working code
+- See [tests/test_custom_functions.py](../tests/test_custom_functions.py) for test patterns
 
 **Questions?**
 - Open an issue: https://github.com/resoltico/ftllexbuffer/issues
-- Read the full API docs: [API.md](API.md)
+- Read the full API docs: [DOC_00_Index.md](DOC_00_Index.md)
 
 ---
 

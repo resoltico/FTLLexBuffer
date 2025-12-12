@@ -1,3 +1,9 @@
+<!--
+RETRIEVAL_HINTS:
+  keywords: [parsing, parse_number, parse_decimal, parse_date, parse_currency, bi-directional, user input, forms]
+  answers: [how to parse user input, parse number, parse date, parse currency, bidirectional localization]
+  related: [DOC_03_Parsing.md, QUICK_REFERENCE.md, ../README.md]
+-->
 # Parsing Guide - Bi-Directional Localization
 
 FTLLexBuffer provides comprehensive **bi-directional localization**: both formatting (data → display) and parsing (display → data).
@@ -720,7 +726,7 @@ result, errors = parse_date("2025-01-02", locale)  # Always Jan 2
 
 ## See Also
 
-- [API.md](API.md) - Complete API reference
+- [docs/DOC_00_Index.md](docs/DOC_00_Index.md) - Complete API reference
 - [README.md](README.md) - Getting started
 - [CHANGELOG.md](CHANGELOG.md) - v0.8.0 breaking changes
 - [Babel Documentation](https://babel.pocoo.org/) - Number and date formatting patterns

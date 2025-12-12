@@ -1,3 +1,9 @@
+<!--
+RETRIEVAL_HINTS:
+  keywords: [terminology, definitions, glossary, fluent terms, message, term, pattern, placeable, resource]
+  answers: [what is a message, what is a term, what is a pattern, fluent terminology]
+  related: [../README.md, DOC_02_Types.md]
+-->
 # FTLLexBuffer Terminology Guide
 
 **Official terminology reference for FTLLexBuffer project**
@@ -431,5 +437,5 @@ Complete alphabetical reference:
 
 **See Also**:
 - [README.md - Terminology Section](README.md#terminology)
-- [API.md - Importing from FTLLexBuffer](API.md#importing-from-ftllexbuffer)
+- [docs/DOC_00_Index.md](docs/DOC_00_Index.md) - Complete API reference
 - [QUICK_REFERENCE.md](QUICK_REFERENCE.md)

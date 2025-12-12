@@ -1,3 +1,9 @@
+<!--
+RETRIEVAL_HINTS:
+  keywords: [contributing, development, setup, pull request, code style, workflow]
+  answers: [how to contribute, development setup, pr process, code standards]
+  related: [TESTING.md, VERSIONING.md]
+-->
 # Contributing
 
 ## Setup
