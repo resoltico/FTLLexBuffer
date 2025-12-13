@@ -1,7 +1,7 @@
 <!--
 RETRIEVAL_HINTS:
-  keywords: [ftllexbuffer, fluent, localization, i18n, l10n, ftl, translation, plurals, babel, cldr]
-  answers: [what is ftllexbuffer, how to install, quick start, getting started, fluent python]
+  keywords: [ftllexbuffer, fluent, localization, i18n, l10n, ftl, translation, plurals, babel, cldr, python]
+  answers: [what is ftllexbuffer, how to install, quick start, fluent python, localization library]
   related: [docs/QUICK_REFERENCE.md, docs/DOC_00_Index.md, docs/PARSING_GUIDE.md, docs/TERMINOLOGY.md]
 -->
 # FTLLexBuffer
@@ -12,133 +12,21 @@ RETRIEVAL_HINTS:
 
 ![FTLLexBuffer Device (MK1), Early Victorian Design](images/FTLLexBuffer.png)
 
-**Python implementation of the Fluent localization system.**
+**A Python 3.13+ implementation of the Mozilla Fluent localization system.**
 
-FTLLexBuffer is a library for the [Fluent](https://projectfluent.org/) localization system, targeting Python 3.13+. It provides functions for formatting translations and parsing localized data (numbers, dates, currencies).
+FTLLexBuffer implements [Project Fluent](https://projectfluent.org/) for Python, enabling natural-sounding translations with grammatical logic handled by translators, not developers. It provides bidirectional localization: format messages for display and parse localized input back to Python types.
 
 ---
 
 ## Table of Contents
-- [Getting Started](#getting-started)
+
+- [Installation](#installation)
+- [Quick Start](#quick-start)
 - [The Fluent Difference](#the-fluent-difference)
 - [Key Features](#key-features)
-- [Project Structure](#project-structure)
 - [Documentation](#documentation)
 - [Contributing](#contributing)
-- [License](#license--legal)
-
----
-
-## Getting Started
-
-FTLLexBuffer facilitates both the formatting of messages and the parsing of user input.
-
-```python
-from decimal import Decimal
-from ftllexbuffer import FluentBundle
-from ftllexbuffer.parsing import parse_currency
-
-# 1. PARSE: Native localized input
-# Note: Handles ambiguity (e.g., differentiates USD/CAD $)
-amount, currency = parse_currency("1.234,50 €", "de_DE")
-# -> Decimal('1234.50'), 'EUR'
-
-# 2. CALCULATE: Standard Python math
-# Uses Decimal for financial precision (no floating point errors)
-total = amount * Decimal("1.20") # Add 20% Tax
-
-# 3. FORMAT: Serialize back to localized string
-bundle = FluentBundle("en_US")
-bundle.add_resource("total = Total: { CURRENCY($num, currency: $curr) }")
-
-print(bundle.format_pattern("total", {"num": total, "curr": currency}))
-# -> "Total: $1,481.40"
-```
-
----
-
-## The Fluent Difference
-
-Localization often requires logic for grammatical agreement (plurals, cases).
-
-**The Traditional Way (Logic in Python)**
-
-Developers often have to hardcode grammatical logic directly in their application code.
-
-```python
-# The developer manually handles pluralization logic
-if coffee_count == 0:
-    msg = "Out of coffee! Panic!"
-elif coffee_count == 1:
-    msg = "1 coffee left."
-else:
-    msg = f"{coffee_count} coffees left."
-```
-
-**The Fluent Way (Logic in FTL)**
-
-With Fluent, the application code passes the data, and the translation file handles the logic. This keeps your Python code **clean and logic-free**.
-
-```python
-# The developer passes the data; no if/else statements
-bundle.format_pattern("coffee-stock", {"count": coffee_count})
-```
-
-```ftl
-# Grammar and logic live in the translation file
-coffee-stock = { $count ->
-    [0] Out of coffee! Panic!
-    [one] One coffee left.
-   *[other] { $count } coffees left.
-}
-```
-
----
-
-## Key Features
-
-FTLLexBuffer provides three core capabilities for handling localized data:
-
-### 1. Translation Management
-The core engine (`FluentBundle`) manages the lifecycle of translation resources.
-*   **Logical Isolation**: Translators define logic in `.ftl` files.
-*   **Runtime Resolution**: The engine resolves messages at runtime, providing robust fallback strings.
-
-### 2. Output Formatting
-Format complex strings with natural-sounding grammar using the Mozilla Fluent syntax.
-
-### 3. Input Parsing
-Parse localized strings back into Python objects for data processing.
-*   **Ambiguity Detection**: Smartly handles ambiguous currency symbols (e.g., determining if `$` implies `USD` or `CAD` based on locale).
-*   **Safety**: Uses a non-raising error pattern to ensure production stability.
-*   **Data Types**: Wraps `Babel` to parse Numbers, Dates, and Currencies into standard Python types (`Decimal`, `date`).
-
----
-
-## Project Structure
-
-```text
-ftllexbuffer/
-├── diagnostics/      # Error definitions and templates
-├── parsing/          # Locale-aware parsing (Babel wrapper)
-├── runtime/          # Core message formatting engine
-├── syntax/           # FTL parser and AST definitions
-├── enums.py          # Type-safe constants
-├── introspection.py  # Variable extraction tools
-├── locale_utils.py   # BCP-47 localization helpers
-└── localization.py   # High-level orchestration
-```
-
----
-
-## Documentation
-
-| Guide | Description |
-|:------|:------------|
-| [Quick Reference](docs/QUICK_REFERENCE.md) | One-page reference for common tasks. |
-| [API Reference](docs/DOC_00_Index.md) | Detailed class and function documentation. |
-| [Parsing Guide](docs/PARSING_GUIDE.md) | Guide to locale-aware parsing functions. |
-| [Examples](examples/) | Code examples for various use cases. |
+- [License](#license)
 
 ---
 
@@ -148,20 +36,131 @@ ftllexbuffer/
 pip install ftllexbuffer
 ```
 
-**Requirements**: Python 3.13+, Babel>=2.17.0
+**Requirements**: Python 3.13+, Babel >= 2.17.0
+
+---
+
+## Quick Start
+
+### Basic Message Formatting
+
+```python
+from ftllexbuffer import FluentBundle
+
+bundle = FluentBundle("en_US")
+bundle.add_resource("""
+hello = Hello, World!
+welcome = Welcome, { $name }!
+""")
+
+result, errors = bundle.format_pattern("hello")
+print(result)  # "Hello, World!"
+
+result, errors = bundle.format_pattern("welcome", {"name": "Alice"})
+print(result)  # "Welcome, Alice!"
+```
+
+### Bidirectional Localization (Parse + Format)
+
+```python
+from decimal import Decimal
+from ftllexbuffer import FluentBundle
+from ftllexbuffer.parsing import parse_currency
+
+# 1. PARSE: Locale-formatted user input -> Python types
+result, errors = parse_currency("1.234,50 €", "de_DE")
+if result is not None:
+    amount, currency = result  # Decimal('1234.50'), 'EUR'
+
+    # 2. CALCULATE: Standard Python math with Decimal precision
+    total = amount * Decimal("1.19")  # Add 19% VAT
+
+    # 3. FORMAT: Python types -> Locale-formatted output
+    bundle = FluentBundle("en_US")
+    bundle.add_resource('invoice = Total: { CURRENCY($amount, currency: "EUR") }')
+
+    output, _ = bundle.format_pattern("invoice", {"amount": total})
+    print(output)  # "Total: €1,469.06"
+```
+
+---
+
+## The Fluent Difference
+
+Traditional i18n forces developers to handle grammatical logic:
+
+```python
+# Developer must know grammar rules for every language
+if count == 1:
+    msg = "1 item in cart"
+else:
+    msg = f"{count} items in cart"
+```
+
+With Fluent, translators handle grammar in `.ftl` files:
+
+```python
+from ftllexbuffer import FluentBundle
+
+bundle = FluentBundle("en_US")
+bundle.add_resource("""
+cart-items = { $count ->
+    [one] { $count } item in cart
+   *[other] { $count } items in cart
+}
+""")
+
+result, _ = bundle.format_pattern("cart-items", {"count": 1})
+print(result)  # "1 item in cart"
+
+result, _ = bundle.format_pattern("cart-items", {"count": 5})
+print(result)  # "5 items in cart"
+```
+
+This separation enables correct translations for complex languages (Russian with 4 plural forms, Arabic with 6) without code changes.
+
+---
+
+## Key Features
+
+- **Fluent 1.0 Compliant** - Full implementation of the [Fluent syntax](https://projectfluent.org/fluent/guide/), including select expressions, terms, attributes, and built-in functions.
+
+- **Bidirectional Localization** - Format messages for output AND parse locale-formatted strings (numbers, dates, currencies) back to Python types.
+
+- **Translator-Controlled Logic** - Pluralization, gender agreement, and grammatical cases live in `.ftl` files, keeping application code clean.
+
+- **CLDR-Powered** - Uses Babel for Unicode CLDR compliance across 200+ locales with correct number, date, and currency formatting.
+
+- **Robust Error Handling** - Never raises exceptions during formatting. Returns `(result, errors)` tuples for graceful degradation in production.
+
+- **Full Introspection** - Extract variables, functions, and structure from messages for validation, tooling, and IDE integration.
+
+- **Type-Safe** - Comprehensive type hints throughout. Works with mypy strict mode.
+
+---
+
+## Documentation
+
+| Resource | Description |
+|:---------|:------------|
+| [Quick Reference](docs/QUICK_REFERENCE.md) | Copy-paste patterns for common tasks |
+| [API Reference](docs/DOC_00_Index.md) | Complete class and function documentation |
+| [Parsing Guide](docs/PARSING_GUIDE.md) | Locale-aware input parsing |
+| [Terminology](docs/TERMINOLOGY.md) | Fluent/FTLLexBuffer concept definitions |
+| [Examples](examples/) | Working code examples |
 
 ---
 
 ## Contributing
 
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for details on setting up your development environment, running tests, and submitting pull requests.
+Contributions welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, testing, and pull request guidelines.
 
 ---
 
-## License & Legal
+## License
 
 MIT License - See [LICENSE](LICENSE).
 
 Independent implementation of [Fluent Specification](https://github.com/projectfluent/fluent/blob/master/spec/fluent.ebnf) (Apache 2.0).
 
-**Legal**: [PATENTS.md](PATENTS.md) (patent considerations) | [NOTICE](NOTICE) (attributions)
+**Legal**: [PATENTS.md](PATENTS.md) | [NOTICE](NOTICE)
