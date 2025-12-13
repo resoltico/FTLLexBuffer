@@ -12,7 +12,7 @@ RETRIEVAL_HINTS:
 
 ![FTLLexBuffer Device (MK1), Early Victorian Design](images/FTLLexBuffer.png)
 
-**Mozilla Fluent Visualization System for Python.**
+**Python implementation of the Fluent localization system.**
 
 FTLLexBuffer is a library for the [Fluent](https://projectfluent.org/) localization system, targeting Python 3.13+. It provides functions for formatting translations and parsing localized data (numbers, dates, currencies).
 
