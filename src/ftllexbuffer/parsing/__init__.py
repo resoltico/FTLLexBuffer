@@ -1,6 +1,6 @@
 """Bi-directional localization: Parse locale-aware display strings back to Python types.
 
-- Functions NEVER raise exceptions - errors are returned in the list
+- Functions NEVER raise exceptions - errors are returned in tuple
 - Removed `strict` parameter from all functions
 - Consistent with format_*() "never raise" philosophy
 
@@ -12,11 +12,11 @@ All parsing functions are thread-safe and use Babel for CLDR-compliant parsing.
 
 Public API:
     Parsing Functions:
-        parse_number - Returns tuple[float, list[FluentParseError]]
-        parse_decimal - Returns tuple[Decimal, list[FluentParseError]]
-        parse_date - Returns tuple[date | None, list[FluentParseError]]
-        parse_datetime - Returns tuple[datetime | None, list[FluentParseError]]
-        parse_currency - Returns tuple[tuple[Decimal, str] | None, list[FluentParseError]]
+        parse_number - Returns tuple[float, tuple[FluentParseError, ...]]
+        parse_decimal - Returns tuple[Decimal, tuple[FluentParseError, ...]]
+        parse_date - Returns tuple[date | None, tuple[FluentParseError, ...]]
+        parse_datetime - Returns tuple[datetime | None, tuple[FluentParseError, ...]]
+        parse_currency - Returns tuple[tuple[Decimal, str] | None, tuple[FluentParseError, ...]]
 
     Type Guards:
         is_valid_decimal - TypeIs guard for finite Decimal

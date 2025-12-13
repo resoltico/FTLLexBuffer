@@ -51,7 +51,6 @@ class FluentResolver:
 
     __slots__ = (
         "_resolution_stack",
-        "errors",
         "function_registry",
         "locale",
         "messages",
@@ -83,7 +82,6 @@ class FluentResolver:
         self.terms = terms
         self.function_registry = function_registry
         self._resolution_stack: list[str] = []  # Circular reference detection
-        self.errors: list[FluentError] = []  # Error accumulator (Mozilla-aligned)
 
     def resolve_message(
         self,
@@ -112,7 +110,7 @@ class FluentResolver:
             Per Fluent spec, resolution never fails catastrophically.
             Errors are collected and fallback values are used.
         """
-        self.errors = []  # Reset error list for this resolution
+        errors: list[FluentError] = []  # Local error list for this resolution
         args = args or {}
 
         # Select pattern (value or attribute)
@@ -122,14 +120,14 @@ class FluentResolver:
                 error = FluentReferenceError(
                     ErrorTemplate.attribute_not_found(attribute, message.id.name)
                 )
-                self.errors.append(error)
-                return (f"{{{message.id.name}.{attribute}}}", tuple(self.errors))
+                errors.append(error)
+                return (f"{{{message.id.name}.{attribute}}}", tuple(errors))
             pattern = attr.value
         else:
             if message.value is None:
                 error = FluentReferenceError(ErrorTemplate.message_no_value(message.id.name))
-                self.errors.append(error)
-                return (f"{{{message.id.name}}}", tuple(self.errors))
+                errors.append(error)
+                return (f"{{{message.id.name}}}", tuple(errors))
             pattern = message.value
 
         # Check for circular references
@@ -137,17 +135,19 @@ class FluentResolver:
         if msg_key in self._resolution_stack:
             cycle_path = [*self._resolution_stack, msg_key]
             error = FluentCyclicReferenceError(ErrorTemplate.cyclic_reference(cycle_path))
-            self.errors.append(error)
-            return (f"{{{msg_key}}}", tuple(self.errors))
+            errors.append(error)
+            return (f"{{{msg_key}}}", tuple(errors))
 
         try:
             self._resolution_stack.append(msg_key)
-            result = self._resolve_pattern(pattern, args)
-            return (result, tuple(self.errors))
+            result = self._resolve_pattern(pattern, args, errors)
+            return (result, tuple(errors))
         finally:
             self._resolution_stack.pop()
 
-    def _resolve_pattern(self, pattern: Pattern, args: Mapping[str, FluentValue]) -> str:
+    def _resolve_pattern(
+        self, pattern: Pattern, args: Mapping[str, FluentValue], errors: list[FluentError]
+    ) -> str:
         """Resolve pattern by walking elements."""
         result = ""
 
@@ -157,7 +157,7 @@ class FluentResolver:
                     result += element.value
                 case Placeable():
                     try:
-                        value = self._resolve_expression(element.expression, args)
+                        value = self._resolve_expression(element.expression, args, errors)
                         formatted = self._format_value(value)
 
                         # Wrap in Unicode bidi isolation marks (FSI/PDI)
@@ -172,14 +172,14 @@ class FluentResolver:
                     except (FluentReferenceError, FluentResolutionError) as e:
                         # Mozilla-aligned error handling:
                         # Collect error, show readable fallback (not {ERROR: ...})
-                        self.errors.append(e)
+                        errors.append(e)
                         fallback = self._get_fallback_for_placeable(element.expression)
                         result += fallback
 
         return result
 
     def _resolve_expression(  # noqa: PLR0911  # Complex dispatch logic expected
-        self, expr: Expression, args: Mapping[str, FluentValue]
+        self, expr: Expression, args: Mapping[str, FluentValue], errors: list[FluentError]
     ) -> FluentValue:
         """Resolve expression to value.
 
@@ -191,21 +191,21 @@ class FluentResolver:
         """
         match expr:
             case SelectExpression():
-                return self._resolve_select_expression(expr, args)
+                return self._resolve_select_expression(expr, args, errors)
             case VariableReference():
                 return self._resolve_variable_reference(expr, args)
             case MessageReference():
-                return self._resolve_message_reference(expr, args)
+                return self._resolve_message_reference(expr, args, errors)
             case TermReference():
-                return self._resolve_term_reference(expr, args)
+                return self._resolve_term_reference(expr, args, errors)
             case FunctionReference():
-                return self._resolve_function_call(expr, args)
+                return self._resolve_function_call(expr, args, errors)
             case StringLiteral():
                 return expr.value
             case NumberLiteral():
                 return expr.value
             case Placeable():
-                return self._resolve_expression(expr.expression, args)
+                return self._resolve_expression(expr.expression, args, errors)
             case _:
                 raise FluentResolutionError(ErrorTemplate.unknown_expression(type(expr).__name__))
 
@@ -219,7 +219,7 @@ class FluentResolver:
         return args[var_name]
 
     def _resolve_message_reference(
-        self, expr: MessageReference, args: Mapping[str, FluentValue]
+        self, expr: MessageReference, args: Mapping[str, FluentValue], errors: list[FluentError]
     ) -> str:
         """Resolve message reference."""
         msg_id = expr.id.name
@@ -234,11 +234,11 @@ class FluentResolver:
             attribute=expr.attribute.name if expr.attribute else None,
         )
         # Add nested errors to our error list
-        self.errors.extend(nested_errors)
+        errors.extend(nested_errors)
         return result
 
     def _resolve_term_reference(
-        self, expr: TermReference, args: Mapping[str, FluentValue]
+        self, expr: TermReference, args: Mapping[str, FluentValue], errors: list[FluentError]
     ) -> str:
         """Resolve term reference."""
         term_id = expr.id.name
@@ -257,14 +257,14 @@ class FluentResolver:
         else:
             pattern = term.value
 
-        return self._resolve_pattern(pattern, args)
+        return self._resolve_pattern(pattern, args, errors)
 
     def _resolve_select_expression(
-        self, expr: SelectExpression, args: Mapping[str, FluentValue]
+        self, expr: SelectExpression, args: Mapping[str, FluentValue], errors: list[FluentError]
     ) -> str:
         """Resolve select expression by matching variant."""
         # Evaluate selector
-        selector_value = self._resolve_expression(expr.selector, args)
+        selector_value = self._resolve_expression(expr.selector, args, errors)
 
         # Find matching variant
         matched_variant = None
@@ -306,10 +306,13 @@ class FluentResolver:
             raise FluentResolutionError(ErrorTemplate.no_variants())
 
         # Resolve matched variant pattern
-        return self._resolve_pattern(matched_variant.value, args)
+        return self._resolve_pattern(matched_variant.value, args, errors)
 
     def _resolve_function_call(
-        self, func_ref: FunctionReference, args: Mapping[str, FluentValue]
+        self,
+        func_ref: FunctionReference,
+        args: Mapping[str, FluentValue],
+        errors: list[FluentError],
     ) -> str | int | float:
         """Resolve function call.
 
@@ -320,12 +323,12 @@ class FluentResolver:
 
         # Evaluate positional arguments
         positional_values: list[FluentValue] = [
-            self._resolve_expression(arg, args) for arg in func_ref.arguments.positional
+            self._resolve_expression(arg, args, errors) for arg in func_ref.arguments.positional
         ]
 
         # Evaluate named arguments (camelCase from FTL)
         named_values: dict[str, FluentValue] = {
-            arg.name.name: self._resolve_expression(arg.value, args)
+            arg.name.name: self._resolve_expression(arg.value, args, errors)
             for arg in func_ref.arguments.named
         }
 

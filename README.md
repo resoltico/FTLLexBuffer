@@ -12,23 +12,133 @@ RETRIEVAL_HINTS:
 
 ![FTLLexBuffer Device (MK1), Early Victorian Design](images/FTLLexBuffer.png)
 
-**Fluent-based localization for Python** - asymmetric grammar, bi-directional parsing, 200+ locales.
+**Mozilla Fluent Visualization System for Python.**
 
-FTLLexBuffer implements Mozilla's [Fluent](https://projectfluent.org/) localization system for Python 3.13+. Unlike traditional gettext-style translation where all languages must follow the source message structure, Fluent enables **asymmetric localization**: each language can restructure messages to fit its native grammar. Arabic uses 6 plural forms, Latvian has a zero category, Polish distinguishes "few" from "many" - all without changing your application code.
-
-FTLLexBuffer extends the Fluent v1.0 specification with **bi-directional localization** (parse locale-formatted strings back to Python types), **CURRENCY formatting**, **message introspection**, and **full type safety** (`mypy --strict` compatible).
+FTLLexBuffer is a library for the [Fluent](https://projectfluent.org/) localization system, targeting Python 3.13+. It provides functions for formatting translations and parsing localized data (numbers, dates, currencies).
 
 ---
 
-## Quick Links
+## Table of Contents
+- [Getting Started](#getting-started)
+- [The Fluent Difference](#the-fluent-difference)
+- [Key Features](#key-features)
+- [Project Structure](#project-structure)
+- [Documentation](#documentation)
+- [Contributing](#contributing)
+- [License](#license--legal)
 
-| Getting Started | Documentation | Development |
-|:----------------|:--------------|:------------|
-| [Quick Reference](docs/QUICK_REFERENCE.md) | [API Reference](docs/DOC_00_Index.md) | [Testing Guide](TESTING.md) |
-| [Examples](examples/) | [Parsing Guide](docs/PARSING_GUIDE.md) | [Contributing](CONTRIBUTING.md) |
-| | [Type Hints Guide](docs/TYPE_HINTS_GUIDE.md) | [Changelog](CHANGELOG.md) |
-| | [Terminology](docs/TERMINOLOGY.md) | |
-| | [Migration Guide](docs/MIGRATION.md) | |
+---
+
+## Getting Started
+
+FTLLexBuffer facilitates both the formatting of messages and the parsing of user input.
+
+```python
+from decimal import Decimal
+from ftllexbuffer import FluentBundle
+from ftllexbuffer.parsing import parse_currency
+
+# 1. PARSE: Native localized input
+# Note: Handles ambiguity (e.g., differentiates USD/CAD $)
+amount, currency = parse_currency("1.234,50 €", "de_DE")
+# -> Decimal('1234.50'), 'EUR'
+
+# 2. CALCULATE: Standard Python math
+# Uses Decimal for financial precision (no floating point errors)
+total = amount * Decimal("1.20") # Add 20% Tax
+
+# 3. FORMAT: Serialize back to localized string
+bundle = FluentBundle("en_US")
+bundle.add_resource("total = Total: { CURRENCY($num, currency: $curr) }")
+
+print(bundle.format_pattern("total", {"num": total, "curr": currency}))
+# -> "Total: $1,481.40"
+```
+
+---
+
+## The Fluent Difference
+
+Localization often requires logic for grammatical agreement (plurals, cases).
+
+**The Traditional Way (Logic in Python)**
+
+Developers often have to hardcode grammatical logic directly in their application code.
+
+```python
+# The developer manually handles pluralization logic
+if coffee_count == 0:
+    msg = "Out of coffee! Panic!"
+elif coffee_count == 1:
+    msg = "1 coffee left."
+else:
+    msg = f"{coffee_count} coffees left."
+```
+
+**The Fluent Way (Logic in FTL)**
+
+With Fluent, the application code passes the data, and the translation file handles the logic. This keeps your Python code **clean and logic-free**.
+
+```python
+# The developer passes the data; no if/else statements
+bundle.format_pattern("coffee-stock", {"count": coffee_count})
+```
+
+```ftl
+# Grammar and logic live in the translation file
+coffee-stock = { $count ->
+    [0] Out of coffee! Panic!
+    [one] One coffee left.
+   *[other] { $count } coffees left.
+}
+```
+
+---
+
+## Key Features
+
+FTLLexBuffer provides three core capabilities for handling localized data:
+
+### 1. Translation Management
+The core engine (`FluentBundle`) manages the lifecycle of translation resources.
+*   **Logical Isolation**: Translators define logic in `.ftl` files.
+*   **Runtime Resolution**: The engine resolves messages at runtime, providing robust fallback strings.
+
+### 2. Output Formatting
+Format complex strings with natural-sounding grammar using the Mozilla Fluent syntax.
+
+### 3. Input Parsing
+Parse localized strings back into Python objects for data processing.
+*   **Ambiguity Detection**: Smartly handles ambiguous currency symbols (e.g., determining if `$` implies `USD` or `CAD` based on locale).
+*   **Safety**: Uses a non-raising error pattern to ensure production stability.
+*   **Data Types**: Wraps `Babel` to parse Numbers, Dates, and Currencies into standard Python types (`Decimal`, `date`).
+
+---
+
+## Project Structure
+
+```text
+ftllexbuffer/
+├── diagnostics/      # Error definitions and templates
+├── parsing/          # Locale-aware parsing (Babel wrapper)
+├── runtime/          # Core message formatting engine
+├── syntax/           # FTL parser and AST definitions
+├── enums.py          # Type-safe constants
+├── introspection.py  # Variable extraction tools
+├── locale_utils.py   # BCP-47 localization helpers
+└── localization.py   # High-level orchestration
+```
+
+---
+
+## Documentation
+
+| Guide | Description |
+|:------|:------------|
+| [Quick Reference](docs/QUICK_REFERENCE.md) | One-page reference for common tasks. |
+| [API Reference](docs/DOC_00_Index.md) | Detailed class and function documentation. |
+| [Parsing Guide](docs/PARSING_GUIDE.md) | Guide to locale-aware parsing functions. |
+| [Examples](examples/) | Code examples for various use cases. |
 
 ---
 
@@ -42,69 +152,9 @@ pip install ftllexbuffer
 
 ---
 
-## Key Features
+## Contributing
 
-- **Fluent v1.0 specification compliance** - Asymmetric localization, select expressions, terms, attributes
-- **Bi-directional localization** - Parse locale-formatted numbers, dates, currencies back to Python types
-- **200+ locale plural rules** - Full Unicode CLDR compliance via Babel
-- **Type safety** - `mypy --strict` compatible with PEP 695 generics
-- **Production-ready** - Never raises exceptions, graceful fallbacks, optional LRU caching
-
----
-
-## Why Fluent?
-
-Traditional localization forces all translations to follow the source language structure:
-
-```po
-# gettext: Translators fill blanks, can't restructure
-msgid "You have %d file"
-msgid_plural "You have %d files"
-msgstr[0] "Masz %d plik"      # Polish must follow English structure
-msgstr[1] "Masz %d pliki"
-msgstr[2] "Masz %d plików"
-```
-
-Fluent lets each language use its native grammar:
-
-```ftl
-# Fluent: Each language defines its own structure
-# English (2 forms)
-files = { $count ->
-    [one] one file
-   *[other] { $count } files
-}
-
-# Arabic (6 forms including dual)
-files = { $count ->
-    [zero] no files
-    [one] one file
-    [two] two files
-    [few] { $count } files
-    [many] { $count } files
-   *[other] { $count } files
-}
-```
-
-**Additional Fluent capabilities**: Gender agreement, message references, terms (brand names), attributes (tooltips, aria-labels).
-
----
-
-## Python Localization Solutions Comparison
-
-| Feature | **FTLLexBuffer** | fluent.runtime | gettext (stdlib) | Babel |
-|---------|------------------|----------------|------------------|-------|
-| **Grammar Approach** | **Asymmetric** | **Asymmetric** | Symmetric | Symmetric |
-| **Bi-directional Parsing** | **Yes** | No | No | **Yes** |
-| **Plural Forms** | CLDR (200+) | CLDR | CLDR | CLDR (600+) |
-| **Type Safety** | **mypy --strict** | Partial | No | Partial |
-| **Python Version** | 3.13+ | 3.6+ | All | 3.8+ |
-| **Dependencies** | Babel only | Multiple | None | pytz |
-
-**Recommendation**:
-- **Need asymmetric grammar** (natural translations): FTLLexBuffer, fluent.runtime
-- **Need bi-directional parsing** (forms, invoices): FTLLexBuffer, Babel
-- **Legacy/maximum compatibility**: gettext
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for details on setting up your development environment, running tests, and submitting pull requests.
 
 ---
 

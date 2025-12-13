@@ -58,8 +58,9 @@ class TestResolverExpressionEdgeCases:
 
         unknown = UnknownExpr()
 
+        errors: list = []
         with pytest.raises(FluentResolutionError, match="Unknown expression type"):
-            resolver._resolve_expression(unknown, {})  # type: ignore[arg-type]
+            resolver._resolve_expression(unknown, {}, errors)  # type: ignore[arg-type]
 
     def test_resolve_bool_true_as_string(self) -> None:
         """Boolean True converts to lowercase 'true' string."""

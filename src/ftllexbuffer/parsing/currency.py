@@ -1,7 +1,7 @@
 """Currency parsing with locale awareness.
 
-API: parse_currency() returns tuple[tuple[Decimal, str] | None, list[FluentParseError]].
-Functions NEVER raise exceptions - errors returned in list.
+API: parse_currency() returns tuple[tuple[Decimal, str] | None, tuple[FluentParseError, ...]].
+Functions NEVER raise exceptions - errors returned in tuple.
 
 Thread-safe. Uses Babel for currency symbol mapping and number parsing.
 All currency data sourced from Unicode CLDR via Babel at module initialization.
@@ -153,10 +153,10 @@ def parse_currency(
     *,
     default_currency: str | None = None,
     infer_from_locale: bool = False,
-) -> tuple[tuple[Decimal, str] | None, list[FluentParseError]]:
+) -> tuple[tuple[Decimal, str] | None, tuple[FluentParseError, ...]]:
     """Parse locale-aware currency string to (amount, currency_code).
 
-    No longer raises exceptions. Errors are returned in the list.
+    No longer raises exceptions. Errors are returned in tuple.
     The `strict` parameter has been removed.
 
     Extracts both numeric value and currency code from formatted string.
@@ -174,14 +174,14 @@ def parse_currency(
     Returns:
         Tuple of (result, errors):
         - result: Tuple of (amount, currency_code), or None if parsing failed
-        - errors: List of FluentParseError (empty on success)
+        - errors: Tuple of FluentParseError (empty tuple on success)
 
     Examples:
         >>> result, errors = parse_currency("EUR100.50", "en_US")  # Unambiguous symbol
         >>> result
         (Decimal('100.50'), 'EUR')
         >>> errors
-        []
+        ()
 
         >>> result, errors = parse_currency("100,50 EUR", "lv_LV")  # Unambiguous symbol
         >>> result
@@ -233,7 +233,7 @@ def parse_currency(
                 parse_type="currency",
             )
         )
-        return (None, errors)
+        return (None, tuple(errors))
 
     try:
         locale = Locale.parse(normalize_locale(locale_code))
@@ -247,7 +247,7 @@ def parse_currency(
                 parse_type="currency",
             )
         )
-        return (None, errors)
+        return (None, tuple(errors))
 
     # Extract currency symbol or code
     # Look for currency symbols or ISO codes (EUR, USD, etc.)
@@ -266,7 +266,7 @@ def parse_currency(
                 parse_type="currency",
             )
         )
-        return (None, errors)
+        return (None, tuple(errors))
 
     currency_str = match.group(1)
 
@@ -289,7 +289,7 @@ def parse_currency(
                             parse_type="currency",
                         )
                     )
-                    return (None, errors)
+                    return (None, tuple(errors))
                 currency_code = inferred_currency
             else:
                 # No default provided - error for ambiguous symbol
@@ -302,7 +302,7 @@ def parse_currency(
                         parse_type="currency",
                     )
                 )
-                return (None, errors)
+                return (None, tuple(errors))
         else:
             # Unambiguous symbol - use mapping
             mapped_currency = _CURRENCY_SYMBOL_MAP.get(currency_str)
@@ -316,7 +316,7 @@ def parse_currency(
                         parse_type="currency",
                     )
                 )
-                return (None, errors)
+                return (None, tuple(errors))
             currency_code = mapped_currency
     else:
         # It's already an ISO code - always unambiguous
@@ -338,6 +338,6 @@ def parse_currency(
                 parse_type="currency",
             )
         )
-        return (None, errors)
+        return (None, tuple(errors))
 
-    return ((amount, currency_code), errors)
+    return ((amount, currency_code), tuple(errors))

@@ -463,8 +463,8 @@ if not has_parse_errors(errors) and result is not None:
 ```
 
 **Key Functions**:
-- `parse_number(value, locale)` → `tuple[float, tuple[FluentParseError, ...]]`
-- `parse_decimal(value, locale)` → `tuple[Decimal, tuple[FluentParseError, ...]]`
+- `parse_number(value, locale)` → `tuple[float | None, tuple[FluentParseError, ...]]`
+- `parse_decimal(value, locale)` → `tuple[Decimal | None, tuple[FluentParseError, ...]]`
 - `parse_date(value, locale)` → `tuple[date | None, tuple[FluentParseError, ...]]`
 - `parse_datetime(value, locale, tzinfo=None)` → `tuple[datetime | None, tuple[FluentParseError, ...]]`
 - `parse_currency(value, locale)` → `tuple[tuple[Decimal, str] | None, tuple[FluentParseError, ...]]`
@@ -735,6 +735,6 @@ print(f"Fluent Specification {__fluent_spec_version__}")
 
 ---
 
-**Quick Reference Last Updated**: December 12, 2025
-**FTLLexBuffer Version**: 0.11.1
+**Quick Reference Last Updated**: December 13, 2025
+**FTLLexBuffer Version**: 0.12.0
 **Python Requirement**: 3.13+

@@ -1,8 +1,8 @@
 ---
 spec_version: AFAD-v1
-project_version: 0.11.1
+project_version: 0.12.0
 context: PARSING
-last_updated: 2025-12-11T00:00:00Z
+last_updated: 2025-12-13T00:00:00Z
 maintainer: claude-opus-4-5
 ---
 
@@ -77,7 +77,7 @@ class FluentParserV1:
 def parse_number(
     value: str,
     locale_code: str,
-) -> tuple[float | None, list[FluentParseError]]:
+) -> tuple[float | None, tuple[FluentParseError, ...]]:
 ```
 
 ### Contract
@@ -101,7 +101,7 @@ def parse_number(
 def parse_decimal(
     value: str,
     locale_code: str,
-) -> tuple[Decimal | None, list[FluentParseError]]:
+) -> tuple[Decimal | None, tuple[FluentParseError, ...]]:
 ```
 
 ### Contract
@@ -125,7 +125,7 @@ def parse_decimal(
 def parse_date(
     value: str,
     locale_code: str,
-) -> tuple[date | None, list[FluentParseError]]:
+) -> tuple[date | None, tuple[FluentParseError, ...]]:
 ```
 
 ### Contract
@@ -151,7 +151,7 @@ def parse_datetime(
     locale_code: str,
     *,
     tzinfo: timezone | None = None,
-) -> tuple[datetime | None, list[FluentParseError]]:
+) -> tuple[datetime | None, tuple[FluentParseError, ...]]:
 ```
 
 ### Contract
@@ -176,7 +176,7 @@ def parse_datetime(
 def parse_currency(
     value: str,
     locale_code: str,
-) -> tuple[tuple[Decimal, str] | None, list[FluentParseError]]:
+) -> tuple[tuple[Decimal, str] | None, tuple[FluentParseError, ...]]:
 ```
 
 ### Contract

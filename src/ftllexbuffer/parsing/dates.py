@@ -1,8 +1,8 @@
 """Date and datetime parsing functions with locale awareness.
 
-- parse_date() returns tuple[date | None, list[FluentParseError]]
-- parse_datetime() returns tuple[datetime | None, list[FluentParseError]]
-- Removed `strict` parameter - functions NEVER raise, errors returned in list
+- parse_date() returns tuple[date | None, tuple[FluentParseError, ...]]
+- parse_datetime() returns tuple[datetime | None, tuple[FluentParseError, ...]]
+- Removed `strict` parameter - functions NEVER raise, errors returned in tuple
 - Consistent with format_*() "never raise" philosophy
 - Fixed: Date pattern tokenizer replaces regex word boundary approach
 
@@ -23,10 +23,10 @@ from ftllexbuffer.locale_utils import normalize_locale
 def parse_date(
     value: str,
     locale_code: str,
-) -> tuple[date | None, list[FluentParseError]]:
+) -> tuple[date | None, tuple[FluentParseError, ...]]:
     """Parse locale-aware date string to date object.
 
-    No longer raises exceptions. Errors are returned in the list.
+    No longer raises exceptions. Errors are returned in tuple.
     The `strict` parameter has been removed.
 
     Only ISO 8601 and locale-specific CLDR patterns are supported.
@@ -39,14 +39,14 @@ def parse_date(
     Returns:
         Tuple of (result, errors):
         - result: Parsed date object, or None if parsing failed
-        - errors: List of FluentParseError (empty on success)
+        - errors: Tuple of FluentParseError (empty tuple on success)
 
     Examples:
         >>> result, errors = parse_date("2025-01-28", "en_US")  # ISO 8601
         >>> result
         datetime.date(2025, 1, 28)
         >>> errors
-        []
+        ()
 
         >>> result, errors = parse_date("1/28/25", "en_US")  # US locale format
         >>> result
@@ -76,11 +76,11 @@ def parse_date(
                 parse_type="date",
             )
         )
-        return (None, errors)
+        return (None, tuple(errors))
 
     # Try ISO 8601 first (fastest path)
     try:
-        return (datetime.fromisoformat(value).date(), errors)
+        return (datetime.fromisoformat(value).date(), tuple(errors))
     except ValueError:
         pass
 
@@ -97,11 +97,11 @@ def parse_date(
                 parse_type="date",
             )
         )
-        return (None, errors)
+        return (None, tuple(errors))
 
     for pattern in patterns:
         try:
-            return (datetime.strptime(value, pattern).date(), errors)
+            return (datetime.strptime(value, pattern).date(), tuple(errors))
         except ValueError:
             continue
 
@@ -117,7 +117,7 @@ def parse_date(
             parse_type="date",
         )
     )
-    return (None, errors)
+    return (None, tuple(errors))
 
 
 def parse_datetime(
@@ -125,10 +125,10 @@ def parse_datetime(
     locale_code: str,
     *,
     tzinfo: timezone | None = None,
-) -> tuple[datetime | None, list[FluentParseError]]:
+) -> tuple[datetime | None, tuple[FluentParseError, ...]]:
     """Parse locale-aware datetime string to datetime object.
 
-    No longer raises exceptions. Errors are returned in the list.
+    No longer raises exceptions. Errors are returned in tuple.
     The `strict` parameter has been removed.
 
     Only ISO 8601 and locale-specific CLDR patterns are supported.
@@ -141,14 +141,14 @@ def parse_datetime(
     Returns:
         Tuple of (result, errors):
         - result: Parsed datetime object, or None if parsing failed
-        - errors: List of FluentParseError (empty on success)
+        - errors: Tuple of FluentParseError (empty tuple on success)
 
     Examples:
         >>> result, errors = parse_datetime("2025-01-28 14:30", "en_US")  # ISO 8601
         >>> result
         datetime.datetime(2025, 1, 28, 14, 30)
         >>> errors
-        []
+        ()
 
         >>> result, errors = parse_datetime("1/28/25 2:30 PM", "en_US")  # US locale
         >>> result
@@ -178,14 +178,14 @@ def parse_datetime(
                 parse_type="datetime",
             )
         )
-        return (None, errors)
+        return (None, tuple(errors))
 
     # Try ISO 8601 first (fastest path)
     try:
         parsed = datetime.fromisoformat(value)
         if tzinfo is not None and parsed.tzinfo is None:
             parsed = parsed.replace(tzinfo=tzinfo)
-        return (parsed, errors)
+        return (parsed, tuple(errors))
     except (ValueError, TypeError):
         pass
 
@@ -202,14 +202,14 @@ def parse_datetime(
                 parse_type="datetime",
             )
         )
-        return (None, errors)
+        return (None, tuple(errors))
 
     for pattern in patterns:
         try:
             parsed = datetime.strptime(value, pattern)
             if tzinfo is not None and parsed.tzinfo is None:
                 parsed = parsed.replace(tzinfo=tzinfo)
-            return (parsed, errors)
+            return (parsed, tuple(errors))
         except ValueError:
             continue
 
@@ -225,7 +225,7 @@ def parse_datetime(
             parse_type="datetime",
         )
     )
-    return (None, errors)
+    return (None, tuple(errors))
 
 
 def _get_date_patterns(locale_code: str) -> list[str]:

@@ -22,7 +22,7 @@ class TestParseNumberProperties:
         result, errors = parse_number(value, locale_code)
         # Should always return a tuple
         assert isinstance(result, (float, type(None)))
-        assert isinstance(errors, list)
+        assert isinstance(errors, tuple)
 
     @given(st.text(min_size=1), st.text(min_size=1))
     def test_parse_number_error_structure(self, value: str, locale_code: str) -> None:
@@ -49,19 +49,19 @@ class TestParseNumberProperties:
         """Verify parse_number handles simple US integer."""
         result, errors = parse_number("42", "en_US")
         assert result == 42.0
-        assert errors == []
+        assert errors == ()
 
     def test_parse_number_valid_en_us_decimal(self) -> None:
         """Verify parse_number handles US decimal with comma separator."""
         result, errors = parse_number("1,234.56", "en_US")
         assert result == 1234.56
-        assert errors == []
+        assert errors == ()
 
     def test_parse_number_valid_lv_lv_decimal(self) -> None:
         """Verify parse_number handles Latvian decimal with space separator."""
         result, errors = parse_number("1 234,56", "lv_LV")
         assert result == 1234.56
-        assert errors == []
+        assert errors == ()
 
     def test_parse_number_invalid_value(self) -> None:
         """Verify parse_number returns error for invalid number string."""
@@ -105,19 +105,19 @@ class TestParseNumberProperties:
         str_value = str(value)
         result, errors = parse_number(str_value, "en_US")
         assert result == float(value)
-        assert errors == []
+        assert errors == ()
 
     def test_parse_number_negative_number(self) -> None:
         """Verify parse_number handles negative numbers."""
         result, errors = parse_number("-123.45", "en_US")
         assert result == -123.45
-        assert errors == []
+        assert errors == ()
 
     def test_parse_number_zero(self) -> None:
         """Verify parse_number handles zero."""
         result, errors = parse_number("0", "en_US")
         assert result == 0.0
-        assert errors == []
+        assert errors == ()
 
 
 class TestParseDecimalProperties:
@@ -129,7 +129,7 @@ class TestParseDecimalProperties:
         result, errors = parse_decimal(value, locale_code)
         # Should always return a tuple
         assert isinstance(result, (Decimal, type(None)))
-        assert isinstance(errors, list)
+        assert isinstance(errors, tuple)
 
     @given(st.text(min_size=1), st.text(min_size=1))
     def test_parse_decimal_error_structure(self, value: str, locale_code: str) -> None:
@@ -156,19 +156,19 @@ class TestParseDecimalProperties:
         """Verify parse_decimal handles simple US integer."""
         result, errors = parse_decimal("42", "en_US")
         assert result == Decimal("42")
-        assert errors == []
+        assert errors == ()
 
     def test_parse_decimal_valid_en_us_decimal(self) -> None:
         """Verify parse_decimal handles US decimal with comma separator."""
         result, errors = parse_decimal("1,234.56", "en_US")
         assert result == Decimal("1234.56")
-        assert errors == []
+        assert errors == ()
 
     def test_parse_decimal_valid_lv_lv_decimal(self) -> None:
         """Verify parse_decimal handles Latvian decimal with space separator."""
         result, errors = parse_decimal("1 234,56", "lv_LV")
         assert result == Decimal("1234.56")
-        assert errors == []
+        assert errors == ()
 
     def test_parse_decimal_invalid_value(self) -> None:
         """Verify parse_decimal returns error for invalid number string."""
@@ -201,7 +201,7 @@ class TestParseDecimalProperties:
         str_value = str(value)
         result, errors = parse_decimal(str_value, "en_US")
         assert result == Decimal(value)
-        assert errors == []
+        assert errors == ()
 
     @given(
         st.decimals(
@@ -226,19 +226,19 @@ class TestParseDecimalProperties:
         """Verify parse_decimal handles negative numbers."""
         result, errors = parse_decimal("-123.45", "en_US")
         assert result == Decimal("-123.45")
-        assert errors == []
+        assert errors == ()
 
     def test_parse_decimal_zero(self) -> None:
         """Verify parse_decimal handles zero."""
         result, errors = parse_decimal("0", "en_US")
         assert result == Decimal("0")
-        assert errors == []
+        assert errors == ()
 
     def test_parse_decimal_financial_precision(self) -> None:
         """Verify parse_decimal maintains financial precision (no float rounding)."""
         result, errors = parse_decimal("100.50", "en_US")
         assert result == Decimal("100.50")
-        assert errors == []
+        assert errors == ()
 
         # Test VAT calculation from docstring example
         if result is not None:
@@ -281,25 +281,25 @@ class TestParseNumberLocaleVariations:
         """Verify parse_number handles French number format with space."""
         result, errors = parse_number("1 234,56", "fr_FR")
         assert result == 1234.56
-        assert errors == []
+        assert errors == ()
 
     def test_parse_number_german_dot_separator(self) -> None:
         """Verify parse_number handles German number format with dot separator."""
         result, errors = parse_number("1.234,56", "de_DE")
         assert result == 1234.56
-        assert errors == []
+        assert errors == ()
 
     def test_parse_decimal_french_space_separator(self) -> None:
         """Verify parse_decimal handles French number format with space."""
         result, errors = parse_decimal("1 234,56", "fr_FR")
         assert result == Decimal("1234.56")
-        assert errors == []
+        assert errors == ()
 
     def test_parse_decimal_german_dot_separator(self) -> None:
         """Verify parse_decimal handles German number format with dot separator."""
         result, errors = parse_decimal("1.234,56", "de_DE")
         assert result == Decimal("1234.56")
-        assert errors == []
+        assert errors == ()
 
 
 class TestParseNumberEdgeCases:
@@ -309,25 +309,25 @@ class TestParseNumberEdgeCases:
         """Verify parse_number handles very small floating point numbers."""
         result, errors = parse_number("0.000001", "en_US")
         assert result == 0.000001
-        assert errors == []
+        assert errors == ()
 
     def test_parse_number_very_large_float(self) -> None:
         """Verify parse_number handles very large floating point numbers."""
         result, errors = parse_number("999999999.99", "en_US")
         assert result == 999999999.99
-        assert errors == []
+        assert errors == ()
 
     def test_parse_decimal_very_small_decimal(self) -> None:
         """Verify parse_decimal handles very small decimal numbers."""
         result, errors = parse_decimal("0.000001", "en_US")
         assert result == Decimal("0.000001")
-        assert errors == []
+        assert errors == ()
 
     def test_parse_decimal_very_large_decimal(self) -> None:
         """Verify parse_decimal handles very large decimal numbers."""
         result, errors = parse_decimal("999999999.99", "en_US")
         assert result == Decimal("999999999.99")
-        assert errors == []
+        assert errors == ()
 
     def test_parse_number_whitespace_only(self) -> None:
         """Verify parse_number handles whitespace-only string."""
@@ -346,7 +346,7 @@ class TestParseNumberEdgeCases:
         result, errors = parse_number("  123.45  ", "en_US")
         # Babel might handle this - either way, no exception should be raised
         assert isinstance(result, (float, type(None)))
-        assert isinstance(errors, list)
+        assert isinstance(errors, tuple)
 
     @given(st.text(alphabet=st.characters(blacklist_characters="0123456789.,-+ "), min_size=1))
     def test_parse_number_no_digits(self, value: str) -> None:

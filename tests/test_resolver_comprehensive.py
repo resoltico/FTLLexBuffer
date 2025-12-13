@@ -59,7 +59,8 @@ class TestNestedPlaceableExpression:
 
         # Resolve outer placeable - should unwrap to inner variable
         args = {"test": "value123"}
-        result = resolver._resolve_expression(outer_placeable, args)
+        errors: list = []
+        result = resolver._resolve_expression(outer_placeable, args, errors)
         assert result == "value123"
 
     def test_programmatic_nested_placeable_with_string_literal(self) -> None:
@@ -77,7 +78,8 @@ class TestNestedPlaceableExpression:
         string_lit = StringLiteral(value="literal_text")
         placeable = Placeable(expression=string_lit)
 
-        result = resolver._resolve_expression(placeable, {})
+        errors: list = []
+        result = resolver._resolve_expression(placeable, {}, errors)
         assert result == "literal_text"
 
     def test_programmatic_nested_placeable_with_number_literal(self) -> None:
@@ -95,7 +97,8 @@ class TestNestedPlaceableExpression:
         number_lit = NumberLiteral(value=42.5, raw="42.5")
         placeable = Placeable(expression=number_lit)
 
-        result = resolver._resolve_expression(placeable, {})
+        errors: list = []
+        result = resolver._resolve_expression(placeable, {}, errors)
         assert result == 42.5
 
     def test_programmatic_deeply_nested_placeables(self) -> None:
@@ -115,7 +118,8 @@ class TestNestedPlaceableExpression:
         level2 = Placeable(expression=level1)
         level3 = Placeable(expression=level2)
 
-        result = resolver._resolve_expression(level3, {})
+        errors: list = []
+        result = resolver._resolve_expression(level3, {}, errors)
         assert result == "deep"
 
 
@@ -144,8 +148,9 @@ class TestUnknownExpressionType:
 
         unknown = UnknownExpr()
 
+        errors: list = []
         with pytest.raises(FluentResolutionError) as exc_info:
-            resolver._resolve_expression(unknown, {})  # type: ignore[arg-type]
+            resolver._resolve_expression(unknown, {}, errors)  # type: ignore[arg-type]
 
         error_msg = str(exc_info.value).lower()
         assert "unknown expression" in error_msg or "UnknownExpr" in str(exc_info.value)

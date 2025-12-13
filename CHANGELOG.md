@@ -11,6 +11,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [0.12.0] - 2025-12-13
+
+### Changed
+
+- **BREAKING: Parsing functions now return immutable error tuples**
+  - `parse_number()` now returns `tuple[float | None, tuple[FluentParseError, ...]]` (was `list[FluentParseError]`)
+  - `parse_decimal()` now returns `tuple[Decimal | None, tuple[FluentParseError, ...]]` (was `list[FluentParseError]`)
+  - `parse_date()` now returns `tuple[date | None, tuple[FluentParseError, ...]]` (was `list[FluentParseError]`)
+  - `parse_datetime()` now returns `tuple[datetime | None, tuple[FluentParseError, ...]]` (was `list[FluentParseError]`)
+  - `parse_currency()` now returns `tuple[tuple[Decimal, str] | None, tuple[FluentParseError, ...]]` (was `list[FluentParseError]`)
+  - **Rationale**: Completes v0.11.0 immutability migration - parsing functions were missed in original refactoring
+  - **Impact**: Code that mutates parsing error lists or compares with empty lists must be updated
+  - **Migration**:
+    ```python
+    # OLD:
+    result, errors = parse_number("123.45", "en_US")
+    assert errors == []  # Compare with empty list
+
+    # NEW:
+    result, errors = parse_number("123.45", "en_US")
+    assert errors == ()  # Compare with empty tuple
+    ```
+
+### Fixed
+
+- **CRITICAL: Error accumulation bug in nested message resolution**
+  - Fixed bug in `FluentResolver` where nested message references lost previously accumulated errors
+  - Root cause: `self.errors = []` at line 115 replaced instance-level error list, orphaning outer errors during recursive resolution
+  - Solution: Refactored error handling to use local error lists passed through call stack instead of instance-level accumulation
+  - Impact: Nested message references like `msg1 = { msg2 }` now correctly preserve all errors from both outer and inner resolution
+  - Affected methods: `resolve_message()`, `_resolve_pattern()`, `_resolve_expression()`, `_resolve_message_reference()`, `_resolve_term_reference()`, `_resolve_select_expression()`, `_resolve_function_call()`
+
 ## [0.11.1] - 2025-12-12
 
 ### Fixed
@@ -1543,6 +1577,7 @@ if "CURRENCY" in bundle._function_registry:
 
 Initial release.
 
+[0.12.0]: https://github.com/resoltico/ftllexbuffer/releases/tag/v0.12.0
 [0.11.1]: https://github.com/resoltico/ftllexbuffer/releases/tag/v0.11.1
 [0.11.0]: https://github.com/resoltico/ftllexbuffer/releases/tag/v0.11.0
 [0.10.0]: https://github.com/resoltico/ftllexbuffer/releases/tag/v0.10.0

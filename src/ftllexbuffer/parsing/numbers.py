@@ -1,8 +1,8 @@
 """Number parsing functions with locale awareness.
 
-- parse_number() returns tuple[float, list[FluentParseError]]
-- parse_decimal() returns tuple[Decimal, list[FluentParseError]]
-- Removed `strict` parameter - functions NEVER raise, errors returned in list
+- parse_number() returns tuple[float | None, tuple[FluentParseError, ...]]
+- parse_decimal() returns tuple[Decimal | None, tuple[FluentParseError, ...]]
+- Removed `strict` parameter - functions NEVER raise, errors returned in tuple
 - Consistent with format_*() "never raise" philosophy
 
 Thread-safe. Uses Babel for CLDR-compliant parsing.
@@ -24,7 +24,7 @@ from ftllexbuffer.locale_utils import normalize_locale
 def parse_number(
     value: str,
     locale_code: str,
-) -> tuple[float | None, list[FluentParseError]]:
+) -> tuple[float | None, tuple[FluentParseError, ...]]:
     """Parse locale-aware number string to float.
 
 
@@ -35,14 +35,14 @@ def parse_number(
     Returns:
         Tuple of (result, errors):
         - result: Parsed float, or None if parsing failed
-        - errors: List of FluentParseError (empty on success)
+        - errors: Tuple of FluentParseError (empty tuple on success)
 
     Examples:
         >>> result, errors = parse_number("1,234.5", "en_US")
         >>> result
         1234.5
         >>> errors
-        []
+        ()
 
         >>> result, errors = parse_number("1 234,5", "lv_LV")
         >>> result
@@ -73,11 +73,11 @@ def parse_number(
                 parse_type="number",
             )
         )
-        return (None, errors)
+        return (None, tuple(errors))
 
     try:
         parsed = babel_parse_decimal(value, locale=locale)
-        return (float(parsed), errors)
+        return (float(parsed), tuple(errors))
     except (NumberFormatError, InvalidOperation, ValueError, AttributeError, TypeError) as e:
         diagnostic = ErrorTemplate.parse_number_failed(value, locale_code, str(e))
         errors.append(
@@ -88,13 +88,13 @@ def parse_number(
                 parse_type="number",
             )
         )
-        return (None, errors)
+        return (None, tuple(errors))
 
 
 def parse_decimal(
     value: str,
     locale_code: str,
-) -> tuple[Decimal | None, list[FluentParseError]]:
+) -> tuple[Decimal | None, tuple[FluentParseError, ...]]:
     """Parse locale-aware number string to Decimal (financial precision).
 
 
@@ -108,14 +108,14 @@ def parse_decimal(
     Returns:
         Tuple of (result, errors):
         - result: Parsed Decimal, or None if parsing failed
-        - errors: List of FluentParseError (empty on success)
+        - errors: Tuple of FluentParseError (empty tuple on success)
 
     Examples:
         >>> result, errors = parse_decimal("1,234.56", "en_US")
         >>> result
         Decimal('1234.56')
         >>> errors
-        []
+        ()
 
         >>> result, errors = parse_decimal("1 234,56", "lv_LV")
         >>> result
@@ -152,10 +152,10 @@ def parse_decimal(
                 parse_type="decimal",
             )
         )
-        return (None, errors)
+        return (None, tuple(errors))
 
     try:
-        return (babel_parse_decimal(value, locale=locale), errors)
+        return (babel_parse_decimal(value, locale=locale), tuple(errors))
     except (NumberFormatError, InvalidOperation, ValueError, AttributeError, TypeError) as e:
         diagnostic = ErrorTemplate.parse_decimal_failed(value, locale_code, str(e))
         errors.append(
@@ -166,4 +166,4 @@ def parse_decimal(
                 parse_type="decimal",
             )
         )
-        return (None, errors)
+        return (None, tuple(errors))
