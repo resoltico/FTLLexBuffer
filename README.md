@@ -92,9 +92,9 @@ Traditional i18n forces developers to handle grammatical logic:
 ```python
 # Developer must know grammar rules for every language
 if count == 1:
-    msg = "1 item in cart"
+    msg = "1 cup of coffee"
 else:
-    msg = f"{count} items in cart"
+    msg = f"{count} cups of coffee"
 ```
 
 With Fluent, translators handle grammar in `.ftl` files:
@@ -104,20 +104,20 @@ from ftllexbuffer import FluentBundle
 
 bundle = FluentBundle("en_US")
 bundle.add_resource("""
-cart-items = { $count ->
-    [one] { $count } item in cart
-   *[other] { $count } items in cart
+coffee-order = { $count ->
+    [one] { $count } cup of coffee
+   *[other] { $count } cups of coffee
 }
 """)
 
-result, _ = bundle.format_pattern("cart-items", {"count": 1})
-print(result)  # "1 item in cart"
+result, _ = bundle.format_pattern("coffee-order", {"count": 1})
+print(result)  # "1 cup of coffee"
 
-result, _ = bundle.format_pattern("cart-items", {"count": 5})
-print(result)  # "5 items in cart"
+result, _ = bundle.format_pattern("coffee-order", {"count": 5})
+print(result)  # "5 cups of coffee"
 ```
 
-This separation enables correct translations for complex languages (Russian with 4 plural forms, Arabic with 6) without code changes.
+This separation enables correct translations for complex languages (Polish with 4 plural forms, Welsh with 6) without code changes.
 
 ---
 
