@@ -12,7 +12,7 @@ RETRIEVAL_HINTS:
 
 ![FTLLexBuffer Device (MK1), Early Victorian Design](images/FTLLexBuffer.png)
 
-**A Python 3.13+ implementation of the Mozilla Fluent localization system.**
+**Independent Python implementation of the Mozilla Fluent localization system.**
 
 FTLLexBuffer implements [Project Fluent](https://projectfluent.org/) for Python, enabling natural-sounding translations with grammatical logic handled by translators, not developers. It provides bidirectional localization: format messages for display and parse localized input back to Python types.
 
@@ -36,7 +36,7 @@ FTLLexBuffer implements [Project Fluent](https://projectfluent.org/) for Python,
 pip install ftllexbuffer
 ```
 
-**Requirements**: Python 3.13+, Babel >= 2.17.0
+**Requirements**: Python >= 3.13, Babel >= 2.17
 
 ---
 
